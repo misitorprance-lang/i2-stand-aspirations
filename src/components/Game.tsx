@@ -102,6 +102,7 @@ export default function Game() {
   useEffect(() => {
     const keys = new Set<string>();
     const onDown = (e: KeyboardEvent) => {
+      unlockAudio();
       keys.add(e.key.toLowerCase());
       const k = e.key.toLowerCase();
       if (k === "1") inputRef.current.pressed.a1 = true;
