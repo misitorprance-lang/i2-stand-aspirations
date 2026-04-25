@@ -351,19 +351,29 @@ function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff") {
   });
 }
 
-function spawnParticles(w: World, pos: Vec2, color: string, n = 6) {
+function spawnParticles(w: World, pos: Vec2, color: string, n = 6, opts?: { shape?: Particle["shape"]; gravity?: number; speedMin?: number; speedMax?: number; life?: number }) {
+  const sMin = opts?.speedMin ?? 20;
+  const sMax = opts?.speedMax ?? 80;
+  const life = opts?.life ?? 0.4;
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;
-    const sp = rand(20, 80);
+    const sp = rand(sMin, sMax);
     w.particles.push({
       pos: { ...pos },
       vel: { x: Math.cos(a) * sp, y: Math.sin(a) * sp },
       color,
       size: rand(1.5, 3),
       bornAt: w.time,
-      expireAt: w.time + 0.4,
+      expireAt: w.time + life,
+      shape: opts?.shape,
+      gravity: opts?.gravity,
     });
   }
+}
+
+function spawnVfx(w: World, v: Omit<Vfx, "bornAt" | "expireAt"> & { life: number }) {
+  const { life, ...rest } = v;
+  w.vfx.push({ ...rest, bornAt: w.time, expireAt: w.time + life });
 }
 
 function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }) {
