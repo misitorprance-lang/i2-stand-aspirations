@@ -905,11 +905,16 @@ export function update(w: World, input: InputState, dt: number) {
     pa.pos.x += pa.vel.x * dt;
     pa.pos.y += pa.vel.y * dt;
     pa.vel.x *= 0.9; pa.vel.y *= 0.9;
+    if (pa.gravity) pa.vel.y += pa.gravity * dt;
   }
   w.particles = w.particles.filter((p) => w.time < p.expireAt);
 
+  // VFX expire
+  w.vfx = w.vfx.filter((v) => w.time < v.expireAt);
+
   // Craters expire
   w.craters = w.craters.filter((c) => w.time < c.expireAt);
+
 
   // Item spawns
   w.nextArrowAt -= dt;
