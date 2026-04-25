@@ -100,6 +100,7 @@ interface World {
   damageNumbers: DamageNumber[];
   craters: Crater[];
   particles: Particle[];
+  vfx: Vfx[];
   items: ItemPickup[];
   nextArrowAt: number;
   nextDiscAt: number;
