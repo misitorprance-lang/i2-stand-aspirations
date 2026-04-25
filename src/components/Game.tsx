@@ -12,6 +12,7 @@ import {
   type InputState,
 } from "@/game/engine";
 import { STANDS, SHIT_ABILITY } from "@/game/stands";
+import { unlockAudio } from "@/game/sound";
 import type { World } from "@/game/engine";
 
 interface UIData {
