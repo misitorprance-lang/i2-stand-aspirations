@@ -1409,6 +1409,11 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
     const standPos = computeStandPos(w);
     if (standPos.y >= pl.pos.y) drawStand(ctx, w, standPos);
   }
+  if (w.time < w.rageUntil) {
+    ctx.strokeStyle = `rgba(255,61,61,${0.45 + Math.sin(w.time * 16) * 0.18})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(pl.pos.x, pl.pos.y, 18 + Math.sin(w.time * 12) * 2, 0, Math.PI * 2); ctx.stroke();
+  }
 }
 
 function computeStandPos(w: World): Vec2 {
@@ -1440,6 +1445,7 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   if (id === "star_platinum") drawStarPlatinum(ctx, w, pos);
   else if (id === "rhcp") drawRhcp(ctx, w, pos);
   else if (id === "echoes") drawEchoes(ctx, w, pos);
+  else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
 }
 
 function drawStarPlatinum(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
