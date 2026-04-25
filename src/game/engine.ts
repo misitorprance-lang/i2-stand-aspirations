@@ -762,7 +762,35 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
-  // Inputs -> abilities
+  // Entity vs entity soft collision (push apart). Player <-> NPCs and NPC <-> NPC.
+  const all: Entity[] = pl.alive ? [pl, ...w.npcs] : [...w.npcs];
+  for (let i = 0; i < all.length; i++) {
+    const a = all[i];
+    if (!a.alive) continue;
+    for (let j = i + 1; j < all.length; j++) {
+      const b = all[j];
+      if (!b.alive) continue;
+      const dx = b.pos.x - a.pos.x;
+      const dy = b.pos.y - a.pos.y;
+      const minD = a.radius + b.radius;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > 0 && d2 < minD * minD) {
+        const d = Math.sqrt(d2);
+        const overlap = minD - d;
+        const nx = dx / d, ny = dy / d;
+        // Player is heavier than NPCs: push NPC more.
+        const aIsPlayer = a.kind === "player";
+        const bIsPlayer = b.kind === "player";
+        const aShare = aIsPlayer ? 0.25 : bIsPlayer ? 0.75 : 0.5;
+        const bShare = 1 - aShare;
+        a.pos.x -= nx * overlap * aShare;
+        a.pos.y -= ny * overlap * aShare;
+        b.pos.x += nx * overlap * bShare;
+        b.pos.y += ny * overlap * bShare;
+      }
+    }
+  }
+
   if (pl.alive) {
     if (input.pressed.m1) { input.pressed.m1 = false; castAbility(w, "m1", input); }
     if (input.pressed.a1) { input.pressed.a1 = false; castAbility(w, "a1", input); }
