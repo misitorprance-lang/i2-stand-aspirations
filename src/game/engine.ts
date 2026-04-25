@@ -330,7 +330,7 @@ export function createWorld(): World {
     bannerUntil: 0,
     nextId: 1000,
     shake: 0,
-    cam: { x: 0, y: 0 },
+    cam: { x: player.pos.x, y: player.pos.y },
     standPunchUntil: 0,
     standPunchDir: { x: 0, y: 1 },
     standAimUntil: 0,
