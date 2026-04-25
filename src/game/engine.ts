@@ -28,7 +28,7 @@ export const VW = 360;
 export const VH = 640;
 export const MAP_W = 900;
 export const MAP_H = 1400;
-const CAMERA_ZOOM = 1.35;
+export const CAMERA_ZOOM = 1.35;
 
 const PLAYER_SPEED = 110;
 const PLAYER_SPRINT_SPEED = 142;
