@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   VW,
   VH,
+  MAP_W,
+  MAP_H,
+  CAMERA_ZOOM,
   createWorld,
   makeInput,
   render,
@@ -25,6 +28,8 @@ interface UIData {
   cd: { m1: number; a1: number; a2: number; a3: number; a4: number };
   banner: string | null;
   kills: number;
+  rage: number;
+  rageActive: boolean;
 }
 
 export default function Game() {
@@ -44,6 +49,8 @@ export default function Game() {
     cd: { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 },
     banner: null,
     kills: 0,
+    rage: 0,
+    rageActive: false,
   });
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
   const [showHelp, setShowHelp] = useState<boolean>(true);
