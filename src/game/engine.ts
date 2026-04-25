@@ -17,8 +17,10 @@ import type {
   Rect,
   UIState,
   Vec2,
+  Vfx,
   Zone,
 } from "./types";
+import { play, type SfxKey } from "./sound";
 
 // ---------- constants ----------
 export const VW = 360;
