@@ -122,6 +122,10 @@ interface World {
   standAimTarget: Vec2 | null;
   kills: number;
   footstepAcc: number;
+  pointerAim: Vec2 | null;
+  puppet: PuppetState;
+  rage: number;
+  rageUntil: number;
 }
 
 function makeProps(): Prop[] {
