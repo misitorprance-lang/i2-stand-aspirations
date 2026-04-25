@@ -2,9 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   VW,
   VH,
-  MAP_W,
-  MAP_H,
-  CAMERA_ZOOM,
   createWorld,
   makeInput,
   render,
@@ -260,7 +257,7 @@ export default function Game() {
       </div>
 
       {/* Top bar — title + HP + inventory */}
-      <div className="absolute top-0 left-0 right-0 px-3 pt-3 flex flex-col gap-2 pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 px-3 pt-3 flex flex-col gap-2 pointer-events-none z-30">
         <div className="flex items-center justify-between">
           <div className="text-white text-sm font-bold tracking-wider drop-shadow">STAND TEST</div>
           <div className="flex items-center gap-2 pointer-events-auto">
@@ -306,6 +303,14 @@ export default function Game() {
         >
           {stand.name}{ui.standId === "echoes" && ui.shitVariant ? " (S.H.I.T.)" : ""}
         </div>
+        {ui.standId === "ebony_devil" && (
+          <div className="bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-32">
+            <div
+              className="h-full transition-[width]"
+              style={{ width: `${ui.rage}%`, background: ui.rageActive ? "#ff3d3d" : "#d04848" }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Banner */}
