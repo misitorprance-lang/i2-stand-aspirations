@@ -818,6 +818,7 @@ export function update(w: World, input: InputState, dt: number) {
           }
         }
         spawnParticles(w, { x: tx, y: ty }, c.color, 2);
+        play("oraTick");
         c.nextTickAt += c.tickEvery;
       }
     }
