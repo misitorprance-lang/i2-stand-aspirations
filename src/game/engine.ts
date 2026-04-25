@@ -1306,6 +1306,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   for (const e of w.npcs) {
     if (e.alive) drawables.push({ y: e.pos.y, draw: () => drawNpc(ctx, w, e) });
   }
+  if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
