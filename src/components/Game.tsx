@@ -132,6 +132,7 @@ export default function Game() {
   // Joystick handlers (left half of screen)
   const onJoyStart = (e: React.PointerEvent) => {
     e.preventDefault();
+    unlockAudio();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     joyRef.current.active = true;
     joyRef.current.baseX = e.clientX;
