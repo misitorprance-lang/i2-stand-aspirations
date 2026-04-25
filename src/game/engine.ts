@@ -435,6 +435,20 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   }
 }
 
+function damagePuppet(w: World, dmg: number) {
+  if (!w.puppet.active || w.puppet.hp <= 0) return;
+  w.puppet.hp -= dmg;
+  w.rage = Math.min(100, w.rage + dmg * 2.2);
+  spawnDmg(w, w.puppet.pos, dmg, "#d6d8dd");
+  spawnParticles(w, w.puppet.pos, "#8f949c", 7);
+  play("hurt");
+  if (w.puppet.hp <= 0) {
+    w.puppet.active = false;
+    w.puppet.hp = w.puppet.maxHp;
+    spawnVfx(w, { kind: "crater_smoke", pos: { ...w.puppet.pos }, radius: 20, color: "#585d66", life: 0.7 });
+  }
+}
+
 function getAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): Ability {
   const stand = STANDS[w.standId];
   const a = stand.abilities[key];
