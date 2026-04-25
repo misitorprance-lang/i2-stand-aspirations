@@ -851,7 +851,10 @@ export function update(w: World, input: InputState, dt: number) {
         color: pr.detonateColor || "#fff",
         ringColor: pr.detonateColor || "#fff",
       });
-      spawnParticles(w, pr.pos, pr.detonateColor || "#fff", 14);
+      spawnParticles(w, pr.pos, pr.detonateColor || "#fff", 14, { speedMin: 60, speedMax: 180, life: 0.5, gravity: 60 });
+      spawnVfx(w, { kind: "explosion_ring", pos: { ...pr.pos }, radius: r, color: pr.detonateColor || "#fff", life: 0.45 });
+      spawnVfx(w, { kind: "fire_burst", pos: { ...pr.pos }, radius: r * 0.8, color: pr.detonateColor || "#ff8a3a", life: 0.5 });
+      play("bomber");
       w.shake = Math.max(w.shake, 5);
       pr.expireAt = 0; // mark for removal
     }
