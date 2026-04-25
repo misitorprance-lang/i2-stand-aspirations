@@ -832,7 +832,8 @@ export function update(w: World, input: InputState, dt: number) {
     const len = Math.hypot(j.x, j.y);
     if (len > 0.05) {
       const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
-      const speed = PLAYER_SPEED * Math.min(1, len);
+      const baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
+      const speed = baseSpeed * Math.min(1, len);
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
       pl.facing = { x: nx, y: ny };
       w.footstepAcc += dt * Math.min(1, len);
@@ -846,6 +847,19 @@ export function update(w: World, input: InputState, dt: number) {
       pl.hp = pl.maxHp;
       pl.pos = { x: MAP_W / 2, y: MAP_H / 2 };
     }
+  }
+
+  if (input.aim) w.pointerAim = norm(input.aim);
+
+  if (w.puppet.active) {
+    if (w.puppet.hp <= 0) w.puppet.active = false;
+    const desired = w.time < w.puppet.attackUntil
+      ? { x: pl.pos.x + w.puppet.facing.x * 28, y: pl.pos.y + w.puppet.facing.y * 24 }
+      : { x: pl.pos.x - pl.facing.x * 28, y: pl.pos.y - pl.facing.y * 22 + 4 };
+    w.puppet.pos.x += (desired.x - w.puppet.pos.x) * Math.min(1, dt * 9);
+    w.puppet.pos.y += (desired.y - w.puppet.pos.y) * Math.min(1, dt * 9);
+    w.puppet.pos.x = Math.max(10, Math.min(MAP_W - 10, w.puppet.pos.x));
+    w.puppet.pos.y = Math.max(10, Math.min(MAP_H - 10, w.puppet.pos.y));
   }
 
   // Item use buttons
