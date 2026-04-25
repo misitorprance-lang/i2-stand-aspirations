@@ -436,11 +436,44 @@ function getAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): Ability {
   return a;
 }
 
-function aimDir(w: World, input: InputState): Vec2 {
-  if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) {
-    return norm(input.joy);
-  }
+function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, preferEnemy = true): Entity | null {
+  let target: Entity | null = null;
+  let best = range * range;
+  const scan = (enemyOnly: boolean) => {
+    for (const e of w.npcs) {
+      if (!e.alive || (enemyOnly && e.kind !== "enemy")) continue;
+      const d = dist2(e.pos, from);
+      if (d < best) { best = d; target = e; }
+    }
+  };
+  if (preferEnemy) scan(true);
+  if (!target) scan(false);
+  return target;
+}
+
+function aimDir(w: World, input: InputState, ab?: Ability): Vec2 {
+  if (input.aim) return norm(input.aim);
+  if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
+  const target = nearestTarget(w, w.player.pos, ab?.range ? Math.max(ab.range + 70, AIM_ASSIST_RANGE * 0.65) : AIM_ASSIST_RANGE * 0.65);
+  if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
   return w.player.facing;
+}
+
+function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: number, damage: number, knockbackAmount?: number) {
+  const reach = range + radius;
+  let hitAny = false;
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    const dx = e.pos.x - origin.x, dy = e.pos.y - origin.y;
+    const d = Math.hypot(dx, dy);
+    if (d > reach + e.radius) continue;
+    const dot = d <= e.radius + 8 ? 1 : (dx * dir.x + dy * dir.y) / (d || 1);
+    if (dot > 0.15) {
+      damageEntity(w, e, damage, knockbackAmount ? { dir, amount: knockbackAmount } : undefined);
+      hitAny = true;
+    }
+  }
+  return hitAny;
 }
 
 // Map ability identity -> SFX key. Resolved by stand+key (and shit variant).
