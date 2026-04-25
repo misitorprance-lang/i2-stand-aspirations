@@ -26,6 +26,8 @@ export interface Entity {
   respawnAt?: number;
   // attack cd (enemies)
   nextAttackAt?: number;
+  // hostile only retaliates after being damaged
+  provoked?: boolean;
 }
 
 export interface Prop {

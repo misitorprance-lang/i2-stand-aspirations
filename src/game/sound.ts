@@ -85,6 +85,8 @@ export const SFX = {
   pickupDisc:   () => { tone(440, 0.08, "sine", 0.3, 660); tone(330, 0.1, "sine", 0.3, 220); },
   rollStand:    () => { tone(500, 0.06, "square", 0.3, 700); tone(700, 0.06, "square", 0.3, 1000); tone(900, 0.08, "square", 0.3, 1400); },
   hurt:         () => { tone(300, 0.12, "sawtooth", 0.35, 120); noise(0.08, 0.2, 600); },
+  footstep:     () => { noise(0.04, 0.06, 350, "lowpass"); },
+  standSummon:  () => { tone(220, 0.25, "triangle", 0.3, 660); tone(440, 0.2, "sine", 0.2, 880); },
 };
 
 export type SfxKey = keyof typeof SFX;

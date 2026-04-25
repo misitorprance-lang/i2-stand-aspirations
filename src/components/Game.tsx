@@ -12,7 +12,7 @@ import {
   type InputState,
 } from "@/game/engine";
 import { STANDS, SHIT_ABILITY } from "@/game/stands";
-import { unlockAudio } from "@/game/sound";
+import { unlockAudio, isSoundEnabled, setSoundEnabled } from "@/game/sound";
 import type { World } from "@/game/engine";
 
 interface UIData {
@@ -24,6 +24,7 @@ interface UIData {
   maxHp: number;
   cd: { m1: number; a1: number; a2: number; a3: number; a4: number };
   banner: string | null;
+  kills: number;
 }
 
 export default function Game() {
@@ -42,7 +43,10 @@ export default function Game() {
     maxHp: 100,
     cd: { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 },
     banner: null,
+    kills: 0,
   });
+  const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
+  const [showHelp, setShowHelp] = useState<boolean>(true);
 
   // Joystick state
   const joyRef = useRef<{ active: boolean; baseX: number; baseY: number; pointerId: number | null }>({
@@ -91,6 +95,7 @@ export default function Game() {
           maxHp: w.player.maxHp,
           cd: { ...w.cdTimers },
           banner: w.bannerText,
+          kills: w.kills,
         });
       }
     };
@@ -231,8 +236,15 @@ export default function Game() {
               onClick={onUseDisc}
               className="bg-black/60 border border-white/30 rounded px-2 py-1 flex items-center gap-1 text-white text-xs"
             >
-              <span style={{ color: "#c8246c" }}>●</span>
+              <span style={{ color: "#cfd2d8" }}>◎</span>
               <span>DISC {ui.discs}</span>
+            </button>
+            <button
+              onClick={() => { const n = !soundOn; setSoundOn(n); setSoundEnabled(n); }}
+              className="bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-xs"
+              title="Toggle sound"
+            >
+              {soundOn ? "🔊" : "🔇"}
             </button>
           </div>
         </div>
@@ -246,6 +258,8 @@ export default function Game() {
             }}
           />
         </div>
+        {/* Kill counter */}
+        <div className="text-[10px] text-white/80 self-start">Kills: {ui.kills}</div>
         {/* Stand label */}
         <div
           className="text-xs px-2 py-0.5 rounded self-start font-bold"
@@ -265,6 +279,27 @@ export default function Game() {
             {ui.banner}
           </div>
         </div>
+      )}
+
+      {/* Help / controls */}
+      {showHelp && (
+        <div className="absolute inset-x-3 top-24 bg-black/75 border border-white/30 rounded p-3 text-white text-[11px] z-30 pointer-events-auto"
+             onClick={() => setShowHelp(false)}>
+          <div className="font-bold mb-1 text-sm">How to play (tap to close)</div>
+          <div>• Drag the LEFT half to move (or WASD).</div>
+          <div>• Tap M1 / 1-4 to attack (or Space, 1-4).</div>
+          <div>• Pick up <span style={{color:"#caa14a"}}>Arrows</span> to roll a stand.</div>
+          <div>• Pick up <span style={{color:"#cfd2d8"}}>DISCs</span> to remove your current stand.</div>
+          <div>• Hostile NPCs (red) only attack after you provoke them.</div>
+        </div>
+      )}
+      {!showHelp && (
+        <button
+          onClick={() => setShowHelp(true)}
+          className="absolute top-24 right-3 bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-[10px] z-30"
+        >
+          ?
+        </button>
       )}
 
       {/* Joystick area (left half, bottom) */}
