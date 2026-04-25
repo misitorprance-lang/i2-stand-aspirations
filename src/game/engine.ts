@@ -730,24 +730,64 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       });
       break;
     }
-    case "auto_aim": {
-      // Pick nearest HOSTILE within range; fall back to nearest friendly only if no enemy in range.
-      let target: Entity | null = null;
-      let best = ab.range * ab.range;
+    case "puppet_toggle": {
+      w.puppet.active = !w.puppet.active;
+      w.puppet.hp = w.puppet.active ? Math.max(1, w.puppet.hp || w.puppet.maxHp) : w.puppet.hp;
+      w.puppet.pos = { x: p.x - w.player.facing.x * 22, y: p.y - w.player.facing.y * 18 };
+      w.puppet.facing = { ...w.player.facing };
+      w.bannerText = w.puppet.active ? "Puppet summoned" : "Puppet recalled";
+      w.bannerUntil = w.time + 1;
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.puppet.pos }, radius: 28, color: ab.color, life: 0.35 });
+      spawnParticles(w, w.puppet.pos, ab.color, 12, { shape: "spark", life: 0.45 });
+      break;
+    }
+    case "puppet_spear": {
+      if (!w.puppet.active || w.puppet.hp <= 0) { w.bannerText = "Summon puppet first"; w.bannerUntil = w.time + 0.9; break; }
+      const target = nearestTarget(w, w.puppet.pos, ab.range + 80);
+      const spearDir = target ? norm({ x: target.pos.x - w.puppet.pos.x, y: target.pos.y - w.puppet.pos.y }) : dir;
+      w.puppet.facing = spearDir;
+      w.puppet.attackUntil = w.time + 0.35;
+      w.standAimTarget = target ? { ...target.pos } : { x: w.puppet.pos.x + spearDir.x * ab.range, y: w.puppet.pos.y + spearDir.y * ab.range };
+      w.standAimUntil = w.time + 0.45;
+      w.projectiles.push({
+        id: w.nextId++,
+        pos: { ...w.puppet.pos },
+        vel: { x: spearDir.x * ab.speed!, y: spearDir.y * ab.speed! },
+        radius: ab.radius || 7,
+        damage: ab.damage,
+        color: ab.color,
+        ownerKind: "player",
+        pierce: true,
+        hitSet: new Set(),
+        expireAt: w.time + ab.range / ab.speed!,
+      });
+      spawnVfx(w, { kind: "stab_line", pos: { ...w.puppet.pos }, to: { x: w.puppet.pos.x + spearDir.x * 48, y: w.puppet.pos.y + spearDir.y * 48 }, radius: 7, color: ab.color, life: 0.2 });
+      break;
+    }
+    case "puppet_spin": {
+      if (!w.puppet.active || w.puppet.hp <= 0) { w.bannerText = "Summon puppet first"; w.bannerUntil = w.time + 0.9; break; }
       for (const e of w.npcs) {
-        if (!e.alive || e.kind !== "enemy") continue;
-        const d = dist2(e.pos, p);
-        if (d < best) { best = d; target = e; }
+        if (!e.alive) continue;
+        if (dist2(e.pos, w.puppet.pos) < ((ab.radius ?? 58) + e.radius) ** 2) damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - w.puppet.pos.x, y: e.pos.y - w.puppet.pos.y }), amount: 90 });
       }
-      if (!target) {
-        // fallback: any alive npc in range
-        best = ab.range * ab.range;
-        for (const e of w.npcs) {
-          if (!e.alive) continue;
-          const d = dist2(e.pos, p);
-          if (d < best) { best = d; target = e; }
-        }
-      }
+      w.puppet.attackUntil = w.time + 0.55;
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.puppet.pos }, radius: ab.radius!, color: ab.color, life: 0.45 });
+      spawnVfx(w, { kind: "slash_arc", pos: { ...w.puppet.pos }, angle: w.time * 6, radius: ab.radius!, color: ab.color, life: 0.42 });
+      spawnParticles(w, w.puppet.pos, ab.color, 18, { speedMin: 70, speedMax: 150, life: 0.45 });
+      break;
+    }
+    case "rage_mode": {
+      w.rage = 0;
+      w.rageUntil = w.time + (ab.duration ?? 5);
+      w.bannerText = "Rage Mode";
+      w.bannerUntil = w.time + 1.2;
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 72, color: ab.color, life: 0.65 });
+      spawnParticles(w, p, ab.color, 28, { shape: "ember", speedMin: 80, speedMax: 220, life: 0.7 });
+      w.shake = Math.max(w.shake, 6);
+      break;
+    }
+    case "auto_aim": {
+      const target = nearestTarget(w, p, ab.range);
       if (target) {
         w.standAimTarget = { ...target.pos };
         w.standAimUntil = w.time + 0.5;
