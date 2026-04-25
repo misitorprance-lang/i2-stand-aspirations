@@ -927,14 +927,6 @@ export function update(w: World, input: InputState, dt: number) {
   // Craters expire
   w.craters = w.craters.filter((c) => w.time < c.expireAt);
 
-  // VFX (move-specific effects)
-  for (const v of w.vfx) {
-    const total = v.expireAt - v.bornAt;
-    const t = (w.time - v.bornAt) / total; // 0..1
-    const inv = 1 - t;
-    drawVfx(ctx, v, t, inv, w.time);
-  }
-
 
   // Item spawns
   w.nextArrowAt -= dt;
