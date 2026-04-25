@@ -78,6 +78,7 @@ export interface InputState {
   joy: Vec2; // -1..1
   joyActive: boolean;
   aim: Vec2 | null;
+  sprint: boolean;
   pressed: { m1: boolean; a1: boolean; a2: boolean; a3: boolean; a4: boolean };
   useArrow: boolean;
   useDisc: boolean;
@@ -88,6 +89,7 @@ export function makeInput(): InputState {
     joy: { x: 0, y: 0 },
     joyActive: false,
     aim: null,
+    sprint: false,
     pressed: { m1: false, a1: false, a2: false, a3: false, a4: false },
     useArrow: false,
     useDisc: false,
