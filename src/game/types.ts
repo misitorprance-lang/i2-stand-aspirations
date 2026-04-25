@@ -102,6 +102,30 @@ export interface Particle {
   size: number;
   expireAt: number;
   bornAt: number;
+  shape?: "square" | "circle" | "spark" | "ember";
+  gravity?: number;
+}
+
+export type VfxKind =
+  | "slash_arc"      // arcing melee swipe
+  | "shockwave"      // expanding ring
+  | "lightning_bolt" // jagged line between two points
+  | "fire_burst"     // upward flame puff
+  | "ice_burst"      // crystal shards
+  | "stab_line"      // forward streak
+  | "beam"           // straight beam between points
+  | "explosion_ring" // big blast
+  | "crater_smoke";  // smoke after explosion
+
+export interface Vfx {
+  kind: VfxKind;
+  pos: Vec2;
+  to?: Vec2;
+  radius?: number;
+  angle?: number;
+  color: string;
+  bornAt: number;
+  expireAt: number;
 }
 
 export interface ItemPickup {

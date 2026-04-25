@@ -17,8 +17,10 @@ import type {
   Rect,
   UIState,
   Vec2,
+  Vfx,
   Zone,
 } from "./types";
+import { play, type SfxKey } from "./sound";
 
 // ---------- constants ----------
 export const VW = 360;
@@ -98,6 +100,7 @@ interface World {
   damageNumbers: DamageNumber[];
   craters: Crater[];
   particles: Particle[];
+  vfx: Vfx[];
   items: ItemPickup[];
   nextArrowAt: number;
   nextDiscAt: number;
@@ -300,6 +303,7 @@ export function createWorld(): World {
     damageNumbers: [],
     craters: [],
     particles: [],
+    vfx: [],
     items: [],
     nextArrowAt: rand(ARROW_INTERVAL[0], ARROW_INTERVAL[1]),
     nextDiscAt: rand(DISC_INTERVAL[0], DISC_INTERVAL[1]),
@@ -347,19 +351,29 @@ function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff") {
   });
 }
 
-function spawnParticles(w: World, pos: Vec2, color: string, n = 6) {
+function spawnParticles(w: World, pos: Vec2, color: string, n = 6, opts?: { shape?: Particle["shape"]; gravity?: number; speedMin?: number; speedMax?: number; life?: number }) {
+  const sMin = opts?.speedMin ?? 20;
+  const sMax = opts?.speedMax ?? 80;
+  const life = opts?.life ?? 0.4;
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;
-    const sp = rand(20, 80);
+    const sp = rand(sMin, sMax);
     w.particles.push({
       pos: { ...pos },
       vel: { x: Math.cos(a) * sp, y: Math.sin(a) * sp },
       color,
       size: rand(1.5, 3),
       bornAt: w.time,
-      expireAt: w.time + 0.4,
+      expireAt: w.time + life,
+      shape: opts?.shape,
+      gravity: opts?.gravity,
     });
   }
+}
+
+function spawnVfx(w: World, v: Omit<Vfx, "bornAt" | "expireAt"> & { life: number }) {
+  const { life, ...rest } = v;
+  w.vfx.push({ ...rest, bornAt: w.time, expireAt: w.time + life });
 }
 
 function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }) {
@@ -368,6 +382,7 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg);
   spawnParticles(w, e.pos, "#ffd0a8", 4);
+  if (e.kind === "player") play("hurt");
   if (knockback) {
     e.vel.x += knockback.dir.x * knockback.amount;
     e.vel.y += knockback.dir.y * knockback.amount;
@@ -393,6 +408,33 @@ function aimDir(w: World, input: InputState): Vec2 {
   return w.player.facing;
 }
 
+// Map ability identity -> SFX key. Resolved by stand+key (and shit variant).
+function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
+  const sid = w.standId;
+  if (sid === "star_platinum") {
+    if (key === "m1") return "punch";
+    if (key === "a1") return "starFinger";
+    if (key === "a2") return "rangedSmash";
+    if (key === "a3") return "oraTick";
+    return "launch";
+  }
+  if (sid === "rhcp") {
+    if (key === "m1") return "punch";
+    if (key === "a1") return "electricShot";
+    if (key === "a2") return "discharge";
+    if (key === "a3") return "bomber";
+    return "tesla";
+  }
+  if (sid === "echoes") {
+    if (key === "m1") return "punch";
+    if (key === "a1") return "freezeTouch";
+    if (key === "a2") return "explosiveText";
+    if (key === "a3") return "burningText";
+    return w.shitVariant ? "shit" : "threeFreeze";
+  }
+  return "punch";
+}
+
 function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: InputState) {
   const stand = STANDS[w.standId];
   if (stand.id === "none" && key !== "m1") return;
@@ -403,11 +445,18 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
 
   const dir = aimDir(w, input);
   const p = w.player.pos;
+  const sfx = sfxFor(w, key);
+
+  // Generic cast cue (sound) — channel handles its own ticks
+  if (ab.kind !== "channel_cone") play(sfx);
 
   switch (ab.kind) {
     case "melee": {
       const tx = p.x + dir.x * ab.range;
       const ty = p.y + dir.y * ab.range;
+      const angle = Math.atan2(dir.y, dir.x);
+      // slash arc VFX so misses still feel responsive
+      spawnVfx(w, { kind: "slash_arc", pos: { x: p.x, y: p.y }, angle, radius: ab.range + (ab.radius ?? 14), color: ab.color, life: 0.18 });
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
@@ -418,7 +467,6 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "pierce": {
-      // hit all in line
       const steps = 8;
       const hit = new Set<number>();
       for (let s = 1; s <= steps; s++) {
@@ -432,10 +480,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           }
         }
       }
-      // visual
-      for (let s = 0; s < 10; s++) {
-        const t = (ab.range / 10) * s;
-        spawnParticles(w, { x: p.x + dir.x * t, y: p.y + dir.y * t }, ab.color, 1);
+      spawnVfx(w, {
+        kind: "stab_line",
+        pos: { x: p.x, y: p.y },
+        to: { x: p.x + dir.x * ab.range, y: p.y + dir.y * ab.range },
+        radius: (ab.radius ?? 6) * 1.4,
+        color: ab.color,
+        life: 0.22,
+      });
+      for (let s = 0; s < 8; s++) {
+        const t = (ab.range / 8) * s;
+        spawnParticles(w, { x: p.x + dir.x * t, y: p.y + dir.y * t }, ab.color, 1, { life: 0.25 });
       }
       break;
     }
@@ -452,6 +507,8 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         hitSet: new Set(),
         expireAt: w.time + ab.range / ab.speed!,
       });
+      // muzzle flash
+      spawnParticles(w, { x: p.x + dir.x * 10, y: p.y + dir.y * 10 }, ab.color, 6, { speedMin: 40, speedMax: 120, life: 0.2 });
       break;
     }
     case "lobbed": {
@@ -481,17 +538,14 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - p.x, y: e.pos.y - p.y }), amount: 60 });
         }
       }
-      w.zones.push({
-        id: w.nextId++,
-        pos: { ...p },
-        radius: ab.radius!,
-        damagePerTick: 0,
-        tickEvery: 999,
-        nextTickAt: 999,
-        expireAt: w.time + 0.25,
-        color: ab.color,
-        ringColor: ab.color,
-      });
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: ab.radius!, color: ab.color, life: 0.45 });
+      // arcing lightning to nearby targets
+      for (const e of w.npcs) {
+        if (!e.alive) continue;
+        if (dist2(e.pos, p) < (ab.radius! + e.radius) ** 2) {
+          spawnVfx(w, { kind: "lightning_bolt", pos: { ...p }, to: { ...e.pos }, color: ab.color, life: 0.2 });
+        }
+      }
       w.shake = Math.max(w.shake, 4);
       break;
     }
@@ -504,22 +558,13 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage);
         }
       }
-      w.zones.push({
-        id: w.nextId++,
-        pos: { x: tx, y: ty },
-        radius: ab.radius!,
-        damagePerTick: 0,
-        tickEvery: 999,
-        nextTickAt: 999,
-        expireAt: w.time + 0.4,
-        color: ab.color,
-        ringColor: ab.color,
-        crater: ab.crater,
-      });
+      spawnVfx(w, { kind: "explosion_ring", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
+      spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius! * 0.8, color: ab.color, life: 0.55 });
       if (ab.crater) {
         w.craters.push({ pos: { x: tx, y: ty }, radius: ab.radius! * 0.7, bornAt: w.time, expireAt: w.time + 25 });
+        spawnVfx(w, { kind: "crater_smoke", pos: { x: tx, y: ty }, radius: ab.radius! * 0.6, color: "#3a2a22", life: 1.2 });
       }
-      spawnParticles(w, { x: tx, y: ty }, ab.color, 16);
+      spawnParticles(w, { x: tx, y: ty }, ab.color, 18, { speedMin: 60, speedMax: 180, life: 0.6, gravity: 60 });
       w.shake = Math.max(w.shake, 6);
       break;
     }
@@ -538,15 +583,16 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "knockback": {
+      const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
       for (const e of w.npcs) {
         if (!e.alive) continue;
-        const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
           damageEntity(w, e, ab.damage, { dir, amount: ab.knockback || 200 });
         }
       }
-      spawnParticles(w, { x: p.x + dir.x * ab.range, y: p.y + dir.y * ab.range }, ab.color, 10);
-      w.shake = Math.max(w.shake, 4);
+      spawnVfx(w, { kind: "shockwave", pos: { x: tx, y: ty }, radius: ab.radius! * 1.6, color: ab.color, life: 0.35 });
+      spawnParticles(w, { x: tx, y: ty }, ab.color, 12, { speedMin: 80, speedMax: 200, life: 0.4 });
+      w.shake = Math.max(w.shake, 5);
       break;
     }
     case "stun_touch": {
@@ -558,7 +604,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           e.stunUntil = w.time + (ab.stunSeconds || 1);
         }
       }
-      spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
+      spawnVfx(w, { kind: "ice_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.4 });
       break;
     }
     case "dot_zone": {
@@ -574,6 +620,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         color: ab.color,
         ringColor: ab.color,
       });
+      spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: ab.duration! });
       break;
     }
     case "tesla": {
@@ -591,32 +638,36 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "auto_aim": {
-      // pick nearest alive npc within range
+      // Pick nearest HOSTILE within range; fall back to nearest friendly only if no enemy in range.
       let target: Entity | null = null;
       let best = ab.range * ab.range;
       for (const e of w.npcs) {
-        if (!e.alive) continue;
+        if (!e.alive || e.kind !== "enemy") continue;
         const d = dist2(e.pos, p);
         if (d < best) { best = d; target = e; }
       }
+      if (!target) {
+        // fallback: any alive npc in range
+        best = ab.range * ab.range;
+        for (const e of w.npcs) {
+          if (!e.alive) continue;
+          const d = dist2(e.pos, p);
+          if (d < best) { best = d; target = e; }
+        }
+      }
       if (target) {
         damageEntity(w, target, ab.damage);
-        spawnParticles(w, target.pos, ab.color, 18);
-        w.zones.push({
-          id: w.nextId++,
-          pos: { ...target.pos },
-          radius: ab.radius!,
-          damagePerTick: 0,
-          tickEvery: 999,
-          nextTickAt: 999,
-          expireAt: w.time + 0.4,
-          color: ab.color,
-          ringColor: ab.color,
-        });
+        spawnVfx(w, { kind: "beam", pos: { ...p }, to: { ...target.pos }, color: ab.color, life: 0.25 });
+        spawnVfx(w, { kind: "explosion_ring", pos: { ...target.pos }, radius: ab.radius!, color: ab.color, life: 0.4 });
+        spawnParticles(w, target.pos, ab.color, 20, { speedMin: 60, speedMax: 200, life: 0.5 });
         if (ab.crater) {
           w.craters.push({ pos: { ...target.pos }, radius: ab.radius! * 0.6, bornAt: w.time, expireAt: w.time + 30 });
+          spawnVfx(w, { kind: "crater_smoke", pos: { ...target.pos }, radius: ab.radius! * 0.6, color: "#222", life: 1.4 });
         }
         w.shake = Math.max(w.shake, ab.damage > 15 ? 10 : 5);
+      } else {
+        // no target — visual ping so the player knows the cast happened
+        spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 30, color: ab.color, life: 0.3 });
       }
       break;
     }
@@ -711,7 +762,35 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
-  // Inputs -> abilities
+  // Entity vs entity soft collision (push apart). Player <-> NPCs and NPC <-> NPC.
+  const all: Entity[] = pl.alive ? [pl, ...w.npcs] : [...w.npcs];
+  for (let i = 0; i < all.length; i++) {
+    const a = all[i];
+    if (!a.alive) continue;
+    for (let j = i + 1; j < all.length; j++) {
+      const b = all[j];
+      if (!b.alive) continue;
+      const dx = b.pos.x - a.pos.x;
+      const dy = b.pos.y - a.pos.y;
+      const minD = a.radius + b.radius;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > 0 && d2 < minD * minD) {
+        const d = Math.sqrt(d2);
+        const overlap = minD - d;
+        const nx = dx / d, ny = dy / d;
+        // Player is heavier than NPCs: push NPC more.
+        const aIsPlayer = a.kind === "player";
+        const bIsPlayer = b.kind === "player";
+        const aShare = aIsPlayer ? 0.25 : bIsPlayer ? 0.75 : 0.5;
+        const bShare = 1 - aShare;
+        a.pos.x -= nx * overlap * aShare;
+        a.pos.y -= ny * overlap * aShare;
+        b.pos.x += nx * overlap * bShare;
+        b.pos.y += ny * overlap * bShare;
+      }
+    }
+  }
+
   if (pl.alive) {
     if (input.pressed.m1) { input.pressed.m1 = false; castAbility(w, "m1", input); }
     if (input.pressed.a1) { input.pressed.a1 = false; castAbility(w, "a1", input); }
@@ -739,6 +818,7 @@ export function update(w: World, input: InputState, dt: number) {
           }
         }
         spawnParticles(w, { x: tx, y: ty }, c.color, 2);
+        play("oraTick");
         c.nextTickAt += c.tickEvery;
       }
     }
@@ -771,7 +851,10 @@ export function update(w: World, input: InputState, dt: number) {
         color: pr.detonateColor || "#fff",
         ringColor: pr.detonateColor || "#fff",
       });
-      spawnParticles(w, pr.pos, pr.detonateColor || "#fff", 14);
+      spawnParticles(w, pr.pos, pr.detonateColor || "#fff", 14, { speedMin: 60, speedMax: 180, life: 0.5, gravity: 60 });
+      spawnVfx(w, { kind: "explosion_ring", pos: { ...pr.pos }, radius: r, color: pr.detonateColor || "#fff", life: 0.45 });
+      spawnVfx(w, { kind: "fire_burst", pos: { ...pr.pos }, radius: r * 0.8, color: pr.detonateColor || "#ff8a3a", life: 0.5 });
+      play("bomber");
       w.shake = Math.max(w.shake, 5);
       pr.expireAt = 0; // mark for removal
     }
@@ -801,11 +884,23 @@ export function update(w: World, input: InputState, dt: number) {
   for (const z of w.zones) {
     if (z.damagePerTick > 0) {
       while (w.time >= z.nextTickAt && w.time < z.expireAt) {
+        let hitAny = false;
         for (const e of w.npcs) {
           if (!e.alive) continue;
           if (dist2(e.pos, z.pos) < (z.radius + e.radius) ** 2) {
             damageEntity(w, e, z.damagePerTick);
+            hitAny = true;
           }
+        }
+        // arc lightning visual for tesla-style zones
+        if (hitAny) {
+          for (const e of w.npcs) {
+            if (!e.alive) continue;
+            if (dist2(e.pos, z.pos) < (z.radius + e.radius) ** 2) {
+              spawnVfx(w, { kind: "lightning_bolt", pos: { ...z.pos }, to: { ...e.pos }, color: z.color, life: 0.18 });
+            }
+          }
+          play("tesla");
         }
         z.nextTickAt += z.tickEvery;
       }
@@ -822,11 +917,16 @@ export function update(w: World, input: InputState, dt: number) {
     pa.pos.x += pa.vel.x * dt;
     pa.pos.y += pa.vel.y * dt;
     pa.vel.x *= 0.9; pa.vel.y *= 0.9;
+    if (pa.gravity) pa.vel.y += pa.gravity * dt;
   }
   w.particles = w.particles.filter((p) => w.time < p.expireAt);
 
+  // VFX expire
+  w.vfx = w.vfx.filter((v) => w.time < v.expireAt);
+
   // Craters expire
   w.craters = w.craters.filter((c) => w.time < c.expireAt);
+
 
   // Item spawns
   w.nextArrowAt -= dt;
@@ -859,8 +959,8 @@ export function tryPickupItems(w: World): { arrows: number; discs: number } {
   const remain: ItemPickup[] = [];
   for (const it of w.items) {
     if (dist2(it.pos, w.player.pos) < (PICKUP_RADIUS + w.player.radius) ** 2) {
-      if (it.kind === "arrow") a++;
-      else d++;
+      if (it.kind === "arrow") { a++; play("pickupArrow"); }
+      else { d++; play("pickupDisc"); }
     } else remain.push(it);
   }
   w.items = remain;
@@ -871,12 +971,12 @@ export function useArrow(w: World) {
   const { id, shitVariant } = rollStand();
   w.standId = id;
   w.shitVariant = shitVariant;
-  // reset cooldowns
   w.cdTimers = { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 };
   w.channel = null;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
   w.bannerText = "Stand: " + name;
   w.bannerUntil = w.time + 2.5;
+  play("rollStand");
 }
 
 export function useDisc(w: World) {
@@ -886,6 +986,7 @@ export function useDisc(w: World) {
   w.channel = null;
   w.bannerText = "Stand discarded";
   w.bannerUntil = w.time + 1.5;
+  play("pickupDisc");
 }
 
 export function getUIState(w: World): UIState {
@@ -1028,6 +1129,13 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     ctx.beginPath(); ctx.arc(z.pos.x, z.pos.y, z.radius, 0, Math.PI * 2); ctx.stroke();
   }
 
+  // VFX (move-specific effects)
+  for (const v of w.vfx) {
+    const total = v.expireAt - v.bornAt;
+    const t = Math.min(1, Math.max(0, (w.time - v.bornAt) / total));
+    drawVfx(ctx, v, t, w.time);
+  }
+
   // Particles
   for (const pa of w.particles) {
     const f = 1 - (w.time - pa.bornAt) / (pa.expireAt - pa.bornAt);
@@ -1114,3 +1222,159 @@ function hexToRgba(hex: string, a: number) {
 }
 
 export type { World };
+
+// ---------- VFX renderer ----------
+function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number) {
+  const inv = 1 - t;
+  switch (v.kind) {
+    case "slash_arc": {
+      // arcing crescent in the facing direction
+      const cx = v.pos.x, cy = v.pos.y;
+      const ang = v.angle ?? 0;
+      const r = (v.radius ?? 22) * (0.7 + t * 0.4);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+      ctx.strokeStyle = hexToRgba(v.color, inv * 0.95);
+      ctx.lineWidth = 5 * inv + 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -0.9, 0.9);
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.6);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 2, -0.7, 0.7);
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
+    case "shockwave": {
+      const r = (v.radius ?? 30) * (0.4 + t * 1.0);
+      ctx.strokeStyle = hexToRgba(v.color, inv * 0.9);
+      ctx.lineWidth = 3 * inv + 1;
+      ctx.beginPath();
+      ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.5);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(v.pos.x, v.pos.y, r * 0.85, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "lightning_bolt": {
+      if (!v.to) break;
+      const segs = 6;
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let px = v.pos.x, py = v.pos.y;
+      ctx.moveTo(px, py);
+      for (let i = 1; i <= segs; i++) {
+        const f = i / segs;
+        const x = v.pos.x + (v.to.x - v.pos.x) * f + (Math.random() - 0.5) * 8;
+        const y = v.pos.y + (v.to.y - v.pos.y) * f + (Math.random() - 0.5) * 8;
+        ctx.lineTo(x, y);
+        px = x; py = y;
+      }
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.7);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      break;
+    }
+    case "fire_burst": {
+      const r = v.radius ?? 30;
+      // multiple flame puffs
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + time * 2;
+        const dx = Math.cos(a) * r * 0.5 * (0.4 + t * 0.6);
+        const dy = Math.sin(a) * r * 0.5 * (0.4 + t * 0.6) - t * 14;
+        const sz = r * (0.45 - t * 0.3);
+        ctx.fillStyle = hexToRgba(v.color, inv * 0.7);
+        ctx.beginPath();
+        ctx.arc(v.pos.x + dx, v.pos.y + dy, Math.max(2, sz), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = hexToRgba("#ffd24a", inv * 0.5);
+        ctx.beginPath();
+        ctx.arc(v.pos.x + dx, v.pos.y + dy, Math.max(1, sz * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "ice_burst": {
+      const r = (v.radius ?? 16) * (0.6 + t * 0.8);
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      // 6 spokes
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(v.pos.x + Math.cos(a) * r * 0.3, v.pos.y + Math.sin(a) * r * 0.3);
+        ctx.lineTo(v.pos.x + Math.cos(a) * r, v.pos.y + Math.sin(a) * r);
+        ctx.stroke();
+      }
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.7);
+      ctx.beginPath();
+      ctx.arc(v.pos.x, v.pos.y, 3 * inv + 1, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "stab_line": {
+      if (!v.to) break;
+      const w = (v.radius ?? 6) * inv;
+      const dx = v.to.x - v.pos.x, dy = v.to.y - v.pos.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.85);
+      ctx.beginPath();
+      ctx.moveTo(v.pos.x + nx * w, v.pos.y + ny * w);
+      ctx.lineTo(v.to.x + nx * w * 0.3, v.to.y + ny * w * 0.3);
+      ctx.lineTo(v.to.x - nx * w * 0.3, v.to.y - ny * w * 0.3);
+      ctx.lineTo(v.pos.x - nx * w, v.pos.y - ny * w);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.6);
+      ctx.beginPath();
+      ctx.arc(v.to.x, v.to.y, 4 * inv + 1, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "beam": {
+      if (!v.to) break;
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 6 * inv + 1;
+      ctx.beginPath();
+      ctx.moveTo(v.pos.x, v.pos.y);
+      ctx.lineTo(v.to.x, v.to.y);
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.85);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      break;
+    }
+    case "explosion_ring": {
+      const r = (v.radius ?? 30) * (0.3 + t * 1.1);
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.4);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba("#ffd24a", inv * 0.95);
+      ctx.lineWidth = 3 * inv + 1;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "crater_smoke": {
+      const r = (v.radius ?? 30) * (0.6 + t * 0.6);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + time;
+        const dx = Math.cos(a) * r * 0.4;
+        const dy = Math.sin(a) * r * 0.4 - t * 10;
+        ctx.fillStyle = hexToRgba(v.color, inv * 0.5);
+        ctx.beginPath();
+        ctx.arc(v.pos.x + dx, v.pos.y + dy, r * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+  }
+}
+

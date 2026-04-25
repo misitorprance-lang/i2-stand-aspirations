@@ -12,6 +12,7 @@ import {
   type InputState,
 } from "@/game/engine";
 import { STANDS, SHIT_ABILITY } from "@/game/stands";
+import { unlockAudio } from "@/game/sound";
 import type { World } from "@/game/engine";
 
 interface UIData {
@@ -101,6 +102,7 @@ export default function Game() {
   useEffect(() => {
     const keys = new Set<string>();
     const onDown = (e: KeyboardEvent) => {
+      unlockAudio();
       keys.add(e.key.toLowerCase());
       const k = e.key.toLowerCase();
       if (k === "1") inputRef.current.pressed.a1 = true;
@@ -131,6 +133,7 @@ export default function Game() {
   // Joystick handlers (left half of screen)
   const onJoyStart = (e: React.PointerEvent) => {
     e.preventDefault();
+    unlockAudio();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     joyRef.current.active = true;
     joyRef.current.baseX = e.clientX;
@@ -159,6 +162,7 @@ export default function Game() {
   };
 
   const press = (key: "m1" | "a1" | "a2" | "a3" | "a4") => () => {
+    unlockAudio();
     inputRef.current.pressed[key] = true;
   };
 
