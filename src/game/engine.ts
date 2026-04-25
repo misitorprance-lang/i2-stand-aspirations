@@ -77,6 +77,7 @@ function circleRectOverlap(cx: number, cy: number, r: number, rect: Rect) {
 export interface InputState {
   joy: Vec2; // -1..1
   joyActive: boolean;
+  aim: Vec2 | null;
   pressed: { m1: boolean; a1: boolean; a2: boolean; a3: boolean; a4: boolean };
   useArrow: boolean;
   useDisc: boolean;
@@ -86,6 +87,7 @@ export function makeInput(): InputState {
   return {
     joy: { x: 0, y: 0 },
     joyActive: false,
+    aim: null,
     pressed: { m1: false, a1: false, a2: false, a3: false, a4: false },
     useArrow: false,
     useDisc: false,
