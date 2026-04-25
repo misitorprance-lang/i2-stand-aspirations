@@ -544,26 +544,19 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   switch (ab.kind) {
     case "melee": {
       const angle = Math.atan2(dir.y, dir.x);
+      const origin = w.standId === "ebony_devil" && w.puppet.active ? w.puppet.pos : p;
       const reach = ab.range + (ab.radius ?? 14);
       // slash arc VFX so misses still feel responsive
-      spawnVfx(w, { kind: "slash_arc", pos: { x: p.x, y: p.y }, angle, radius: reach, color: ab.color, life: 0.2 });
+      spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.2 });
       // Hit any NPC within an arc in front of the player (cone test).
-      for (const e of w.npcs) {
-        if (!e.alive) continue;
-        const dx = e.pos.x - p.x, dy = e.pos.y - p.y;
-        const d = Math.hypot(dx, dy);
-        if (d > reach + e.radius) continue;
-        // cone of ~140deg facing dir; if very close (touching) ignore facing
-        if (d < e.radius + 6) { damageEntity(w, e, ab.damage); continue; }
-        const dot = (dx * dir.x + dy * dir.y) / (d || 1);
-        if (dot > 0.3) damageEntity(w, e, ab.damage);
-      }
-      const tx = p.x + dir.x * ab.range;
-      const ty = p.y + dir.y * ab.range;
+      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, ab.damage, key === "m1" && w.time < w.rageUntil ? 45 : undefined);
+      const tx = origin.x + dir.x * ab.range;
+      const ty = origin.y + dir.y * ab.range;
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
       // trigger stand-punch animation
       w.standPunchUntil = w.time + 0.25;
       w.standPunchDir = { x: dir.x, y: dir.y };
+      if (w.standId === "ebony_devil") w.puppet.attackUntil = w.time + 0.28;
       break;
     }
     case "pierce": {
