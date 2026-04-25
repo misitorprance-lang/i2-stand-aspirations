@@ -1106,8 +1106,10 @@ export function update(w: World, input: InputState, dt: number) {
   w.shake *= 0.85;
 
   // Camera
-  const camTargetX = Math.max(VW / 2, Math.min(MAP_W - VW / 2, pl.pos.x));
-  const camTargetY = Math.max(VH / 2, Math.min(MAP_H - VH / 2, pl.pos.y));
+  const viewW = VW / CAMERA_ZOOM;
+  const viewH = VH / CAMERA_ZOOM;
+  const camTargetX = Math.max(viewW / 2, Math.min(MAP_W - viewW / 2, pl.pos.x));
+  const camTargetY = Math.max(viewH / 2, Math.min(MAP_H - viewH / 2, pl.pos.y));
   w.cam.x += (camTargetX - w.cam.x) * Math.min(1, dt * 6);
   w.cam.y += (camTargetY - w.cam.y) * Math.min(1, dt * 6);
 }
@@ -1166,21 +1168,29 @@ export function getUIState(w: World): UIState {
 // ---------- render ----------
 export function render(ctx: CanvasRenderingContext2D, w: World) {
   ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, VW, VH);
 
   // Camera with shake
   const sx = (Math.random() - 0.5) * w.shake;
   const sy = (Math.random() - 0.5) * w.shake;
-  const camX = w.cam.x - VW / 2 + sx;
-  const camY = w.cam.y - VH / 2 + sy;
+  const viewW = VW / CAMERA_ZOOM;
+  const viewH = VH / CAMERA_ZOOM;
+  const clampedCamX = Math.max(viewW / 2, Math.min(MAP_W - viewW / 2, w.cam.x));
+  const clampedCamY = Math.max(viewH / 2, Math.min(MAP_H - viewH / 2, w.cam.y));
+  const camX = clampedCamX - viewW / 2 + sx;
+  const camY = clampedCamY - viewH / 2 + sy;
   ctx.save();
+  ctx.scale(CAMERA_ZOOM, CAMERA_ZOOM);
   ctx.translate(-Math.round(camX), -Math.round(camY));
 
   // Grass background — tiled checker
   const tile = 32;
   const x0 = Math.floor(camX / tile) * tile;
   const y0 = Math.floor(camY / tile) * tile;
-  for (let y = y0; y < camY + VH + tile; y += tile) {
-    for (let x = x0; x < camX + VW + tile; x += tile) {
+  for (let y = y0; y < camY + viewH + tile; y += tile) {
+    for (let x = x0; x < camX + viewW + tile; x += tile) {
       const dark = ((x / tile + y / tile) & 1) === 0;
       ctx.fillStyle = dark ? "#3e8a3a" : "#4aa044";
       ctx.fillRect(x, y, tile, tile);
