@@ -558,7 +558,10 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       // trigger stand-punch animation
       w.standPunchUntil = w.time + 0.25;
       w.standPunchDir = { x: dir.x, y: dir.y };
-      if (w.standId === "ebony_devil") w.puppet.attackUntil = w.time + 0.28;
+      if (w.standId === "ebony_devil") {
+        w.puppet.facing = { x: dir.x, y: dir.y };
+        w.puppet.attackUntil = w.time + 0.28;
+      }
       break;
     }
     case "pierce": {
