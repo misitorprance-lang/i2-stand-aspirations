@@ -518,11 +518,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   const stand = STANDS[w.standId];
   if (stand.id === "none" && key !== "m1") return;
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && ab.kind !== "stun_touch") return;
+  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode"].includes(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
+  if (ab.kind === "rage_mode" && w.rage < 100) {
+    w.bannerText = "Rage not ready";
+    w.bannerUntil = w.time + 0.8;
+    spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 22, color: ab.color, life: 0.22 });
+    return;
+  }
   w.cdTimers[key] = ab.cooldown;
 
-  const dir = aimDir(w, input);
+  const dir = aimDir(w, input, ab);
   const p = w.player.pos;
   const sfx = sfxFor(w, key);
 
