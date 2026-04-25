@@ -411,6 +411,7 @@ function spawnVfx(w: World, v: Omit<Vfx, "bornAt" | "expireAt"> & { life: number
 
 function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }) {
   if (!e.alive) return;
+  if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil) dmg *= 1.55;
   e.hp -= dmg;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg);
