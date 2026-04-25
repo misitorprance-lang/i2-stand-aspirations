@@ -67,6 +67,15 @@ export interface Zone {
   craterPlaced?: boolean;
 }
 
+export interface PuppetState {
+  active: boolean;
+  pos: Vec2;
+  hp: number;
+  maxHp: number;
+  facing: Vec2;
+  attackUntil: number;
+}
+
 export interface ChannelState {
   abilityKey: "m1" | "a1" | "a2" | "a3" | "a4";
   dir: Vec2;

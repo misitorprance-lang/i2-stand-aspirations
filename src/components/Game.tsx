@@ -25,6 +25,8 @@ interface UIData {
   cd: { m1: number; a1: number; a2: number; a3: number; a4: number };
   banner: string | null;
   kills: number;
+  rage: number;
+  rageActive: boolean;
 }
 
 export default function Game() {
@@ -44,6 +46,8 @@ export default function Game() {
     cd: { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 },
     banner: null,
     kills: 0,
+    rage: 0,
+    rageActive: false,
   });
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
   const [showHelp, setShowHelp] = useState<boolean>(true);
@@ -52,6 +56,7 @@ export default function Game() {
   const joyRef = useRef<{ active: boolean; baseX: number; baseY: number; pointerId: number | null }>({
     active: false, baseX: 0, baseY: 0, pointerId: null,
   });
+  const aimRef = useRef<{ active: boolean; pointerId: number | null }>({ active: false, pointerId: null });
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -96,6 +101,8 @@ export default function Game() {
           cd: { ...w.cdTimers },
           banner: w.bannerText,
           kills: w.kills,
+          rage: Math.round(w.rage),
+          rageActive: w.time < w.rageUntil,
         });
       }
     };
@@ -115,9 +122,10 @@ export default function Game() {
       if (k === "3") inputRef.current.pressed.a3 = true;
       if (k === "4") inputRef.current.pressed.a4 = true;
       if (k === " " || k === "f") inputRef.current.pressed.m1 = true;
+      inputRef.current.sprint = keys.has("shift");
       updateKeyJoy();
     };
-    const onUp = (e: KeyboardEvent) => { keys.delete(e.key.toLowerCase()); updateKeyJoy(); };
+    const onUp = (e: KeyboardEvent) => { keys.delete(e.key.toLowerCase()); inputRef.current.sprint = keys.has("shift"); updateKeyJoy(); };
     function updateKeyJoy() {
       let x = 0, y = 0;
       if (keys.has("arrowleft") || keys.has("a")) x -= 1;
@@ -164,6 +172,34 @@ export default function Game() {
     inputRef.current.joyActive = false;
     inputRef.current.joy.x = 0;
     inputRef.current.joy.y = 0;
+  };
+
+  const setAimFromPointer = (e: React.PointerEvent) => {
+    const canvas = canvasRef.current;
+    const w = worldRef.current;
+    if (!canvas || !w) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = ((e.clientX - rect.left) / rect.width) * VW;
+    const sy = ((e.clientY - rect.top) / rect.height) * VH;
+    const dx = sx - VW / 2;
+    const dy = sy - VH / 2;
+    const m = Math.hypot(dx, dy);
+    if (m > 8) inputRef.current.aim = { x: dx / m, y: dy / m };
+  };
+  const onAimStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    unlockAudio();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    aimRef.current = { active: true, pointerId: e.pointerId };
+    setAimFromPointer(e);
+  };
+  const onAimMove = (e: React.PointerEvent) => {
+    if (!aimRef.current.active || aimRef.current.pointerId !== e.pointerId) return;
+    setAimFromPointer(e);
+  };
+  const onAimEnd = (e: React.PointerEvent) => {
+    if (aimRef.current.pointerId !== e.pointerId) return;
+    aimRef.current = { active: false, pointerId: null };
   };
 
   const press = (key: "m1" | "a1" | "a2" | "a3" | "a4") => () => {
@@ -221,7 +257,7 @@ export default function Game() {
       </div>
 
       {/* Top bar — title + HP + inventory */}
-      <div className="absolute top-0 left-0 right-0 px-3 pt-3 flex flex-col gap-2 pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 px-3 pt-3 flex flex-col gap-2 pointer-events-none z-30">
         <div className="flex items-center justify-between">
           <div className="text-white text-sm font-bold tracking-wider drop-shadow">STAND TEST</div>
           <div className="flex items-center gap-2 pointer-events-auto">
@@ -267,6 +303,14 @@ export default function Game() {
         >
           {stand.name}{ui.standId === "echoes" && ui.shitVariant ? " (S.H.I.T.)" : ""}
         </div>
+        {ui.standId === "ebony_devil" && (
+          <div className="bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-32">
+            <div
+              className="h-full transition-[width]"
+              style={{ width: `${ui.rage}%`, background: ui.rageActive ? "#ff3d3d" : "#d04848" }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Banner */}
@@ -335,15 +379,25 @@ export default function Game() {
         )}
       </div>
 
+      {/* Aim area: drag the right half to aim; buttons use this direction, otherwise auto-aim picks a nearby target. */}
+      <div
+        className="absolute right-0 top-0 w-1/2 h-full z-10"
+        style={{ touchAction: "none" }}
+        onPointerDown={onAimStart}
+        onPointerMove={onAimMove}
+        onPointerUp={onAimEnd}
+        onPointerCancel={onAimEnd}
+      />
+
       {/* Ability buttons (right side) */}
-      <div className="absolute right-2 bottom-3 flex flex-col items-end gap-2 pointer-events-none">
+      <div className="absolute right-2 bottom-3 flex flex-col items-end gap-2 pointer-events-none z-20">
         <div className="flex gap-2">
-          <AbilityBtn label="1" name={abilities.a1.name} damage={abilities.a1.damage} color={abilities.a1.color} cdFrac={cdFrac("a1")} disabled={ui.standId === "none" || abilities.a1.damage === 0} onPress={press("a1")} />
-          <AbilityBtn label="2" name={abilities.a2.name} damage={abilities.a2.damage} color={abilities.a2.color} cdFrac={cdFrac("a2")} disabled={ui.standId === "none" || abilities.a2.damage === 0} onPress={press("a2")} />
+          <AbilityBtn label="1" name={abilities.a1.name} damage={abilities.a1.damage} color={abilities.a1.color} cdFrac={cdFrac("a1")} disabled={ui.standId === "none" || abilities.a1.name === "-"} onPress={press("a1")} />
+          <AbilityBtn label="2" name={abilities.a2.name} damage={abilities.a2.damage} color={abilities.a2.color} cdFrac={cdFrac("a2")} disabled={ui.standId === "none" || abilities.a2.name === "-"} onPress={press("a2")} />
         </div>
         <div className="flex gap-2">
-          <AbilityBtn label="3" name={abilities.a3.name} damage={abilities.a3.damage} color={abilities.a3.color} cdFrac={cdFrac("a3")} disabled={ui.standId === "none" || abilities.a3.damage === 0} onPress={press("a3")} />
-          <AbilityBtn label="4" name={abilities.a4.name} damage={abilities.a4.damage} color={abilities.a4.color} cdFrac={cdFrac("a4")} disabled={ui.standId === "none" || abilities.a4.damage === 0} onPress={press("a4")} />
+          <AbilityBtn label="3" name={abilities.a3.name} damage={abilities.a3.damage} color={abilities.a3.color} cdFrac={cdFrac("a3")} disabled={ui.standId === "none" || abilities.a3.name === "-"} onPress={press("a3")} />
+          <AbilityBtn label="4" name={abilities.a4.name} damage={abilities.a4.damage} color={abilities.a4.color} cdFrac={cdFrac("a4")} disabled={ui.standId === "none" || abilities.a4.name === "-" || (ui.standId === "ebony_devil" && ui.rage < 100 && !ui.rageActive)} onPress={press("a4")} />
         </div>
         <AbilityBtn label="M1" name={abilities.m1.name} damage={abilities.m1.damage} color={abilities.m1.color} cdFrac={cdFrac("m1")} big onPress={press("m1")} />
       </div>
@@ -368,7 +422,7 @@ function AbilityBtn({
     <button
       onPointerDown={(e) => { e.preventDefault(); if (!disabled) onPress(); }}
       disabled={disabled}
-      className="relative rounded-full flex flex-col items-center justify-center font-bold text-white"
+      className="relative rounded-full flex flex-col items-center justify-center font-bold text-white pointer-events-auto"
       style={{
         width: size, height: size,
         background: disabled ? "rgba(60,60,60,0.5)" : `radial-gradient(circle, ${color}66, rgba(0,0,0,0.7))`,

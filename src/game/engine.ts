@@ -12,6 +12,7 @@ import type {
   Entity,
   ItemPickup,
   Particle,
+  PuppetState,
   Projectile,
   Prop,
   Rect,
@@ -27,8 +28,10 @@ export const VW = 360;
 export const VH = 640;
 export const MAP_W = 900;
 export const MAP_H = 1400;
+export const CAMERA_ZOOM = 1.35;
 
 const PLAYER_SPEED = 110;
+const PLAYER_SPRINT_SPEED = 142;
 const NPC_SPEED = 55;
 const ENEMY_SPEED = 70;
 const ENEMY_AGGRO = 140;
@@ -45,6 +48,7 @@ const ARROW_INTERVAL = [10, 18] as const;
 const DISC_INTERVAL = [22, 38] as const;
 const MAX_ITEMS_ON_GROUND = 4;
 const PICKUP_RADIUS = 18;
+const AIM_ASSIST_RANGE = 260;
 
 // ---------- helpers ----------
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -73,6 +77,8 @@ function circleRectOverlap(cx: number, cy: number, r: number, rect: Rect) {
 export interface InputState {
   joy: Vec2; // -1..1
   joyActive: boolean;
+  aim: Vec2 | null;
+  sprint: boolean;
   pressed: { m1: boolean; a1: boolean; a2: boolean; a3: boolean; a4: boolean };
   useArrow: boolean;
   useDisc: boolean;
@@ -82,6 +88,8 @@ export function makeInput(): InputState {
   return {
     joy: { x: 0, y: 0 },
     joyActive: false,
+    aim: null,
+    sprint: false,
     pressed: { m1: false, a1: false, a2: false, a3: false, a4: false },
     useArrow: false,
     useDisc: false,
@@ -118,6 +126,10 @@ interface World {
   standAimTarget: Vec2 | null;
   kills: number;
   footstepAcc: number;
+  pointerAim: Vec2 | null;
+  puppet: PuppetState;
+  rage: number;
+  rageUntil: number;
 }
 
 function makeProps(): Prop[] {
@@ -320,13 +332,24 @@ export function createWorld(): World {
     bannerUntil: 0,
     nextId: 1000,
     shake: 0,
-    cam: { x: 0, y: 0 },
+    cam: { x: player.pos.x, y: player.pos.y },
     standPunchUntil: 0,
     standPunchDir: { x: 0, y: 1 },
     standAimUntil: 0,
     standAimTarget: null,
     kills: 0,
     footstepAcc: 0,
+    pointerAim: null,
+    puppet: {
+      active: false,
+      pos: { x: player.pos.x - 14, y: player.pos.y + 10 },
+      hp: PLAYER_MAX_HP / 2,
+      maxHp: PLAYER_MAX_HP / 2,
+      facing: { x: 0, y: 1 },
+      attackUntil: 0,
+    },
+    rage: 0,
+    rageUntil: 0,
   };
 }
 
@@ -390,12 +413,16 @@ function spawnVfx(w: World, v: Omit<Vfx, "bornAt" | "expireAt"> & { life: number
 
 function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }) {
   if (!e.alive) return;
+  if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil) dmg *= 1.55;
   e.hp -= dmg;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg);
   spawnParticles(w, e.pos, "#ffd0a8", 4);
   if (e.kind === "enemy") e.provoked = true;
-  if (e.kind === "player") play("hurt");
+  if (e.kind === "player") {
+    w.rage = Math.min(100, w.rage + dmg * 3.5);
+    play("hurt");
+  }
   if (knockback) {
     e.vel.x += knockback.dir.x * knockback.amount;
     e.vel.y += knockback.dir.y * knockback.amount;
@@ -408,6 +435,20 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   }
 }
 
+function damagePuppet(w: World, dmg: number) {
+  if (!w.puppet.active || w.puppet.hp <= 0) return;
+  w.puppet.hp -= dmg;
+  w.rage = Math.min(100, w.rage + dmg * 2.2);
+  spawnDmg(w, w.puppet.pos, dmg, "#d6d8dd");
+  spawnParticles(w, w.puppet.pos, "#8f949c", 7);
+  play("hurt");
+  if (w.puppet.hp <= 0) {
+    w.puppet.active = false;
+    w.puppet.hp = w.puppet.maxHp;
+    spawnVfx(w, { kind: "crater_smoke", pos: { ...w.puppet.pos }, radius: 20, color: "#585d66", life: 0.7 });
+  }
+}
+
 function getAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): Ability {
   const stand = STANDS[w.standId];
   const a = stand.abilities[key];
@@ -415,11 +456,44 @@ function getAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): Ability {
   return a;
 }
 
-function aimDir(w: World, input: InputState): Vec2 {
-  if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) {
-    return norm(input.joy);
-  }
+function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, preferEnemy = true): Entity | null {
+  let target: Entity | null = null;
+  let best = range * range;
+  const scan = (enemyOnly: boolean) => {
+    for (const e of w.npcs) {
+      if (!e.alive || (enemyOnly && e.kind !== "enemy")) continue;
+      const d = dist2(e.pos, from);
+      if (d < best) { best = d; target = e; }
+    }
+  };
+  if (preferEnemy) scan(true);
+  if (!target) scan(false);
+  return target;
+}
+
+function aimDir(w: World, input: InputState, ab?: Ability): Vec2 {
+  if (input.aim) return norm(input.aim);
+  if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
+  const target = nearestTarget(w, w.player.pos, ab?.range ? Math.max(ab.range + 70, AIM_ASSIST_RANGE * 0.65) : AIM_ASSIST_RANGE * 0.65);
+  if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
   return w.player.facing;
+}
+
+function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: number, damage: number, knockbackAmount?: number) {
+  const reach = range + radius;
+  let hitAny = false;
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    const dx = e.pos.x - origin.x, dy = e.pos.y - origin.y;
+    const d = Math.hypot(dx, dy);
+    if (d > reach + e.radius) continue;
+    const dot = d <= e.radius + 8 ? 1 : (dx * dir.x + dy * dir.y) / (d || 1);
+    if (dot > 0.15) {
+      damageEntity(w, e, damage, knockbackAmount ? { dir, amount: knockbackAmount } : undefined);
+      hitAny = true;
+    }
+  }
+  return hitAny;
 }
 
 // Map ability identity -> SFX key. Resolved by stand+key (and shit variant).
@@ -446,6 +520,13 @@ function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
     if (key === "a3") return "burningText";
     return w.shitVariant ? "shit" : "threeFreeze";
   }
+  if (sid === "ebony_devil") {
+    if (key === "m1") return "punch";
+    if (key === "a1") return "puppet";
+    if (key === "a2") return "spear";
+    if (key === "a3") return "spin";
+    return "rage";
+  }
   return "punch";
 }
 
@@ -453,11 +534,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   const stand = STANDS[w.standId];
   if (stand.id === "none" && key !== "m1") return;
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && ab.kind !== "stun_touch") return;
+  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode"].includes(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
+  if (ab.kind === "rage_mode" && w.rage < 100) {
+    w.bannerText = "Rage not ready";
+    w.bannerUntil = w.time + 0.8;
+    spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 22, color: ab.color, life: 0.22 });
+    return;
+  }
   w.cdTimers[key] = ab.cooldown;
 
-  const dir = aimDir(w, input);
+  const dir = aimDir(w, input, ab);
   const p = w.player.pos;
   const sfx = sfxFor(w, key);
 
@@ -473,26 +560,22 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   switch (ab.kind) {
     case "melee": {
       const angle = Math.atan2(dir.y, dir.x);
+      const origin = w.standId === "ebony_devil" && w.puppet.active ? w.puppet.pos : p;
       const reach = ab.range + (ab.radius ?? 14);
       // slash arc VFX so misses still feel responsive
-      spawnVfx(w, { kind: "slash_arc", pos: { x: p.x, y: p.y }, angle, radius: reach, color: ab.color, life: 0.2 });
+      spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.2 });
       // Hit any NPC within an arc in front of the player (cone test).
-      for (const e of w.npcs) {
-        if (!e.alive) continue;
-        const dx = e.pos.x - p.x, dy = e.pos.y - p.y;
-        const d = Math.hypot(dx, dy);
-        if (d > reach + e.radius) continue;
-        // cone of ~140deg facing dir; if very close (touching) ignore facing
-        if (d < e.radius + 6) { damageEntity(w, e, ab.damage); continue; }
-        const dot = (dx * dir.x + dy * dir.y) / (d || 1);
-        if (dot > 0.3) damageEntity(w, e, ab.damage);
-      }
-      const tx = p.x + dir.x * ab.range;
-      const ty = p.y + dir.y * ab.range;
+      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, ab.damage, key === "m1" && w.time < w.rageUntil ? 45 : undefined);
+      const tx = origin.x + dir.x * ab.range;
+      const ty = origin.y + dir.y * ab.range;
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
       // trigger stand-punch animation
       w.standPunchUntil = w.time + 0.25;
       w.standPunchDir = { x: dir.x, y: dir.y };
+      if (w.standId === "ebony_devil") {
+        w.puppet.facing = { x: dir.x, y: dir.y };
+        w.puppet.attackUntil = w.time + 0.28;
+      }
       break;
     }
     case "pierce": {
@@ -666,24 +749,64 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       });
       break;
     }
-    case "auto_aim": {
-      // Pick nearest HOSTILE within range; fall back to nearest friendly only if no enemy in range.
-      let target: Entity | null = null;
-      let best = ab.range * ab.range;
+    case "puppet_toggle": {
+      w.puppet.active = !w.puppet.active;
+      w.puppet.hp = w.puppet.active ? Math.max(1, w.puppet.hp || w.puppet.maxHp) : w.puppet.hp;
+      w.puppet.pos = { x: p.x - w.player.facing.x * 22, y: p.y - w.player.facing.y * 18 };
+      w.puppet.facing = { ...w.player.facing };
+      w.bannerText = w.puppet.active ? "Puppet summoned" : "Puppet recalled";
+      w.bannerUntil = w.time + 1;
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.puppet.pos }, radius: 28, color: ab.color, life: 0.35 });
+      spawnParticles(w, w.puppet.pos, ab.color, 12, { shape: "spark", life: 0.45 });
+      break;
+    }
+    case "puppet_spear": {
+      if (!w.puppet.active || w.puppet.hp <= 0) { w.bannerText = "Summon puppet first"; w.bannerUntil = w.time + 0.9; break; }
+      const target = nearestTarget(w, w.puppet.pos, ab.range + 80);
+      const spearDir = target ? norm({ x: target.pos.x - w.puppet.pos.x, y: target.pos.y - w.puppet.pos.y }) : dir;
+      w.puppet.facing = spearDir;
+      w.puppet.attackUntil = w.time + 0.35;
+      w.standAimTarget = target ? { ...target.pos } : { x: w.puppet.pos.x + spearDir.x * ab.range, y: w.puppet.pos.y + spearDir.y * ab.range };
+      w.standAimUntil = w.time + 0.45;
+      w.projectiles.push({
+        id: w.nextId++,
+        pos: { ...w.puppet.pos },
+        vel: { x: spearDir.x * ab.speed!, y: spearDir.y * ab.speed! },
+        radius: ab.radius || 7,
+        damage: ab.damage,
+        color: ab.color,
+        ownerKind: "player",
+        pierce: true,
+        hitSet: new Set(),
+        expireAt: w.time + ab.range / ab.speed!,
+      });
+      spawnVfx(w, { kind: "stab_line", pos: { ...w.puppet.pos }, to: { x: w.puppet.pos.x + spearDir.x * 48, y: w.puppet.pos.y + spearDir.y * 48 }, radius: 7, color: ab.color, life: 0.2 });
+      break;
+    }
+    case "puppet_spin": {
+      if (!w.puppet.active || w.puppet.hp <= 0) { w.bannerText = "Summon puppet first"; w.bannerUntil = w.time + 0.9; break; }
       for (const e of w.npcs) {
-        if (!e.alive || e.kind !== "enemy") continue;
-        const d = dist2(e.pos, p);
-        if (d < best) { best = d; target = e; }
+        if (!e.alive) continue;
+        if (dist2(e.pos, w.puppet.pos) < ((ab.radius ?? 58) + e.radius) ** 2) damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - w.puppet.pos.x, y: e.pos.y - w.puppet.pos.y }), amount: 90 });
       }
-      if (!target) {
-        // fallback: any alive npc in range
-        best = ab.range * ab.range;
-        for (const e of w.npcs) {
-          if (!e.alive) continue;
-          const d = dist2(e.pos, p);
-          if (d < best) { best = d; target = e; }
-        }
-      }
+      w.puppet.attackUntil = w.time + 0.55;
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.puppet.pos }, radius: ab.radius!, color: ab.color, life: 0.45 });
+      spawnVfx(w, { kind: "slash_arc", pos: { ...w.puppet.pos }, angle: w.time * 6, radius: ab.radius!, color: ab.color, life: 0.42 });
+      spawnParticles(w, w.puppet.pos, ab.color, 18, { speedMin: 70, speedMax: 150, life: 0.45 });
+      break;
+    }
+    case "rage_mode": {
+      w.rage = 0;
+      w.rageUntil = w.time + (ab.duration ?? 5);
+      w.bannerText = "Rage Mode";
+      w.bannerUntil = w.time + 1.2;
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 72, color: ab.color, life: 0.65 });
+      spawnParticles(w, p, ab.color, 28, { shape: "ember", speedMin: 80, speedMax: 220, life: 0.7 });
+      w.shake = Math.max(w.shake, 6);
+      break;
+    }
+    case "auto_aim": {
+      const target = nearestTarget(w, p, ab.range);
       if (target) {
         w.standAimTarget = { ...target.pos };
         w.standAimUntil = w.time + 0.5;
@@ -726,7 +849,8 @@ export function update(w: World, input: InputState, dt: number) {
     const len = Math.hypot(j.x, j.y);
     if (len > 0.05) {
       const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
-      const speed = PLAYER_SPEED * Math.min(1, len);
+      const baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
+      const speed = baseSpeed * Math.min(1, len);
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
       pl.facing = { x: nx, y: ny };
       w.footstepAcc += dt * Math.min(1, len);
@@ -740,6 +864,19 @@ export function update(w: World, input: InputState, dt: number) {
       pl.hp = pl.maxHp;
       pl.pos = { x: MAP_W / 2, y: MAP_H / 2 };
     }
+  }
+
+  if (input.aim) w.pointerAim = norm(input.aim);
+
+  if (w.puppet.active) {
+    if (w.puppet.hp <= 0) w.puppet.active = false;
+    const desired = w.time < w.puppet.attackUntil
+      ? { x: pl.pos.x + w.puppet.facing.x * 28, y: pl.pos.y + w.puppet.facing.y * 24 }
+      : { x: pl.pos.x - pl.facing.x * 28, y: pl.pos.y - pl.facing.y * 22 + 4 };
+    w.puppet.pos.x += (desired.x - w.puppet.pos.x) * Math.min(1, dt * 9);
+    w.puppet.pos.y += (desired.y - w.puppet.pos.y) * Math.min(1, dt * 9);
+    w.puppet.pos.x = Math.max(10, Math.min(MAP_W - 10, w.puppet.pos.x));
+    w.puppet.pos.y = Math.max(10, Math.min(MAP_H - 10, w.puppet.pos.y));
   }
 
   // Item use buttons
@@ -775,12 +912,15 @@ export function update(w: World, input: InputState, dt: number) {
     tryMove(e, e.vel.x * dt, e.vel.y * dt, w.props);
 
     if (e.kind === "enemy" && e.provoked && pl.alive && dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO) {
-      const dir = norm({ x: pl.pos.x - e.pos.x, y: pl.pos.y - e.pos.y });
+      const puppetCloser = w.puppet.active && dist2(e.pos, w.puppet.pos) < dist2(e.pos, pl.pos);
+      const targetPos = puppetCloser ? w.puppet.pos : pl.pos;
+      const dir = norm({ x: targetPos.x - e.pos.x, y: targetPos.y - e.pos.y });
       tryMove(e, dir.x * ENEMY_SPEED * dt, dir.y * ENEMY_SPEED * dt, w.props);
       e.facing = dir;
-      if (dist(e.pos, pl.pos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
+      if (dist(e.pos, targetPos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
         e.nextAttackAt = w.time + ENEMY_ATTACK_CD;
-        damageEntity(w, pl, ENEMY_ATTACK_DMG, { dir, amount: 40 });
+        if (puppetCloser) damagePuppet(w, ENEMY_ATTACK_DMG);
+        else damageEntity(w, pl, ENEMY_ATTACK_DMG, { dir, amount: 40 });
       }
     } else {
       // wander
@@ -983,8 +1123,10 @@ export function update(w: World, input: InputState, dt: number) {
   w.shake *= 0.85;
 
   // Camera
-  const camTargetX = Math.max(VW / 2, Math.min(MAP_W - VW / 2, pl.pos.x));
-  const camTargetY = Math.max(VH / 2, Math.min(MAP_H - VH / 2, pl.pos.y));
+  const viewW = VW / CAMERA_ZOOM;
+  const viewH = VH / CAMERA_ZOOM;
+  const camTargetX = Math.max(viewW / 2, Math.min(MAP_W - viewW / 2, pl.pos.x));
+  const camTargetY = Math.max(viewH / 2, Math.min(MAP_H - viewH / 2, pl.pos.y));
   w.cam.x += (camTargetX - w.cam.x) * Math.min(1, dt * 6);
   w.cam.y += (camTargetY - w.cam.y) * Math.min(1, dt * 6);
 }
@@ -1043,21 +1185,29 @@ export function getUIState(w: World): UIState {
 // ---------- render ----------
 export function render(ctx: CanvasRenderingContext2D, w: World) {
   ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, VW, VH);
 
   // Camera with shake
   const sx = (Math.random() - 0.5) * w.shake;
   const sy = (Math.random() - 0.5) * w.shake;
-  const camX = w.cam.x - VW / 2 + sx;
-  const camY = w.cam.y - VH / 2 + sy;
+  const viewW = VW / CAMERA_ZOOM;
+  const viewH = VH / CAMERA_ZOOM;
+  const clampedCamX = Math.max(viewW / 2, Math.min(MAP_W - viewW / 2, w.cam.x));
+  const clampedCamY = Math.max(viewH / 2, Math.min(MAP_H - viewH / 2, w.cam.y));
+  const camX = clampedCamX - viewW / 2 + sx;
+  const camY = clampedCamY - viewH / 2 + sy;
   ctx.save();
+  ctx.scale(CAMERA_ZOOM, CAMERA_ZOOM);
   ctx.translate(-Math.round(camX), -Math.round(camY));
 
   // Grass background — tiled checker
   const tile = 32;
   const x0 = Math.floor(camX / tile) * tile;
   const y0 = Math.floor(camY / tile) * tile;
-  for (let y = y0; y < camY + VH + tile; y += tile) {
-    for (let x = x0; x < camX + VW + tile; x += tile) {
+  for (let y = y0; y < camY + viewH + tile; y += tile) {
+    for (let x = x0; x < camX + viewW + tile; x += tile) {
       const dark = ((x / tile + y / tile) & 1) === 0;
       ctx.fillStyle = dark ? "#3e8a3a" : "#4aa044";
       ctx.fillRect(x, y, tile, tile);
@@ -1089,57 +1239,57 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     const cx = it.pos.x, cy = it.pos.y + bob;
     // soft drop shadow
     ctx.fillStyle = "rgba(0,0,0,0.25)";
-    ctx.beginPath(); ctx.ellipse(it.pos.x, it.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(it.pos.x, it.pos.y + 6, 6, 2, 0, 0, Math.PI * 2); ctx.fill();
     if (it.kind === "arrow") {
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(-Math.PI / 4);
       // shaft
       ctx.fillStyle = "#3a2418";
-      ctx.fillRect(-10, -1, 16, 3);
+      ctx.fillRect(-8, -1, 13, 2);
       // arrowhead
       ctx.fillStyle = "#caa14a";
       ctx.beginPath();
-      ctx.moveTo(6, -6); ctx.lineTo(13, 0); ctx.lineTo(6, 6); ctx.closePath();
+      ctx.moveTo(5, -5); ctx.lineTo(10, 0); ctx.lineTo(5, 5); ctx.closePath();
       ctx.fill();
       ctx.fillStyle = "#e8c870";
       ctx.beginPath();
-      ctx.moveTo(7, -3); ctx.lineTo(11, 0); ctx.lineTo(7, 3); ctx.closePath();
+      ctx.moveTo(6, -2); ctx.lineTo(9, 0); ctx.lineTo(6, 2); ctx.closePath();
       ctx.fill();
       // fletching
       ctx.fillStyle = "#caa14a";
-      ctx.fillRect(-12, -4, 4, 8);
+      ctx.fillRect(-10, -3, 3, 6);
       ctx.fillStyle = "#5a3a1c";
-      ctx.fillRect(-12, -1, 4, 2);
+      ctx.fillRect(-10, -1, 3, 2);
       ctx.restore();
     } else {
       // DISC — chrome metallic vinyl with hollow center and "DISC" label
       // outer ring (chrome gradient feel via stacked arcs)
-      const grd = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 11);
+      const grd = ctx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, 8);
       grd.addColorStop(0, "#f5f5f8");
       grd.addColorStop(0.55, "#a8acb4");
       grd.addColorStop(1, "#5e636c");
       ctx.fillStyle = grd;
-      ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
       // grooves
       ctx.strokeStyle = "rgba(255,255,255,0.5)";
       ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.stroke();
-      ctx.strokeStyle = "rgba(40,40,46,0.5)";
       ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = "rgba(40,40,46,0.5)";
+      ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.stroke();
       // hollow center (transparent → show grass): draw same color as ground tile beneath approx
       ctx.fillStyle = "#3e8a3a";
-      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.fill();
       // tiny chrome bevel
       ctx.strokeStyle = "rgba(0,0,0,0.6)";
-      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.stroke();
       // "DISC" label
       ctx.save();
       ctx.fillStyle = "#1a1a1f";
-      ctx.font = "bold 5px monospace";
+      ctx.font = "bold 4px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("DISC", cx, cy - 7);
+      ctx.fillText("DISC", cx, cy - 5);
       ctx.restore();
     }
   }
@@ -1156,6 +1306,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   for (const e of w.npcs) {
     if (e.alive) drawables.push({ y: e.pos.y, draw: () => drawNpc(ctx, w, e) });
   }
+  if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
@@ -1259,6 +1410,11 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
     const standPos = computeStandPos(w);
     if (standPos.y >= pl.pos.y) drawStand(ctx, w, standPos);
   }
+  if (w.time < w.rageUntil) {
+    ctx.strokeStyle = `rgba(255,61,61,${0.45 + Math.sin(w.time * 16) * 0.18})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(pl.pos.x, pl.pos.y, 18 + Math.sin(w.time * 12) * 2, 0, Math.PI * 2); ctx.stroke();
+  }
 }
 
 function computeStandPos(w: World): Vec2 {
@@ -1290,6 +1446,7 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   if (id === "star_platinum") drawStarPlatinum(ctx, w, pos);
   else if (id === "rhcp") drawRhcp(ctx, w, pos);
   else if (id === "echoes") drawEchoes(ctx, w, pos);
+  else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
 }
 
 function drawStarPlatinum(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
@@ -1442,6 +1599,63 @@ function drawEchoes(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
       ctx.fillRect(pos.x + 4, pos.y + 1, 3, 5);
     }
   }
+}
+
+function drawEbonyDevil(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const attacking = w.time < w.standPunchUntil || w.time < w.standAimUntil;
+  const bob = Math.sin(w.time * 10) * 1.5;
+  ctx.fillStyle = "rgba(143,148,156,0.24)";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y + bob, 13, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#555b64";
+  ctx.fillRect(pos.x - 5, pos.y - 1 + bob, 10, 10);
+  ctx.fillStyle = "#8f949c";
+  ctx.beginPath();
+  ctx.moveTo(pos.x - 7, pos.y - 5 + bob);
+  ctx.lineTo(pos.x - 3, pos.y - 12 + bob);
+  ctx.lineTo(pos.x, pos.y - 8 + bob);
+  ctx.lineTo(pos.x + 3, pos.y - 12 + bob);
+  ctx.lineTo(pos.x + 7, pos.y - 5 + bob);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#191b20";
+  ctx.fillRect(pos.x - 3, pos.y - 6 + bob, 2, 2);
+  ctx.fillRect(pos.x + 1, pos.y - 6 + bob, 2, 2);
+  ctx.fillStyle = "#cfd3dc";
+  ctx.fillRect(pos.x - 2, pos.y - 2 + bob, 4, 2);
+  ctx.strokeStyle = attacking ? "#f2f3f5" : "#8f949c";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pos.x - 7, pos.y + 2 + bob);
+  ctx.lineTo(pos.x - 12, pos.y + (attacking ? -4 : 6) + bob);
+  ctx.moveTo(pos.x + 7, pos.y + 2 + bob);
+  ctx.lineTo(pos.x + 12, pos.y + (attacking ? -4 : 6) + bob);
+  ctx.stroke();
+}
+
+function drawPuppet(ctx: CanvasRenderingContext2D, w: World) {
+  const p = w.puppet;
+  const attacking = w.time < p.attackUntil;
+  const spin = attacking ? w.time * 22 : Math.sin(w.time * 6) * 0.2;
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(p.pos.x, p.pos.y + 7, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#72533e";
+  ctx.fillRect(p.pos.x - 5, p.pos.y - 1, 10, 10);
+  ctx.fillStyle = "#b08a65";
+  ctx.fillRect(p.pos.x - 4, p.pos.y - 9, 8, 8);
+  ctx.fillStyle = "#1b1714";
+  ctx.fillRect(p.pos.x - 3, p.pos.y - 6, 2, 2);
+  ctx.fillRect(p.pos.x + 1, p.pos.y - 6, 2, 2);
+  ctx.save();
+  ctx.translate(p.pos.x, p.pos.y + 1);
+  if (attacking) ctx.rotate(spin);
+  else ctx.rotate(Math.atan2(p.facing.y, p.facing.x));
+  ctx.strokeStyle = "#d6d8dd";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(18, 0); ctx.stroke();
+  ctx.fillStyle = "#f2f3f5";
+  ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(16, -4); ctx.lineTo(16, 4); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  if (p.hp < p.maxHp) drawHpBar(ctx, p.pos.x, p.pos.y - 15, p.hp / p.maxHp);
 }
 
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {

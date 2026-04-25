@@ -87,6 +87,10 @@ export const SFX = {
   hurt:         () => { tone(300, 0.12, "sawtooth", 0.35, 120); noise(0.08, 0.2, 600); },
   footstep:     () => { noise(0.04, 0.06, 350, "lowpass"); },
   standSummon:  () => { tone(220, 0.25, "triangle", 0.3, 660); tone(440, 0.2, "sine", 0.2, 880); },
+  puppet:       () => { tone(260, 0.12, "triangle", 0.25, 520); tone(130, 0.18, "sawtooth", 0.18, 90); },
+  spear:        () => { tone(760, 0.12, "sawtooth", 0.28, 320); noise(0.07, 0.12, 1800, "highpass"); },
+  spin:         () => { tone(440, 0.22, "triangle", 0.28, 880); noise(0.16, 0.12, 1200); },
+  rage:         () => { tone(90, 0.45, "sawtooth", 0.45, 45); tone(180, 0.25, "square", 0.25, 260); },
 };
 
 export type SfxKey = keyof typeof SFX;

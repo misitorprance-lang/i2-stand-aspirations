@@ -1,7 +1,7 @@
 // Stand & ability data tables for Stand Test.
 // All ability behavior is data-driven; the engine reads `kind` to decide how to execute.
 
-export type StandId = "none" | "star_platinum" | "rhcp" | "echoes";
+export type StandId = "none" | "star_platinum" | "rhcp" | "echoes" | "ebony_devil";
 
 export type AbilityKind =
   | "melee" // short cone in facing dir
@@ -15,7 +15,11 @@ export type AbilityKind =
   | "stun_touch" // close range, applies stun
   | "lobbed" // travels then explodes
   | "dot_zone" // ground zone ticking damage
-  | "tesla"; // stationary AOE that ticks for a few seconds
+  | "tesla" // stationary AOE that ticks for a few seconds
+  | "puppet_toggle"
+  | "puppet_spear"
+  | "puppet_spin"
+  | "rage_mode";
 
 export interface Ability {
   name: string;
@@ -100,6 +104,19 @@ export const STANDS: Record<StandId, Stand> = {
       a4: { name: "Three Freeze", kind: "auto_aim", damage: 11, range: 220, radius: 22, cooldown: 8, color: "#5fd1a0" },
     },
   },
+  ebony_devil: {
+    id: "ebony_devil",
+    name: "Ebony Devil",
+    color: "#8f949c",
+    rarityWeight: 4,
+    abilities: {
+      m1: { name: "Slice", kind: "melee", damage: 3.5, range: 24, radius: 16, cooldown: 0.32, color: "#cfd3dc" },
+      a1: { name: "Doll / Puppet", kind: "puppet_toggle", damage: 0, range: 0, radius: 0, cooldown: 0.35, color: "#b8bcc6" },
+      a2: { name: "Spear Jab", kind: "puppet_spear", damage: 8, range: 190, radius: 8, cooldown: 2.4, speed: 360, color: "#d6d8dd" },
+      a3: { name: "360° Spear Spin", kind: "puppet_spin", damage: 7, range: 0, radius: 58, cooldown: 4.5, color: "#b8bcc6" },
+      a4: { name: "Rage Mode", kind: "rage_mode", damage: 0, range: 0, radius: 0, cooldown: 10, duration: 5, color: "#ff3d3d" },
+    },
+  },
 };
 
 // S.H.I.T. — rare upgraded variant of Echoes' a4
@@ -114,7 +131,7 @@ export const SHIT_ABILITY: Ability = {
   color: "#222",
 };
 
-const ROLLABLE: StandId[] = ["star_platinum", "rhcp", "echoes"];
+const ROLLABLE: StandId[] = ["star_platinum", "rhcp", "echoes", "ebony_devil"];
 
 export function rollStand(): { id: StandId; shitVariant: boolean } {
   const total = ROLLABLE.reduce((s, id) => s + STANDS[id].rarityWeight, 0);
