@@ -1,0 +1,124 @@
+import type { StandId } from "./stands";
+
+export interface Vec2 { x: number; y: number; }
+
+export interface Rect { x: number; y: number; w: number; h: number; }
+
+export type EntityKind = "player" | "friendly" | "enemy";
+
+export interface Entity {
+  id: number;
+  kind: EntityKind;
+  pos: Vec2;
+  vel: Vec2;
+  radius: number;
+  hp: number;
+  maxHp: number;
+  facing: Vec2; // unit
+  color: string;
+  alive: boolean;
+  stunUntil: number; // game time seconds
+  hitFlashUntil: number;
+  // wander
+  wanderTarget?: Vec2;
+  wanderUntil?: number;
+  // respawn
+  respawnAt?: number;
+  // attack cd (enemies)
+  nextAttackAt?: number;
+}
+
+export interface Prop {
+  rect: Rect; // collision rect
+  draw: (ctx: CanvasRenderingContext2D, r: Rect) => void;
+}
+
+export interface Projectile {
+  id: number;
+  pos: Vec2;
+  vel: Vec2;
+  radius: number;
+  damage: number;
+  color: string;
+  ownerKind: "player";
+  pierce: boolean;
+  hitSet: Set<number>;
+  expireAt: number;
+  lobbed?: boolean;
+  detonateAt?: number;
+  detonateRadius?: number;
+  detonateColor?: string;
+  detonateCrater?: boolean;
+}
+
+export interface Zone {
+  id: number;
+  pos: Vec2;
+  radius: number;
+  damagePerTick: number;
+  tickEvery: number;
+  nextTickAt: number;
+  expireAt: number;
+  color: string;
+  ringColor?: string;
+  crater?: boolean;
+  craterPlaced?: boolean;
+}
+
+export interface ChannelState {
+  abilityKey: "m1" | "a1" | "a2" | "a3" | "a4";
+  dir: Vec2;
+  expireAt: number;
+  nextTickAt: number;
+  tickEvery: number;
+  range: number;
+  radius: number;
+  damage: number;
+  color: string;
+}
+
+export interface DamageNumber {
+  id: number;
+  pos: Vec2;
+  text: string;
+  color: string;
+  size: number;
+  vy: number;
+  expireAt: number;
+  bornAt: number;
+}
+
+export interface Crater {
+  pos: Vec2;
+  radius: number;
+  expireAt: number;
+  bornAt: number;
+}
+
+export interface Particle {
+  pos: Vec2;
+  vel: Vec2;
+  color: string;
+  size: number;
+  expireAt: number;
+  bornAt: number;
+}
+
+export interface ItemPickup {
+  id: number;
+  kind: "arrow" | "disc";
+  pos: Vec2;
+  bornAt: number;
+}
+
+export interface UIState {
+  standId: StandId;
+  shitVariant: boolean;
+  arrows: number;
+  discs: number;
+  hp: number;
+  maxHp: number;
+  cooldowns: { m1: number; a1: number; a2: number; a3: number; a4: number }; // remaining seconds
+  banner: string | null;
+  bannerUntil: number;
+}
