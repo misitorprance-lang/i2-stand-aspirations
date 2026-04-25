@@ -1,7 +1,7 @@
 // Stand & ability data tables for Stand Test.
 // All ability behavior is data-driven; the engine reads `kind` to decide how to execute.
 
-export type StandId = "none" | "star_platinum" | "rhcp" | "echoes";
+export type StandId = "none" | "star_platinum" | "rhcp" | "echoes" | "ebony_devil";
 
 export type AbilityKind =
   | "melee" // short cone in facing dir
@@ -15,7 +15,11 @@ export type AbilityKind =
   | "stun_touch" // close range, applies stun
   | "lobbed" // travels then explodes
   | "dot_zone" // ground zone ticking damage
-  | "tesla"; // stationary AOE that ticks for a few seconds
+  | "tesla" // stationary AOE that ticks for a few seconds
+  | "puppet_toggle"
+  | "puppet_spear"
+  | "puppet_spin"
+  | "rage_mode";
 
 export interface Ability {
   name: string;
