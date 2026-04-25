@@ -103,6 +103,8 @@ export default function Game() {
           cd: { ...w.cdTimers },
           banner: w.bannerText,
           kills: w.kills,
+          rage: Math.round(w.rage),
+          rageActive: w.time < w.rageUntil,
         });
       }
     };
