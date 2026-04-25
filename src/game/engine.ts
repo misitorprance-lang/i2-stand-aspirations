@@ -884,11 +884,23 @@ export function update(w: World, input: InputState, dt: number) {
   for (const z of w.zones) {
     if (z.damagePerTick > 0) {
       while (w.time >= z.nextTickAt && w.time < z.expireAt) {
+        let hitAny = false;
         for (const e of w.npcs) {
           if (!e.alive) continue;
           if (dist2(e.pos, z.pos) < (z.radius + e.radius) ** 2) {
             damageEntity(w, e, z.damagePerTick);
+            hitAny = true;
           }
+        }
+        // arc lightning visual for tesla-style zones
+        if (hitAny) {
+          for (const e of w.npcs) {
+            if (!e.alive) continue;
+            if (dist2(e.pos, z.pos) < (z.radius + e.radius) ** 2) {
+              spawnVfx(w, { kind: "lightning_bolt", pos: { ...z.pos }, to: { ...e.pos }, color: z.color, life: 0.18 });
+            }
+          }
+          play("tesla");
         }
         z.nextTickAt += z.tickEvery;
       }
