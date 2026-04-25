@@ -1222,3 +1222,159 @@ function hexToRgba(hex: string, a: number) {
 }
 
 export type { World };
+
+// ---------- VFX renderer ----------
+function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number) {
+  const inv = 1 - t;
+  switch (v.kind) {
+    case "slash_arc": {
+      // arcing crescent in the facing direction
+      const cx = v.pos.x, cy = v.pos.y;
+      const ang = v.angle ?? 0;
+      const r = (v.radius ?? 22) * (0.7 + t * 0.4);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+      ctx.strokeStyle = hexToRgba(v.color, inv * 0.95);
+      ctx.lineWidth = 5 * inv + 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -0.9, 0.9);
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.6);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 2, -0.7, 0.7);
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
+    case "shockwave": {
+      const r = (v.radius ?? 30) * (0.4 + t * 1.0);
+      ctx.strokeStyle = hexToRgba(v.color, inv * 0.9);
+      ctx.lineWidth = 3 * inv + 1;
+      ctx.beginPath();
+      ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.5);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(v.pos.x, v.pos.y, r * 0.85, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "lightning_bolt": {
+      if (!v.to) break;
+      const segs = 6;
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let px = v.pos.x, py = v.pos.y;
+      ctx.moveTo(px, py);
+      for (let i = 1; i <= segs; i++) {
+        const f = i / segs;
+        const x = v.pos.x + (v.to.x - v.pos.x) * f + (Math.random() - 0.5) * 8;
+        const y = v.pos.y + (v.to.y - v.pos.y) * f + (Math.random() - 0.5) * 8;
+        ctx.lineTo(x, y);
+        px = x; py = y;
+      }
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.7);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      break;
+    }
+    case "fire_burst": {
+      const r = v.radius ?? 30;
+      // multiple flame puffs
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + time * 2;
+        const dx = Math.cos(a) * r * 0.5 * (0.4 + t * 0.6);
+        const dy = Math.sin(a) * r * 0.5 * (0.4 + t * 0.6) - t * 14;
+        const sz = r * (0.45 - t * 0.3);
+        ctx.fillStyle = hexToRgba(v.color, inv * 0.7);
+        ctx.beginPath();
+        ctx.arc(v.pos.x + dx, v.pos.y + dy, Math.max(2, sz), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = hexToRgba("#ffd24a", inv * 0.5);
+        ctx.beginPath();
+        ctx.arc(v.pos.x + dx, v.pos.y + dy, Math.max(1, sz * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "ice_burst": {
+      const r = (v.radius ?? 16) * (0.6 + t * 0.8);
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      // 6 spokes
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(v.pos.x + Math.cos(a) * r * 0.3, v.pos.y + Math.sin(a) * r * 0.3);
+        ctx.lineTo(v.pos.x + Math.cos(a) * r, v.pos.y + Math.sin(a) * r);
+        ctx.stroke();
+      }
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.7);
+      ctx.beginPath();
+      ctx.arc(v.pos.x, v.pos.y, 3 * inv + 1, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "stab_line": {
+      if (!v.to) break;
+      const w = (v.radius ?? 6) * inv;
+      const dx = v.to.x - v.pos.x, dy = v.to.y - v.pos.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.85);
+      ctx.beginPath();
+      ctx.moveTo(v.pos.x + nx * w, v.pos.y + ny * w);
+      ctx.lineTo(v.to.x + nx * w * 0.3, v.to.y + ny * w * 0.3);
+      ctx.lineTo(v.to.x - nx * w * 0.3, v.to.y - ny * w * 0.3);
+      ctx.lineTo(v.pos.x - nx * w, v.pos.y - ny * w);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.6);
+      ctx.beginPath();
+      ctx.arc(v.to.x, v.to.y, 4 * inv + 1, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "beam": {
+      if (!v.to) break;
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 6 * inv + 1;
+      ctx.beginPath();
+      ctx.moveTo(v.pos.x, v.pos.y);
+      ctx.lineTo(v.to.x, v.to.y);
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.85);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      break;
+    }
+    case "explosion_ring": {
+      const r = (v.radius ?? 30) * (0.3 + t * 1.1);
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.4);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba("#ffd24a", inv * 0.95);
+      ctx.lineWidth = 3 * inv + 1;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "crater_smoke": {
+      const r = (v.radius ?? 30) * (0.6 + t * 0.6);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + time;
+        const dx = Math.cos(a) * r * 0.4;
+        const dy = Math.sin(a) * r * 0.4 - t * 10;
+        ctx.fillStyle = hexToRgba(v.color, inv * 0.5);
+        ctx.beginPath();
+        ctx.arc(v.pos.x + dx, v.pos.y + dy, r * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+  }
+}
+
