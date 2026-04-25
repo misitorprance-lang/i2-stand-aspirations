@@ -12,6 +12,7 @@ import type {
   Entity,
   ItemPickup,
   Particle,
+  PuppetState,
   Projectile,
   Prop,
   Rect,
@@ -27,8 +28,10 @@ export const VW = 360;
 export const VH = 640;
 export const MAP_W = 900;
 export const MAP_H = 1400;
+const CAMERA_ZOOM = 1.35;
 
 const PLAYER_SPEED = 110;
+const PLAYER_SPRINT_SPEED = 142;
 const NPC_SPEED = 55;
 const ENEMY_SPEED = 70;
 const ENEMY_AGGRO = 140;
@@ -45,6 +48,7 @@ const ARROW_INTERVAL = [10, 18] as const;
 const DISC_INTERVAL = [22, 38] as const;
 const MAX_ITEMS_ON_GROUND = 4;
 const PICKUP_RADIUS = 18;
+const AIM_ASSIST_RANGE = 260;
 
 // ---------- helpers ----------
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
