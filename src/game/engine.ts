@@ -912,12 +912,15 @@ export function update(w: World, input: InputState, dt: number) {
     tryMove(e, e.vel.x * dt, e.vel.y * dt, w.props);
 
     if (e.kind === "enemy" && e.provoked && pl.alive && dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO) {
-      const dir = norm({ x: pl.pos.x - e.pos.x, y: pl.pos.y - e.pos.y });
+      const puppetCloser = w.puppet.active && dist2(e.pos, w.puppet.pos) < dist2(e.pos, pl.pos);
+      const targetPos = puppetCloser ? w.puppet.pos : pl.pos;
+      const dir = norm({ x: targetPos.x - e.pos.x, y: targetPos.y - e.pos.y });
       tryMove(e, dir.x * ENEMY_SPEED * dt, dir.y * ENEMY_SPEED * dt, w.props);
       e.facing = dir;
-      if (dist(e.pos, pl.pos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
+      if (dist(e.pos, targetPos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
         e.nextAttackAt = w.time + ENEMY_ATTACK_CD;
-        damageEntity(w, pl, ENEMY_ATTACK_DMG, { dir, amount: 40 });
+        if (puppetCloser) damagePuppet(w, ENEMY_ATTACK_DMG);
+        else damageEntity(w, pl, ENEMY_ATTACK_DMG, { dir, amount: 40 });
       }
     } else {
       // wander
