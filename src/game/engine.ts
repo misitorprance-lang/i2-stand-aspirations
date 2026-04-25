@@ -335,6 +335,17 @@ export function createWorld(): World {
     standAimTarget: null,
     kills: 0,
     footstepAcc: 0,
+    pointerAim: null,
+    puppet: {
+      active: false,
+      pos: { x: player.pos.x - 14, y: player.pos.y + 10 },
+      hp: PLAYER_MAX_HP / 2,
+      maxHp: PLAYER_MAX_HP / 2,
+      facing: { x: 0, y: 1 },
+      attackUntil: 0,
+    },
+    rage: 0,
+    rageUntil: 0,
   };
 }
 
