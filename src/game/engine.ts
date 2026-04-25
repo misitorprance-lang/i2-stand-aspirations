@@ -408,6 +408,33 @@ function aimDir(w: World, input: InputState): Vec2 {
   return w.player.facing;
 }
 
+// Map ability identity -> SFX key. Resolved by stand+key (and shit variant).
+function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
+  const sid = w.standId;
+  if (sid === "star_platinum") {
+    if (key === "m1") return "punch";
+    if (key === "a1") return "starFinger";
+    if (key === "a2") return "rangedSmash";
+    if (key === "a3") return "oraTick";
+    return "launch";
+  }
+  if (sid === "rhcp") {
+    if (key === "m1") return "punch";
+    if (key === "a1") return "electricShot";
+    if (key === "a2") return "discharge";
+    if (key === "a3") return "bomber";
+    return "tesla";
+  }
+  if (sid === "echoes") {
+    if (key === "m1") return "punch";
+    if (key === "a1") return "freezeTouch";
+    if (key === "a2") return "explosiveText";
+    if (key === "a3") return "burningText";
+    return w.shitVariant ? "shit" : "threeFreeze";
+  }
+  return "punch";
+}
+
 function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: InputState) {
   const stand = STANDS[w.standId];
   if (stand.id === "none" && key !== "m1") return;
@@ -418,11 +445,18 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
 
   const dir = aimDir(w, input);
   const p = w.player.pos;
+  const sfx = sfxFor(w, key);
+
+  // Generic cast cue (sound) — channel handles its own ticks
+  if (ab.kind !== "channel_cone") play(sfx);
 
   switch (ab.kind) {
     case "melee": {
       const tx = p.x + dir.x * ab.range;
       const ty = p.y + dir.y * ab.range;
+      const angle = Math.atan2(dir.y, dir.x);
+      // slash arc VFX so misses still feel responsive
+      spawnVfx(w, { kind: "slash_arc", pos: { x: p.x, y: p.y }, angle, radius: ab.range + (ab.radius ?? 14), color: ab.color, life: 0.18 });
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
@@ -433,7 +467,6 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "pierce": {
-      // hit all in line
       const steps = 8;
       const hit = new Set<number>();
       for (let s = 1; s <= steps; s++) {
@@ -447,10 +480,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           }
         }
       }
-      // visual
-      for (let s = 0; s < 10; s++) {
-        const t = (ab.range / 10) * s;
-        spawnParticles(w, { x: p.x + dir.x * t, y: p.y + dir.y * t }, ab.color, 1);
+      spawnVfx(w, {
+        kind: "stab_line",
+        pos: { x: p.x, y: p.y },
+        to: { x: p.x + dir.x * ab.range, y: p.y + dir.y * ab.range },
+        radius: (ab.radius ?? 6) * 1.4,
+        color: ab.color,
+        life: 0.22,
+      });
+      for (let s = 0; s < 8; s++) {
+        const t = (ab.range / 8) * s;
+        spawnParticles(w, { x: p.x + dir.x * t, y: p.y + dir.y * t }, ab.color, 1, { life: 0.25 });
       }
       break;
     }
@@ -467,6 +507,8 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         hitSet: new Set(),
         expireAt: w.time + ab.range / ab.speed!,
       });
+      // muzzle flash
+      spawnParticles(w, { x: p.x + dir.x * 10, y: p.y + dir.y * 10 }, ab.color, 6, { speedMin: 40, speedMax: 120, life: 0.2 });
       break;
     }
     case "lobbed": {
@@ -496,17 +538,14 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - p.x, y: e.pos.y - p.y }), amount: 60 });
         }
       }
-      w.zones.push({
-        id: w.nextId++,
-        pos: { ...p },
-        radius: ab.radius!,
-        damagePerTick: 0,
-        tickEvery: 999,
-        nextTickAt: 999,
-        expireAt: w.time + 0.25,
-        color: ab.color,
-        ringColor: ab.color,
-      });
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: ab.radius!, color: ab.color, life: 0.45 });
+      // arcing lightning to nearby targets
+      for (const e of w.npcs) {
+        if (!e.alive) continue;
+        if (dist2(e.pos, p) < (ab.radius! + e.radius) ** 2) {
+          spawnVfx(w, { kind: "lightning_bolt", pos: { ...p }, to: { ...e.pos }, color: ab.color, life: 0.2 });
+        }
+      }
       w.shake = Math.max(w.shake, 4);
       break;
     }
@@ -519,22 +558,13 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage);
         }
       }
-      w.zones.push({
-        id: w.nextId++,
-        pos: { x: tx, y: ty },
-        radius: ab.radius!,
-        damagePerTick: 0,
-        tickEvery: 999,
-        nextTickAt: 999,
-        expireAt: w.time + 0.4,
-        color: ab.color,
-        ringColor: ab.color,
-        crater: ab.crater,
-      });
+      spawnVfx(w, { kind: "explosion_ring", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
+      spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius! * 0.8, color: ab.color, life: 0.55 });
       if (ab.crater) {
         w.craters.push({ pos: { x: tx, y: ty }, radius: ab.radius! * 0.7, bornAt: w.time, expireAt: w.time + 25 });
+        spawnVfx(w, { kind: "crater_smoke", pos: { x: tx, y: ty }, radius: ab.radius! * 0.6, color: "#3a2a22", life: 1.2 });
       }
-      spawnParticles(w, { x: tx, y: ty }, ab.color, 16);
+      spawnParticles(w, { x: tx, y: ty }, ab.color, 18, { speedMin: 60, speedMax: 180, life: 0.6, gravity: 60 });
       w.shake = Math.max(w.shake, 6);
       break;
     }
@@ -553,15 +583,16 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "knockback": {
+      const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
       for (const e of w.npcs) {
         if (!e.alive) continue;
-        const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
           damageEntity(w, e, ab.damage, { dir, amount: ab.knockback || 200 });
         }
       }
-      spawnParticles(w, { x: p.x + dir.x * ab.range, y: p.y + dir.y * ab.range }, ab.color, 10);
-      w.shake = Math.max(w.shake, 4);
+      spawnVfx(w, { kind: "shockwave", pos: { x: tx, y: ty }, radius: ab.radius! * 1.6, color: ab.color, life: 0.35 });
+      spawnParticles(w, { x: tx, y: ty }, ab.color, 12, { speedMin: 80, speedMax: 200, life: 0.4 });
+      w.shake = Math.max(w.shake, 5);
       break;
     }
     case "stun_touch": {
@@ -573,7 +604,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           e.stunUntil = w.time + (ab.stunSeconds || 1);
         }
       }
-      spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
+      spawnVfx(w, { kind: "ice_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.4 });
       break;
     }
     case "dot_zone": {
@@ -589,6 +620,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         color: ab.color,
         ringColor: ab.color,
       });
+      spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: ab.duration! });
       break;
     }
     case "tesla": {
@@ -606,32 +638,36 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "auto_aim": {
-      // pick nearest alive npc within range
+      // Pick nearest HOSTILE within range; fall back to nearest friendly only if no enemy in range.
       let target: Entity | null = null;
       let best = ab.range * ab.range;
       for (const e of w.npcs) {
-        if (!e.alive) continue;
+        if (!e.alive || e.kind !== "enemy") continue;
         const d = dist2(e.pos, p);
         if (d < best) { best = d; target = e; }
       }
+      if (!target) {
+        // fallback: any alive npc in range
+        best = ab.range * ab.range;
+        for (const e of w.npcs) {
+          if (!e.alive) continue;
+          const d = dist2(e.pos, p);
+          if (d < best) { best = d; target = e; }
+        }
+      }
       if (target) {
         damageEntity(w, target, ab.damage);
-        spawnParticles(w, target.pos, ab.color, 18);
-        w.zones.push({
-          id: w.nextId++,
-          pos: { ...target.pos },
-          radius: ab.radius!,
-          damagePerTick: 0,
-          tickEvery: 999,
-          nextTickAt: 999,
-          expireAt: w.time + 0.4,
-          color: ab.color,
-          ringColor: ab.color,
-        });
+        spawnVfx(w, { kind: "beam", pos: { ...p }, to: { ...target.pos }, color: ab.color, life: 0.25 });
+        spawnVfx(w, { kind: "explosion_ring", pos: { ...target.pos }, radius: ab.radius!, color: ab.color, life: 0.4 });
+        spawnParticles(w, target.pos, ab.color, 20, { speedMin: 60, speedMax: 200, life: 0.5 });
         if (ab.crater) {
           w.craters.push({ pos: { ...target.pos }, radius: ab.radius! * 0.6, bornAt: w.time, expireAt: w.time + 30 });
+          spawnVfx(w, { kind: "crater_smoke", pos: { ...target.pos }, radius: ab.radius! * 0.6, color: "#222", life: 1.4 });
         }
         w.shake = Math.max(w.shake, ab.damage > 15 ? 10 : 5);
+      } else {
+        // no target — visual ping so the player knows the cast happened
+        spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 30, color: ab.color, life: 0.3 });
       }
       break;
     }
