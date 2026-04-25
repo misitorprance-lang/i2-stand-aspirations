@@ -303,6 +303,7 @@ export function createWorld(): World {
     damageNumbers: [],
     craters: [],
     particles: [],
+    vfx: [],
     items: [],
     nextArrowAt: rand(ARROW_INTERVAL[0], ARROW_INTERVAL[1]),
     nextDiscAt: rand(DISC_INTERVAL[0], DISC_INTERVAL[1]),
