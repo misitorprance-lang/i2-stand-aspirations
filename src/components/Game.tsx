@@ -422,7 +422,7 @@ function AbilityBtn({
     <button
       onPointerDown={(e) => { e.preventDefault(); if (!disabled) onPress(); }}
       disabled={disabled}
-      className="relative rounded-full flex flex-col items-center justify-center font-bold text-white"
+      className="relative rounded-full flex flex-col items-center justify-center font-bold text-white pointer-events-auto"
       style={{
         width: size, height: size,
         background: disabled ? "rgba(60,60,60,0.5)" : `radial-gradient(circle, ${color}66, rgba(0,0,0,0.7))`,
