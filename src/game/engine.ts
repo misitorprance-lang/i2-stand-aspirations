@@ -382,6 +382,7 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg);
   spawnParticles(w, e.pos, "#ffd0a8", 4);
+  if (e.kind === "player") play("hurt");
   if (knockback) {
     e.vel.x += knockback.dir.x * knockback.amount;
     e.vel.y += knockback.dir.y * knockback.amount;
