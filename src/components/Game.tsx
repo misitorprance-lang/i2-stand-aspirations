@@ -161,6 +161,7 @@ export default function Game() {
   };
 
   const press = (key: "m1" | "a1" | "a2" | "a3" | "a4") => () => {
+    unlockAudio();
     inputRef.current.pressed[key] = true;
   };
 
