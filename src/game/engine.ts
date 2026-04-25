@@ -1601,6 +1601,63 @@ function drawEchoes(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   }
 }
 
+function drawEbonyDevil(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const attacking = w.time < w.standPunchUntil || w.time < w.standAimUntil;
+  const bob = Math.sin(w.time * 10) * 1.5;
+  ctx.fillStyle = "rgba(143,148,156,0.24)";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y + bob, 13, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#555b64";
+  ctx.fillRect(pos.x - 5, pos.y - 1 + bob, 10, 10);
+  ctx.fillStyle = "#8f949c";
+  ctx.beginPath();
+  ctx.moveTo(pos.x - 7, pos.y - 5 + bob);
+  ctx.lineTo(pos.x - 3, pos.y - 12 + bob);
+  ctx.lineTo(pos.x, pos.y - 8 + bob);
+  ctx.lineTo(pos.x + 3, pos.y - 12 + bob);
+  ctx.lineTo(pos.x + 7, pos.y - 5 + bob);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#191b20";
+  ctx.fillRect(pos.x - 3, pos.y - 6 + bob, 2, 2);
+  ctx.fillRect(pos.x + 1, pos.y - 6 + bob, 2, 2);
+  ctx.fillStyle = "#cfd3dc";
+  ctx.fillRect(pos.x - 2, pos.y - 2 + bob, 4, 2);
+  ctx.strokeStyle = attacking ? "#f2f3f5" : "#8f949c";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pos.x - 7, pos.y + 2 + bob);
+  ctx.lineTo(pos.x - 12, pos.y + (attacking ? -4 : 6) + bob);
+  ctx.moveTo(pos.x + 7, pos.y + 2 + bob);
+  ctx.lineTo(pos.x + 12, pos.y + (attacking ? -4 : 6) + bob);
+  ctx.stroke();
+}
+
+function drawPuppet(ctx: CanvasRenderingContext2D, w: World) {
+  const p = w.puppet;
+  const attacking = w.time < p.attackUntil;
+  const spin = attacking ? w.time * 22 : Math.sin(w.time * 6) * 0.2;
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(p.pos.x, p.pos.y + 7, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#72533e";
+  ctx.fillRect(p.pos.x - 5, p.pos.y - 1, 10, 10);
+  ctx.fillStyle = "#b08a65";
+  ctx.fillRect(p.pos.x - 4, p.pos.y - 9, 8, 8);
+  ctx.fillStyle = "#1b1714";
+  ctx.fillRect(p.pos.x - 3, p.pos.y - 6, 2, 2);
+  ctx.fillRect(p.pos.x + 1, p.pos.y - 6, 2, 2);
+  ctx.save();
+  ctx.translate(p.pos.x, p.pos.y + 1);
+  if (attacking) ctx.rotate(spin);
+  else ctx.rotate(Math.atan2(p.facing.y, p.facing.x));
+  ctx.strokeStyle = "#d6d8dd";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(18, 0); ctx.stroke();
+  ctx.fillStyle = "#f2f3f5";
+  ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(16, -4); ctx.lineTo(16, 4); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  if (p.hp < p.maxHp) drawHpBar(ctx, p.pos.x, p.pos.y - 15, p.hp / p.maxHp);
+}
+
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(e.pos.x, e.pos.y + 8, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
