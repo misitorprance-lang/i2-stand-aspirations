@@ -1129,6 +1129,13 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     ctx.beginPath(); ctx.arc(z.pos.x, z.pos.y, z.radius, 0, Math.PI * 2); ctx.stroke();
   }
 
+  // VFX (move-specific effects)
+  for (const v of w.vfx) {
+    const total = v.expireAt - v.bornAt;
+    const t = Math.min(1, Math.max(0, (w.time - v.bornAt) / total));
+    drawVfx(ctx, v, t, w.time);
+  }
+
   // Particles
   for (const pa of w.particles) {
     const f = 1 - (w.time - pa.bornAt) / (pa.expireAt - pa.bornAt);
