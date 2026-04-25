@@ -959,8 +959,8 @@ export function tryPickupItems(w: World): { arrows: number; discs: number } {
   const remain: ItemPickup[] = [];
   for (const it of w.items) {
     if (dist2(it.pos, w.player.pos) < (PICKUP_RADIUS + w.player.radius) ** 2) {
-      if (it.kind === "arrow") a++;
-      else d++;
+      if (it.kind === "arrow") { a++; play("pickupArrow"); }
+      else { d++; play("pickupDisc"); }
     } else remain.push(it);
   }
   w.items = remain;
@@ -971,12 +971,12 @@ export function useArrow(w: World) {
   const { id, shitVariant } = rollStand();
   w.standId = id;
   w.shitVariant = shitVariant;
-  // reset cooldowns
   w.cdTimers = { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 };
   w.channel = null;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
   w.bannerText = "Stand: " + name;
   w.bannerUntil = w.time + 2.5;
+  play("rollStand");
 }
 
 export function useDisc(w: World) {
@@ -986,6 +986,7 @@ export function useDisc(w: World) {
   w.channel = null;
   w.bannerText = "Stand discarded";
   w.bannerUntil = w.time + 1.5;
+  play("pickupDisc");
 }
 
 export function getUIState(w: World): UIState {
