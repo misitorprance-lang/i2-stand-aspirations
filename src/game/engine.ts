@@ -112,6 +112,12 @@ interface World {
   nextId: number;
   shake: number;
   cam: Vec2;
+  standPunchUntil: number;
+  standPunchDir: Vec2;
+  standAimUntil: number;
+  standAimTarget: Vec2 | null;
+  kills: number;
+  footstepAcc: number;
 }
 
 function makeProps(): Prop[] {
@@ -315,6 +321,12 @@ export function createWorld(): World {
     nextId: 1000,
     shake: 0,
     cam: { x: 0, y: 0 },
+    standPunchUntil: 0,
+    standPunchDir: { x: 0, y: 1 },
+    standAimUntil: 0,
+    standAimTarget: null,
+    kills: 0,
+    footstepAcc: 0,
   };
 }
 
@@ -382,6 +394,7 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg);
   spawnParticles(w, e.pos, "#ffd0a8", 4);
+  if (e.kind === "enemy") e.provoked = true;
   if (e.kind === "player") play("hurt");
   if (knockback) {
     e.vel.x += knockback.dir.x * knockback.amount;
@@ -391,6 +404,7 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
     e.alive = false;
     e.respawnAt = w.time + RESPAWN_DELAY;
     spawnParticles(w, e.pos, e.color, 14);
+    if (e.kind === "enemy") w.kills++;
   }
 }
 
@@ -450,20 +464,35 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   // Generic cast cue (sound) — channel handles its own ticks
   if (ab.kind !== "channel_cone") play(sfx);
 
+  // Stand aiming: project the stand model toward the cast target/direction
+  w.standAimUntil = w.time + 0.4;
+  if (ab.kind === "aoe_target" || ab.kind === "lobbed" || ab.kind === "stun_touch" || ab.kind === "knockback" || ab.kind === "channel_cone" || ab.kind === "pierce" || ab.kind === "projectile") {
+    w.standAimTarget = { x: w.player.pos.x + dir.x * Math.min(ab.range, 60), y: w.player.pos.y + dir.y * Math.min(ab.range, 60) };
+  }
+
   switch (ab.kind) {
     case "melee": {
-      const tx = p.x + dir.x * ab.range;
-      const ty = p.y + dir.y * ab.range;
       const angle = Math.atan2(dir.y, dir.x);
+      const reach = ab.range + (ab.radius ?? 14);
       // slash arc VFX so misses still feel responsive
-      spawnVfx(w, { kind: "slash_arc", pos: { x: p.x, y: p.y }, angle, radius: ab.range + (ab.radius ?? 14), color: ab.color, life: 0.18 });
+      spawnVfx(w, { kind: "slash_arc", pos: { x: p.x, y: p.y }, angle, radius: reach, color: ab.color, life: 0.2 });
+      // Hit any NPC within an arc in front of the player (cone test).
       for (const e of w.npcs) {
         if (!e.alive) continue;
-        if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
-          damageEntity(w, e, ab.damage);
-        }
+        const dx = e.pos.x - p.x, dy = e.pos.y - p.y;
+        const d = Math.hypot(dx, dy);
+        if (d > reach + e.radius) continue;
+        // cone of ~140deg facing dir; if very close (touching) ignore facing
+        if (d < e.radius + 6) { damageEntity(w, e, ab.damage); continue; }
+        const dot = (dx * dir.x + dy * dir.y) / (d || 1);
+        if (dot > 0.3) damageEntity(w, e, ab.damage);
       }
-      spawnParticles(w, { x: tx, y: ty }, ab.color, 5);
+      const tx = p.x + dir.x * ab.range;
+      const ty = p.y + dir.y * ab.range;
+      spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
+      // trigger stand-punch animation
+      w.standPunchUntil = w.time + 0.25;
+      w.standPunchDir = { x: dir.x, y: dir.y };
       break;
     }
     case "pierce": {
@@ -656,6 +685,8 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         }
       }
       if (target) {
+        w.standAimTarget = { ...target.pos };
+        w.standAimUntil = w.time + 0.5;
         damageEntity(w, target, ab.damage);
         spawnVfx(w, { kind: "beam", pos: { ...p }, to: { ...target.pos }, color: ab.color, life: 0.25 });
         spawnVfx(w, { kind: "explosion_ring", pos: { ...target.pos }, radius: ab.radius!, color: ab.color, life: 0.4 });
@@ -698,6 +729,10 @@ export function update(w: World, input: InputState, dt: number) {
       const speed = PLAYER_SPEED * Math.min(1, len);
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
       pl.facing = { x: nx, y: ny };
+      w.footstepAcc += dt * Math.min(1, len);
+      if (w.footstepAcc >= 0.32) { w.footstepAcc = 0; play("footstep"); }
+    } else {
+      w.footstepAcc = 0.32; // ready to step on next move
     }
   } else {
     if (pl.respawnAt && w.time >= pl.respawnAt) {
@@ -723,6 +758,7 @@ export function update(w: World, input: InputState, dt: number) {
         e.pos = spot;
         e.hp = e.maxHp;
         e.alive = true;
+        e.provoked = false;
       }
       continue;
     }
@@ -738,7 +774,7 @@ export function update(w: World, input: InputState, dt: number) {
     e.vel.y *= 0.9;
     tryMove(e, e.vel.x * dt, e.vel.y * dt, w.props);
 
-    if (e.kind === "enemy" && pl.alive && dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO) {
+    if (e.kind === "enemy" && e.provoked && pl.alive && dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO) {
       const dir = norm({ x: pl.pos.x - e.pos.x, y: pl.pos.y - e.pos.y });
       tryMove(e, dir.x * ENEMY_SPEED * dt, dir.y * ENEMY_SPEED * dt, w.props);
       e.facing = dir;
@@ -977,6 +1013,7 @@ export function useArrow(w: World) {
   w.bannerText = "Stand: " + name;
   w.bannerUntil = w.time + 2.5;
   play("rollStand");
+  play("standSummon");
 }
 
 export function useDisc(w: World) {
@@ -1049,30 +1086,61 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   // Items
   for (const it of w.items) {
     const bob = Math.sin((w.time - it.bornAt) * 4) * 2;
+    const cx = it.pos.x, cy = it.pos.y + bob;
+    // soft drop shadow
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath(); ctx.ellipse(it.pos.x, it.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
     if (it.kind === "arrow") {
-      // glowing arrow icon
       ctx.save();
-      ctx.translate(it.pos.x, it.pos.y + bob);
+      ctx.translate(cx, cy);
       ctx.rotate(-Math.PI / 4);
-      ctx.fillStyle = "#222";
-      ctx.fillRect(-8, -2, 14, 4);
+      // shaft
+      ctx.fillStyle = "#3a2418";
+      ctx.fillRect(-10, -1, 16, 3);
+      // arrowhead
       ctx.fillStyle = "#caa14a";
       ctx.beginPath();
-      ctx.moveTo(6, -5); ctx.lineTo(12, 0); ctx.lineTo(6, 5); ctx.closePath();
+      ctx.moveTo(6, -6); ctx.lineTo(13, 0); ctx.lineTo(6, 6); ctx.closePath();
       ctx.fill();
+      ctx.fillStyle = "#e8c870";
+      ctx.beginPath();
+      ctx.moveTo(7, -3); ctx.lineTo(11, 0); ctx.lineTo(7, 3); ctx.closePath();
+      ctx.fill();
+      // fletching
       ctx.fillStyle = "#caa14a";
-      ctx.fillRect(-12, -3, 4, 6);
+      ctx.fillRect(-12, -4, 4, 8);
+      ctx.fillStyle = "#5a3a1c";
+      ctx.fillRect(-12, -1, 4, 2);
       ctx.restore();
-      ctx.strokeStyle = "rgba(255,210,100,0.5)";
-      ctx.beginPath(); ctx.arc(it.pos.x, it.pos.y + bob, 14, 0, Math.PI * 2); ctx.stroke();
     } else {
-      // DISC — vinyl
-      ctx.fillStyle = "#1b1b22";
-      ctx.beginPath(); ctx.arc(it.pos.x, it.pos.y + bob, 8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#c8246c";
-      ctx.beginPath(); ctx.arc(it.pos.x, it.pos.y + bob, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "rgba(200,36,108,0.5)";
-      ctx.beginPath(); ctx.arc(it.pos.x, it.pos.y + bob, 14, 0, Math.PI * 2); ctx.stroke();
+      // DISC — chrome metallic vinyl with hollow center and "DISC" label
+      // outer ring (chrome gradient feel via stacked arcs)
+      const grd = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 11);
+      grd.addColorStop(0, "#f5f5f8");
+      grd.addColorStop(0.55, "#a8acb4");
+      grd.addColorStop(1, "#5e636c");
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+      // grooves
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = "rgba(40,40,46,0.5)";
+      ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke();
+      // hollow center (transparent → show grass): draw same color as ground tile beneath approx
+      ctx.fillStyle = "#3e8a3a";
+      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+      // tiny chrome bevel
+      ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.stroke();
+      // "DISC" label
+      ctx.save();
+      ctx.fillStyle = "#1a1a1f";
+      ctx.font = "bold 5px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("DISC", cx, cy - 7);
+      ctx.restore();
     }
   }
 
@@ -1160,6 +1228,10 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
 
 function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   const pl = w.player;
+  // Stand drawn UNDER player when behind, OVER when in front. We compute pos and z-order.
+  const standPos = computeStandPos(w);
+  const standInFront = standPos.y >= pl.pos.y;
+  if (w.standId !== "none" && !standInFront) drawStand(ctx, w, standPos);
   // shadow
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(pl.pos.x, pl.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
@@ -1183,6 +1255,193 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
   // hp bar (only if damaged)
   if (pl.hp < pl.maxHp) drawHpBar(ctx, pl.pos.x, pl.pos.y - 16, pl.hp / pl.maxHp);
+  if (w.standId !== "none") {
+    const standPos = computeStandPos(w);
+    if (standPos.y >= pl.pos.y) drawStand(ctx, w, standPos);
+  }
+}
+
+function computeStandPos(w: World): Vec2 {
+  const pl = w.player;
+  // Default: behind the player (opposite of facing)
+  const back = { x: -pl.facing.x, y: -pl.facing.y };
+  let target = { x: pl.pos.x + back.x * 14, y: pl.pos.y + back.y * 6 + 2 };
+  // While punching/aiming, place IN FRONT of player toward dir/target
+  if (w.time < w.standPunchUntil) {
+    const d = w.standPunchDir;
+    target = { x: pl.pos.x + d.x * 16, y: pl.pos.y + d.y * 10 - 2 };
+  } else if (w.time < w.standAimUntil) {
+    let dir = pl.facing;
+    if (w.standAimTarget) {
+      const dx = w.standAimTarget.x - pl.pos.x;
+      const dy = w.standAimTarget.y - pl.pos.y;
+      const m = Math.hypot(dx, dy) || 1;
+      dir = { x: dx / m, y: dy / m };
+    }
+    target = { x: pl.pos.x + dir.x * 16, y: pl.pos.y + dir.y * 10 - 2 };
+  }
+  // Smooth toward target stored in world.cam-like field; cheap: lerp via sine wobble
+  const wob = Math.sin(w.time * 5) * 1.5;
+  return { x: target.x, y: target.y + wob };
+}
+
+function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const id = w.standId;
+  if (id === "star_platinum") drawStarPlatinum(ctx, w, pos);
+  else if (id === "rhcp") drawRhcp(ctx, w, pos);
+  else if (id === "echoes") drawEchoes(ctx, w, pos);
+}
+
+function drawStarPlatinum(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  // aura
+  ctx.fillStyle = "rgba(124,92,255,0.25)";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, 13, 0, Math.PI * 2); ctx.fill();
+  // body — purple/teal humanoid
+  ctx.fillStyle = "#5b3fbf";
+  ctx.fillRect(pos.x - 5, pos.y - 2, 10, 11);
+  ctx.fillStyle = "#7c5cff";
+  ctx.fillRect(pos.x - 4, pos.y - 1, 8, 4);
+  // head
+  ctx.fillStyle = "#b9a4ff";
+  ctx.fillRect(pos.x - 4, pos.y - 10, 8, 8);
+  // headband
+  ctx.fillStyle = "#2a1f5a";
+  ctx.fillRect(pos.x - 4, pos.y - 7, 8, 2);
+  // eyes
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(pos.x - 3, pos.y - 5, 2, 2);
+  ctx.fillRect(pos.x + 1, pos.y - 5, 2, 2);
+  // arms — punch extension
+  ctx.fillStyle = "#7c5cff";
+  if (punching) {
+    const d = w.standPunchDir;
+    ctx.fillRect(pos.x - 1 + d.x * 6, pos.y - 1 + d.y * 6, 5, 4);
+  } else {
+    ctx.fillRect(pos.x - 7, pos.y, 3, 5);
+    ctx.fillRect(pos.x + 4, pos.y, 3, 5);
+  }
+}
+
+function drawRhcp(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  ctx.fillStyle = "rgba(255,68,68,0.22)";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2); ctx.fill();
+  // body — red lanky
+  ctx.fillStyle = "#a02323";
+  ctx.fillRect(pos.x - 4, pos.y - 2, 8, 11);
+  ctx.fillStyle = "#ff4444";
+  ctx.fillRect(pos.x - 3, pos.y, 6, 3);
+  // head — angular
+  ctx.fillStyle = "#ff6a6a";
+  ctx.beginPath();
+  ctx.moveTo(pos.x - 4, pos.y - 4);
+  ctx.lineTo(pos.x, pos.y - 11);
+  ctx.lineTo(pos.x + 4, pos.y - 4);
+  ctx.closePath();
+  ctx.fill();
+  // eyes (jagged)
+  ctx.fillStyle = "#fff36b";
+  ctx.fillRect(pos.x - 2, pos.y - 7, 1, 2);
+  ctx.fillRect(pos.x + 1, pos.y - 7, 1, 2);
+  // electric crackle
+  ctx.strokeStyle = "rgba(255,243,107,0.7)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pos.x - 6, pos.y - 8 + Math.sin(w.time * 20) * 2);
+  ctx.lineTo(pos.x + 6, pos.y - 6 + Math.cos(w.time * 18) * 2);
+  ctx.stroke();
+  // arms
+  if (punching) {
+    const d = w.standPunchDir;
+    ctx.fillStyle = "#ff4444";
+    ctx.fillRect(pos.x - 1 + d.x * 6, pos.y - 1 + d.y * 6, 5, 4);
+  } else {
+    ctx.fillStyle = "#ff4444";
+    ctx.fillRect(pos.x - 6, pos.y + 1, 3, 4);
+    ctx.fillRect(pos.x + 3, pos.y + 1, 3, 4);
+  }
+}
+
+function drawEchoes(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  // Echoes form depends on how many enemies the player has hit/killed (act progression).
+  // Act 1: small with tail. Act 2: bigger humanoid. Act 3: white with green accents.
+  const act = w.shitVariant ? 3 : (w.kills >= 6 ? 3 : w.kills >= 2 ? 2 : 1);
+  const punching = w.time < w.standPunchUntil;
+  if (act === 1) {
+    // small egg-like creature with tail
+    ctx.fillStyle = "rgba(95,209,160,0.25)";
+    ctx.beginPath(); ctx.arc(pos.x, pos.y + 2, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#4ab089";
+    ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 2, 6, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#9af0c8";
+    ctx.beginPath(); ctx.ellipse(pos.x - 1, pos.y, 4, 5, 0, 0, Math.PI * 2); ctx.fill();
+    // eye
+    ctx.fillStyle = "#222";
+    ctx.fillRect(pos.x - 1, pos.y - 1, 2, 2);
+    // tail
+    ctx.strokeStyle = "#4ab089";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pos.x + 5, pos.y + 4);
+    ctx.quadraticCurveTo(pos.x + 10, pos.y + 8 + Math.sin(w.time * 6) * 2, pos.x + 12, pos.y + 2);
+    ctx.stroke();
+  } else if (act === 2) {
+    ctx.fillStyle = "rgba(95,209,160,0.25)";
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#3d8c6c";
+    ctx.fillRect(pos.x - 4, pos.y - 2, 8, 10);
+    ctx.fillStyle = "#5fd1a0";
+    ctx.fillRect(pos.x - 3, pos.y - 1, 6, 4);
+    // head
+    ctx.fillStyle = "#bff5da";
+    ctx.fillRect(pos.x - 4, pos.y - 9, 8, 8);
+    // beak/mouth
+    ctx.fillStyle = "#3d8c6c";
+    ctx.fillRect(pos.x - 1, pos.y - 4, 2, 2);
+    ctx.fillStyle = "#222";
+    ctx.fillRect(pos.x - 3, pos.y - 6, 1, 2);
+    ctx.fillRect(pos.x + 2, pos.y - 6, 1, 2);
+    if (punching) {
+      const d = w.standPunchDir;
+      ctx.fillStyle = "#5fd1a0";
+      ctx.fillRect(pos.x - 1 + d.x * 5, pos.y - 1 + d.y * 5, 4, 4);
+    } else {
+      ctx.fillStyle = "#5fd1a0";
+      ctx.fillRect(pos.x - 6, pos.y + 1, 3, 4);
+      ctx.fillRect(pos.x + 3, pos.y + 1, 3, 4);
+    }
+  } else {
+    // Act 3: mostly white with green accents, taller humanoid
+    ctx.fillStyle = "rgba(95,209,160,0.3)";
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f4f7f3";
+    ctx.fillRect(pos.x - 5, pos.y - 3, 10, 12);
+    // green chest stripe
+    ctx.fillStyle = "#5fd1a0";
+    ctx.fillRect(pos.x - 5, pos.y + 1, 10, 2);
+    // shoulders
+    ctx.fillStyle = "#bff5da";
+    ctx.fillRect(pos.x - 6, pos.y - 2, 2, 5);
+    ctx.fillRect(pos.x + 4, pos.y - 2, 2, 5);
+    // head — white with green band
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(pos.x - 4, pos.y - 11, 8, 9);
+    ctx.fillStyle = "#5fd1a0";
+    ctx.fillRect(pos.x - 4, pos.y - 8, 8, 2);
+    ctx.fillStyle = "#222";
+    ctx.fillRect(pos.x - 3, pos.y - 6, 2, 2);
+    ctx.fillRect(pos.x + 1, pos.y - 6, 2, 2);
+    if (punching) {
+      const d = w.standPunchDir;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(pos.x - 1 + d.x * 7, pos.y - 1 + d.y * 7, 5, 5);
+    } else {
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(pos.x - 7, pos.y + 1, 3, 5);
+      ctx.fillRect(pos.x + 4, pos.y + 1, 3, 5);
+    }
+  }
 }
 
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
