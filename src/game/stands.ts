@@ -138,7 +138,7 @@ export const STANDS: Record<StandId, Stand> = {
       a1: { name: "Eagle Summon", kind: "chain_projectile", damage: 5, range: 260, radius: 6, cooldown: 3.2, speed: 380, color: "#ffd24a" },
       a2: { name: "Frog Summon", kind: "frog_summon", damage: 0, range: 0, cooldown: 4.5, color: "#7fc97f" },
       a3: { name: "Out of Body", kind: "hologram_stun", damage: 5, range: 36, radius: 18, cooldown: 12, stunSeconds: 3.5, color: "#bff5da" },
-      a4: { name: "Tree of Life", kind: "tree_zone", damage: 0, range: 70, radius: 78, cooldown: 30, duration: 6, color: "#5fd16a" },
+      a4: { name: "Tree of Life", kind: "tree_zone", damage: 0, range: 70, radius: 90, cooldown: 30, duration: 14, color: "#5fd16a" },
     },
   },
   hanged_man: {
