@@ -1189,6 +1189,89 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnParticles(w, { x: tx, y: ty }, ab.color, 18, { speedMin: 40, speedMax: 120, life: 0.6 });
       break;
     }
+    case "time_stop": {
+      // Star Platinum's "The World" — freeze NPCs for `duration` seconds.
+      const dur = ab.duration ?? 5;
+      w.timeStopUntil = w.time + dur;
+      w.timeStopStartedAt = w.time;
+      w.pendingPlayerDamage = [];
+      spawnVfx(w, { kind: "time_clock", pos: { x: w.player.pos.x, y: w.player.pos.y - 30 }, radius: 60, color: ab.color, life: 1.4 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 220, color: ab.color, life: 0.8 });
+      w.bannerText = "ZA WARUDO!";
+      w.bannerUntil = w.time + 1.6;
+      play("timeStop");
+      break;
+    }
+    case "pilot_toggle": {
+      // Hanged Man: toggle piloting the stand directly. Player stops moving while piloted.
+      w.pilotActive = !w.pilotActive;
+      w.hangedManFormed = true;
+      if (w.pilotActive) {
+        // spawn the stand near the player on first engage
+        w.hangedMan.pos = { x: w.player.pos.x + 18, y: w.player.pos.y };
+        pushOutOfProps({ ...w.player, pos: w.hangedMan.pos, radius: 9 } as Entity, w.props);
+      }
+      w.bannerText = w.pilotActive ? "Piloting Hanged Man" : "Released";
+      w.bannerUntil = w.time + 0.8;
+      play("pilot");
+      break;
+    }
+    case "mirror_shard": {
+      // Drop a chrome shard at the stand's position (or player). Creates a combat dome.
+      const origin = w.pilotActive ? w.hangedMan.pos : w.player.pos;
+      w.shards.push({
+        id: w.nextId++,
+        pos: { x: origin.x, y: origin.y },
+        radius: ab.radius ?? 80,
+        bornAt: w.time,
+        expireAt: w.time + (ab.duration ?? 12),
+      });
+      spawnVfx(w, { kind: "mirror_dome", pos: { x: origin.x, y: origin.y }, radius: ab.radius ?? 80, color: ab.color, life: 0.6 });
+      spawnVfx(w, { kind: "shard_flash", pos: { x: origin.x, y: origin.y }, radius: 20, color: ab.color, life: 0.4 });
+      play("shard");
+      break;
+    }
+    case "shard_teleport": {
+      // Open a picker so the user can choose which shard to teleport to.
+      const live = w.shards.filter((s) => w.time < s.expireAt);
+      if (live.length === 0) {
+        w.bannerText = "No shards placed";
+        w.bannerUntil = w.time + 0.8;
+        // refund cooldown so the user isn't penalized for an empty picker
+        w.cdTimers[key] = 0;
+        return;
+      }
+      w.shardPickerOpen = true;
+      // refund cooldown until they actually pick one (set in teleportToShard)
+      w.cdTimers[key] = 0;
+      break;
+    }
+    case "brutal_slash": {
+      // Big slash: heavy damage, bleed, stun, slow.
+      const angle = Math.atan2(dir.y, dir.x);
+      const origin = w.pilotActive ? w.hangedMan.pos : p;
+      const reach = ab.range + (ab.radius ?? 16);
+      spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.32 });
+      for (const e of w.npcs) {
+        if (!e.alive) continue;
+        const dx = e.pos.x - origin.x, dy = e.pos.y - origin.y;
+        const d = Math.hypot(dx, dy);
+        if (d > reach + e.radius) continue;
+        const dot = d <= e.radius + 8 ? 1 : (dx * dir.x + dy * dir.y) / (d || 1);
+        if (dot > 0.1) {
+          damageEntity(w, e, ab.damage, { dir, amount: 80 });
+          e.stunUntil = Math.max(e.stunUntil, w.time + (ab.stunSeconds ?? 1.5));
+          e.bleedUntil = w.time + 4;
+          e.bleedNextTickAt = w.time + 0.5;
+          e.slowUntil = w.time + 3;
+        }
+      }
+      const tx = origin.x + dir.x * ab.range;
+      const ty = origin.y + dir.y * ab.range;
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage);
+      play("brutal");
+      break;
+    }
   }
 }
 
@@ -1455,6 +1538,24 @@ export function update(w: World, input: InputState, dt: number) {
   // Eject any entity overlapping a prop (knockback/spawn glitches push them inside houses).
   if (pl.alive) pushOutOfProps(pl, w.props);
   for (const e of w.npcs) if (e.alive) pushOutOfProps(e, w.props);
+
+  // Sweep expired Hanged Man mirror shards.
+  if (w.shards.length) w.shards = w.shards.filter((s) => w.time < s.expireAt);
+  // Auto-close shard picker if all shards have died while it was open.
+  if (w.shardPickerOpen && w.shards.length === 0) w.shardPickerOpen = false;
+
+  // Prop respawn loop — destructible props come back fully healed after their timer.
+  for (const p of w.props) {
+    if (p.destroyedAt && p.respawnAt && w.time >= p.respawnAt) {
+      if (p.original) {
+        p.rect = { ...p.original.rect };
+        p.hp = p.original.hp;
+      }
+      p.destroyedAt = 0;
+      p.respawnAt = 0;
+      p.hitFlashUntil = 0;
+    }
+  }
 
   if (pl.alive) {
     if (input.pressed.m1) { input.pressed.m1 = false; castAbility(w, "m1", input); }
@@ -1908,7 +2009,33 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fillText(dn.text, Math.round(dn.pos.x), Math.round(dn.pos.y));
   }
 
+  // Mirror shards (Hanged Man) — chrome diamond markers + soft dome ring.
+  for (const s of w.shards) {
+    const lifeLeft = s.expireAt - w.time;
+    const a = Math.min(1, lifeLeft / 2);
+    ctx.strokeStyle = hexToRgba("#dfe6f0", a * 0.55);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(s.pos.x, s.pos.y, s.radius, 0, Math.PI * 2); ctx.stroke();
+    // diamond
+    ctx.fillStyle = hexToRgba("#dfe6f0", a);
+    ctx.beginPath();
+    ctx.moveTo(s.pos.x, s.pos.y - 8);
+    ctx.lineTo(s.pos.x + 6, s.pos.y);
+    ctx.lineTo(s.pos.x, s.pos.y + 8);
+    ctx.lineTo(s.pos.x - 6, s.pos.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba("#7a8aa0", a);
+    ctx.stroke();
+  }
+
   ctx.restore();
+
+  // Time Stop tint — desaturated blue overlay across the whole viewport.
+  if (w.time < w.timeStopUntil) {
+    ctx.fillStyle = "rgba(120, 130, 180, 0.18)";
+    ctx.fillRect(0, 0, VW, VH);
+  }
 }
 
 function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
@@ -2439,6 +2566,71 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
       }
       break;
     }
+    case "time_clock": {
+      const r = (v.radius ?? 60);
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r * 0.78, 0, Math.PI * 2); ctx.stroke();
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(v.pos.x + Math.cos(a) * r * 0.82, v.pos.y + Math.sin(a) * r * 0.82);
+        ctx.lineTo(v.pos.x + Math.cos(a) * r * 0.96, v.pos.y + Math.sin(a) * r * 0.96);
+        ctx.stroke();
+      }
+      const ang = t * Math.PI * 4;
+      ctx.beginPath();
+      ctx.moveTo(v.pos.x, v.pos.y);
+      ctx.lineTo(v.pos.x + Math.cos(ang) * r * 0.7, v.pos.y + Math.sin(ang) * r * 0.7);
+      ctx.stroke();
+      break;
+    }
+    case "shard_flash": {
+      const r = (v.radius ?? 20) * (0.4 + t * 1.6);
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.85);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r * 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "mirror_dome": {
+      const r = (v.radius ?? 80);
+      ctx.strokeStyle = hexToRgba(v.color, inv * 0.9);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r * (0.7 + t * 0.4), 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "tree_aura": {
+      const r = (v.radius ?? 60);
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.15);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba(v.color, inv * 0.7);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "hologram_burst": {
+      const r = (v.radius ?? 30) * (0.4 + t * 1.2);
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "chain_arc": {
+      if (!v.to) break;
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(v.pos.x, v.pos.y);
+      const mx = (v.pos.x + v.to.x) / 2 + (Math.random() - 0.5) * 8;
+      const my = (v.pos.y + v.to.y) / 2 + (Math.random() - 0.5) * 8;
+      ctx.lineTo(mx, my);
+      ctx.lineTo(v.to.x, v.to.y);
+      ctx.stroke();
+      break;
+    }
   }
 }
 
@@ -2492,4 +2684,29 @@ export function tryUseDisc(w: World): { ok: boolean; reason?: string } {
     return { ok: false, reason: "puppet" };
   }
   return { ok: true };
+}
+
+// Hanged Man: teleport the player (or piloted stand) to a chosen mirror shard.
+export function teleportToShard(w: World, shardId: number) {
+  const s = w.shards.find((x) => x.id === shardId && w.time < x.expireAt);
+  w.shardPickerOpen = false;
+  if (!s) return;
+  // flash at origin and destination
+  const origin = w.pilotActive ? w.hangedMan.pos : w.player.pos;
+  spawnVfx(w, { kind: "shard_flash", pos: { x: origin.x, y: origin.y }, radius: 24, color: "#dfe6f0", life: 0.4 });
+  if (w.pilotActive) {
+    w.hangedMan.pos = { x: s.pos.x, y: s.pos.y };
+  } else {
+    w.player.pos = { x: s.pos.x, y: s.pos.y };
+    pushOutOfProps(w.player, w.props);
+  }
+  spawnVfx(w, { kind: "shard_flash", pos: { x: s.pos.x, y: s.pos.y }, radius: 24, color: "#dfe6f0", life: 0.4 });
+  // commit the cooldown now
+  const ab = STANDS[w.standId].abilities.a3;
+  w.cdTimers.a3 = ab.cooldown;
+  play("shard");
+}
+
+export function closeShardPicker(w: World) {
+  w.shardPickerOpen = false;
 }
