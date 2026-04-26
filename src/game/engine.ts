@@ -1353,8 +1353,8 @@ export function update(w: World, input: InputState, dt: number) {
   }
   if (input.useDisc) input.useDisc = false;
 
-  // NPC AI
-  for (const e of w.npcs) {
+  // NPC AI — fully frozen during Time Stop.
+  if (!timeStopped) for (const e of w.npcs) {
     if (!e.alive) {
       if (e.respawnAt && w.time >= e.respawnAt) {
         // respawn at strict free spot
