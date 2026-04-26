@@ -438,7 +438,7 @@ export default function Game() {
 }
 
 function AbilityBtn({
-  label, name, damage, color, cdFrac, onPress, disabled, big,
+  label, name, damage, color, cdFrac, onPress, disabled, big, onHoldStart, onHoldEnd,
 }: {
   label: string;
   name: string;
@@ -448,11 +448,16 @@ function AbilityBtn({
   onPress: () => void;
   disabled?: boolean;
   big?: boolean;
+  onHoldStart?: () => void;
+  onHoldEnd?: () => void;
 }) {
   const size = big ? 76 : 56;
   return (
     <button
-      onPointerDown={(e) => { e.preventDefault(); if (!disabled) onPress(); }}
+      onPointerDown={(e) => { e.preventDefault(); if (disabled) return; onPress(); onHoldStart?.(); }}
+      onPointerUp={() => { onHoldEnd?.(); }}
+      onPointerCancel={() => { onHoldEnd?.(); }}
+      onPointerLeave={() => { onHoldEnd?.(); }}
       disabled={disabled}
       className="relative rounded-full flex flex-col items-center justify-center font-bold text-white pointer-events-auto"
       style={{
