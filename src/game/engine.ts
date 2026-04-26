@@ -86,6 +86,8 @@ export interface InputState {
   aim: Vec2 | null;
   sprint: boolean;
   pressed: { m1: boolean; a1: boolean; a2: boolean; a3: boolean; a4: boolean };
+  // True while M1 button is being held — engine auto-repeats M1 each tick the cooldown is ready.
+  m1Held: boolean;
   useArrow: boolean;
   useDisc: boolean;
 }
@@ -97,6 +99,7 @@ export function makeInput(): InputState {
     aim: null,
     sprint: false,
     pressed: { m1: false, a1: false, a2: false, a3: false, a4: false },
+    m1Held: false,
     useArrow: false,
     useDisc: false,
   };
@@ -276,9 +279,10 @@ function makeProps(): Prop[] {
 }
 
 // Strict spawn: never inside a prop, never inside an existing crater, never on player.
-function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?: number; craters?: Crater[] }): Vec2 | null {
-  const padding = 6;
-  for (let i = 0; i < 80; i++) {
+function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?: number; craters?: Crater[]; tries?: number }): Vec2 | null {
+  const padding = 8;
+  const tries = opts?.tries ?? 200;
+  for (let i = 0; i < tries; i++) {
     const x = rand(40, MAP_W - 40);
     const y = rand(40, MAP_H - 40);
     let ok = true;
@@ -302,13 +306,26 @@ function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?:
   return null;
 }
 
-// Fallback when caller MUST have a spot (npc creation at world init)
-function freeSpotOrCenter(props: Prop[], radius: number): Vec2 {
-  return freeSpot(props, radius) ?? { x: MAP_W / 2, y: MAP_H / 2 };
+// Fallback when caller MUST have a spot (npc creation at world init).
+// Walks a grid as a last resort so we never return a position inside a prop.
+function freeSpotOrGrid(props: Prop[], radius: number): Vec2 {
+  const random = freeSpot(props, radius, { tries: 200 });
+  if (random) return random;
+  const step = 24;
+  for (let y = 40; y < MAP_H - 40; y += step) {
+    for (let x = 40; x < MAP_W - 40; x += step) {
+      let ok = true;
+      for (const p of props) if (circleRectOverlap(x, y, radius + 6, p.rect)) { ok = false; break; }
+      if (ok) return { x, y };
+    }
+  }
+  return { x: MAP_W / 2, y: MAP_H / 2 };
 }
 
+const freeSpotOrCenter = freeSpotOrGrid;
+
 function makeNpc(props: Prop[], kind: "friendly" | "enemy", id: number): Entity {
-  const pos = freeSpotOrCenter(props, 10);
+  const pos = freeSpotOrGrid(props, 10);
   return {
     id,
     kind,
@@ -335,7 +352,7 @@ export function createWorld(): World {
   const player: Entity = {
     id: 0,
     kind: "player",
-    pos: { x: MAP_W / 2, y: MAP_H / 2 },
+    pos: freeSpotOrGrid(props, 10),
     vel: { x: 0, y: 0 },
     radius: 9,
     hp: PLAYER_MAX_HP,
@@ -412,6 +429,35 @@ function tryMove(e: Entity, dx: number, dy: number, props: Prop[]) {
   blocked = false;
   for (const p of props) if (circleRectOverlap(e.pos.x, ny, e.radius, p.rect)) { blocked = true; break; }
   if (!blocked) e.pos.y = ny;
+}
+
+// Eject an entity that has somehow ended up overlapping a prop (knockback push, spawn glitch).
+// Walks them out along the shortest axis. Run every tick on every entity.
+function pushOutOfProps(e: Entity, props: Prop[]) {
+  for (let iter = 0; iter < 4; iter++) {
+    let moved = false;
+    for (const p of props) {
+      if (!circleRectOverlap(e.pos.x, e.pos.y, e.radius, p.rect)) continue;
+      // find nearest exit direction
+      const r = p.rect;
+      const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+      const halfW = r.w / 2 + e.radius;
+      const halfH = r.h / 2 + e.radius;
+      const dx = e.pos.x - cx, dy = e.pos.y - cy;
+      const overlapX = halfW - Math.abs(dx);
+      const overlapY = halfH - Math.abs(dy);
+      if (overlapX < overlapY) {
+        e.pos.x += Math.sign(dx || 1) * (overlapX + 0.5);
+      } else {
+        e.pos.y += Math.sign(dy || 1) * (overlapY + 0.5);
+      }
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  // clamp inside map
+  e.pos.x = Math.max(e.radius, Math.min(MAP_W - e.radius, e.pos.x));
+  e.pos.y = Math.max(e.radius, Math.min(MAP_H - e.radius, e.pos.y));
 }
 
 function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff") {
@@ -514,13 +560,32 @@ function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, preferEne
   return target;
 }
 
-function aimDir(w: World, input: InputState, ab?: Ability): Vec2 {
+// "any NPC" target — used for M1 punches which should hit closest NPC regardless of faction.
+function nearestAnyNpc(w: World, from: Vec2, range = AIM_ASSIST_RANGE): Entity | null {
+  let target: Entity | null = null;
+  let best = range * range;
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    const d = dist2(e.pos, from);
+    if (d < best) { best = d; target = e; }
+  }
+  return target;
+}
+
+function aimDir(w: World, input: InputState, ab?: Ability, key?: "m1" | "a1" | "a2" | "a3" | "a4"): Vec2 {
   // Manual aim wins
   if (input.aim) return norm(input.aim);
-  // Target-locked aim: use the ability's range (with fallback) so long-range moves still find targets
-  const range = ab?.range && ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : AIM_ASSIST_RANGE;
-  const target = nearestTarget(w, w.player.pos, range);
-  if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+  // M1: lock onto closest NPC of any kind. For Ebony Devil w/ active puppet, aim from puppet's pos.
+  if (key === "m1") {
+    const origin = (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos : w.player.pos;
+    const t = nearestAnyNpc(w, origin, AIM_ASSIST_RANGE);
+    if (t) return norm({ x: t.pos.x - origin.x, y: t.pos.y - origin.y });
+  } else {
+    // Target-locked aim: use the ability's range (with fallback) so long-range moves still find targets
+    const range = ab?.range && ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : AIM_ASSIST_RANGE;
+    const target = nearestTarget(w, w.player.pos, range);
+    if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+  }
   // Fall back to joystick / facing
   if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
   return w.player.facing;
@@ -595,6 +660,22 @@ function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
   return "punch";
 }
 
+// Per-stand M1 damage table (normal, critical). Crit chance = 15%.
+// Ebony Devil: owner's M1 is intentionally tiny; the puppet (when active) does the real damage.
+function m1DamageRoll(w: World, puppetSwing: boolean): number {
+  const crit = Math.random() < 0.15;
+  const sid = w.standId;
+  if (sid === "ebony_devil") {
+    if (puppetSwing) return crit ? 2.5 : rand(1, 2);
+    return crit ? 0.9 : 0.3;
+  }
+  if (sid === "star_platinum")  return crit ? 5   : 3;
+  if (sid === "gold_experience")return crit ? 4   : 2.5;
+  if (sid === "echoes")         return crit ? 3   : 1.5;
+  if (sid === "rhcp")           return crit ? 3   : 1.4;
+  return 1;
+}
+
 function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: InputState) {
   const stand = STANDS[w.standId];
   if (stand.id === "none" && key !== "m1") return;
@@ -615,7 +696,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   }
   w.cdTimers[key] = ab.cooldown;
 
-  const dir = aimDir(w, input, ab);
+  const dir = aimDir(w, input, ab, key);
   const p = w.player.pos;
   const sfx = sfxFor(w, key);
 
@@ -631,12 +712,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   switch (ab.kind) {
     case "melee": {
       const angle = Math.atan2(dir.y, dir.x);
-      const origin = w.standId === "ebony_devil" && w.puppet.active ? w.puppet.pos : p;
+      // Ebony Devil M1: only the puppet swings (does its own bigger damage). Owner barely scratches.
+      const usePuppetOrigin = w.standId === "ebony_devil" && w.puppet.active && key === "m1";
+      const origin = usePuppetOrigin ? w.puppet.pos : p;
       const reach = ab.range + (ab.radius ?? 14);
       // slash arc VFX so misses still feel responsive
       spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.2 });
+      // M1 punches: roll critical per stand table.
+      let dmg = ab.damage;
+      if (key === "m1") dmg = m1DamageRoll(w, usePuppetOrigin);
       // Hit any NPC within an arc in front of the player (cone test).
-      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, ab.damage, key === "m1" && w.time < w.rageUntil ? 45 : undefined);
+      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, dmg, key === "m1" && w.time < w.rageUntil ? 45 : undefined);
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
@@ -1025,9 +1111,27 @@ export function update(w: World, input: InputState, dt: number) {
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
       pl.facing = { x: nx, y: ny };
       w.footstepAcc += dt * Math.min(1, len);
-      if (w.footstepAcc >= 0.32) { w.footstepAcc = 0; play("footstep"); }
+      if (w.footstepAcc >= 0.32) {
+        w.footstepAcc = 0;
+        play("footstep");
+        // walking dust puff (brown, gravity)
+        const back = { x: -nx, y: -ny };
+        spawnParticles(w, { x: pl.pos.x + back.x * 4, y: pl.pos.y + 6 + back.y * 2 }, "#a1814a", input.sprint ? 5 : 3, {
+          shape: "square", gravity: 60, speedMin: 8, speedMax: input.sprint ? 60 : 35, life: 0.45,
+        });
+      }
     } else {
       w.footstepAcc = 0.32; // ready to step on next move
+    }
+    // Player regen — slow out-of-combat heal (faster while standing in tree zone, handled later).
+    const recentlyHurt = w.time - pl.hitFlashUntil < 4.0;
+    if (!recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
+
+    // Bleed particles when below half HP
+    if (pl.hp < pl.maxHp * 0.5 && Math.random() < dt * 5) {
+      spawnParticles(w, { x: pl.pos.x + rand(-3, 3), y: pl.pos.y - 2 }, "#b21717", 1, {
+        shape: "circle", gravity: 120, speedMin: 8, speedMax: 24, life: 0.5,
+      });
     }
   } else {
     if (pl.respawnAt && w.time >= pl.respawnAt) {
@@ -1035,6 +1139,12 @@ export function update(w: World, input: InputState, dt: number) {
       pl.hp = pl.maxHp;
       pl.pos = { x: MAP_W / 2, y: MAP_H / 2 };
     }
+  }
+
+  // M1 hold-to-repeat (input-driven)
+  w.m1Held = input.m1Held;
+  if (pl.alive && w.m1Held && w.cdTimers.m1 <= 0 && (w.standId === "none" || w.standActive)) {
+    castAbility(w, "m1", input);
   }
 
   if (input.aim) w.pointerAim = norm(input.aim);
@@ -1154,6 +1264,10 @@ export function update(w: World, input: InputState, dt: number) {
       }
     }
   }
+
+  // Eject any entity overlapping a prop (knockback/spawn glitches push them inside houses).
+  if (pl.alive) pushOutOfProps(pl, w.props);
+  for (const e of w.npcs) if (e.alive) pushOutOfProps(e, w.props);
 
   if (pl.alive) {
     if (input.pressed.m1) { input.pressed.m1 = false; castAbility(w, "m1", input); }
@@ -1346,12 +1460,23 @@ export function tryPickupItems(w: World): { arrows: number; discs: number } {
   return { arrows: a, discs: d };
 }
 
-export function useArrow(w: World) {
-  const { id, shitVariant } = rollStand();
-  w.standId = id;
-  w.shitVariant = shitVariant;
+function resetStandRuntime(w: World) {
+  // Clear ability state that can leak when switching/dropping a stand mid-cast.
   w.cdTimers = { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 };
   w.channel = null;
+  w.standPunchUntil = 0;
+  w.standAimUntil = 0;
+  w.standAimTarget = null;
+  w.puppet.active = false;
+  w.puppet.hp = w.puppet.maxHp;
+  w.standActive = true;
+}
+
+export function useArrow(w: World) {
+  const { id, shitVariant } = rollStand();
+  resetStandRuntime(w);
+  w.standId = id;
+  w.shitVariant = shitVariant;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
   w.bannerText = "Stand: " + name;
   w.bannerUntil = w.time + 2.5;
@@ -1361,9 +1486,9 @@ export function useArrow(w: World) {
 
 export function useDisc(w: World) {
   if (w.standId === "none") return;
+  resetStandRuntime(w);
   w.standId = "none";
   w.shitVariant = false;
-  w.channel = null;
   w.bannerText = "Stand discarded";
   w.bannerUntil = w.time + 1.5;
   play("pickupDisc");
@@ -1573,15 +1698,16 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
 
 function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   const pl = w.player;
-  // Stand drawn UNDER player when behind, OVER when in front. We compute pos and z-order.
+  // Stand drawn UNDER player when behind, OVER when in front. Hidden entirely if standActive=false.
+  const standVisible = w.standId !== "none" && w.standActive;
   const standPos = computeStandPos(w);
   const standInFront = standPos.y >= pl.pos.y;
-  if (w.standId !== "none" && !standInFront) drawStand(ctx, w, standPos);
+  if (standVisible && !standInFront) drawStand(ctx, w, standPos);
   // shadow
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(pl.pos.x, pl.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
-  // stand aura
-  if (w.standId !== "none") {
+  // stand aura — only when active
+  if (standVisible) {
     const auraColor = STANDS[w.standId].color;
     ctx.fillStyle = hexToRgba(auraColor, 0.18 + Math.sin(w.time * 6) * 0.05);
     ctx.beginPath(); ctx.arc(pl.pos.x, pl.pos.y, 16, 0, Math.PI * 2); ctx.fill();
@@ -1600,10 +1726,7 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
   // hp bar (only if damaged)
   if (pl.hp < pl.maxHp) drawHpBar(ctx, pl.pos.x, pl.pos.y - 16, pl.hp / pl.maxHp);
-  if (w.standId !== "none") {
-    const standPos = computeStandPos(w);
-    if (standPos.y >= pl.pos.y) drawStand(ctx, w, standPos);
-  }
+  if (standVisible && standInFront) drawStand(ctx, w, standPos);
   if (w.time < w.rageUntil) {
     ctx.strokeStyle = `rgba(255,61,61,${0.45 + Math.sin(w.time * 16) * 0.18})`;
     ctx.lineWidth = 2;
@@ -1641,6 +1764,49 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   else if (id === "rhcp") drawRhcp(ctx, w, pos);
   else if (id === "echoes") drawEchoes(ctx, w, pos);
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
+  else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
+}
+
+function drawGoldExperience(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  // soft golden aura
+  ctx.fillStyle = "rgba(245,211,107,0.28)";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, 14, 0, Math.PI * 2); ctx.fill();
+  // body — slim gold humanoid
+  ctx.fillStyle = "#b58a2c";
+  ctx.fillRect(pos.x - 4, pos.y - 2, 8, 12);
+  ctx.fillStyle = "#f5d36b";
+  ctx.fillRect(pos.x - 3, pos.y - 1, 6, 5);
+  // ladybug-style chest spots
+  ctx.fillStyle = "#8a5a14";
+  ctx.fillRect(pos.x - 2, pos.y + 2, 1, 1);
+  ctx.fillRect(pos.x + 1, pos.y + 4, 1, 1);
+  // round head
+  ctx.fillStyle = "#ffe89a";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y - 7, 5, 0, Math.PI * 2); ctx.fill();
+  // visor / eyes
+  ctx.fillStyle = "#3b2a08";
+  ctx.fillRect(pos.x - 3, pos.y - 8, 6, 1);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(pos.x - 2, pos.y - 8, 1, 1);
+  ctx.fillRect(pos.x + 1, pos.y - 8, 1, 1);
+  // shoulder pads
+  ctx.fillStyle = "#fff0b8";
+  ctx.fillRect(pos.x - 5, pos.y - 2, 2, 3);
+  ctx.fillRect(pos.x + 3, pos.y - 2, 2, 3);
+  // arms — punch extension
+  if (punching) {
+    const d = w.standPunchDir;
+    ctx.fillStyle = "#f5d36b";
+    ctx.fillRect(pos.x - 1 + d.x * 7, pos.y - 1 + d.y * 7, 5, 4);
+    // gold sparkle on fist
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(pos.x + d.x * 9, pos.y + d.y * 9, 2, 2);
+  } else {
+    ctx.fillStyle = "#f5d36b";
+    ctx.fillRect(pos.x - 6, pos.y + 1, 3, 5);
+    ctx.fillRect(pos.x + 3, pos.y + 1, 3, 5);
+  }
 }
 
 function drawStarPlatinum(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {

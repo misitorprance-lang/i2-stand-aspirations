@@ -118,17 +118,27 @@ export default function Game() {
     const keys = new Set<string>();
     const onDown = (e: KeyboardEvent) => {
       unlockAudio();
+      if (keys.has(e.key.toLowerCase())) return; // ignore key-repeat
       keys.add(e.key.toLowerCase());
       const k = e.key.toLowerCase();
       if (k === "1") inputRef.current.pressed.a1 = true;
       if (k === "2") inputRef.current.pressed.a2 = true;
       if (k === "3") inputRef.current.pressed.a3 = true;
       if (k === "4") inputRef.current.pressed.a4 = true;
-      if (k === " " || k === "f") inputRef.current.pressed.m1 = true;
+      if (k === " " || k === "f") {
+        inputRef.current.pressed.m1 = true;
+        inputRef.current.m1Held = true;
+      }
       inputRef.current.sprint = keys.has("shift");
       updateKeyJoy();
     };
-    const onUp = (e: KeyboardEvent) => { keys.delete(e.key.toLowerCase()); inputRef.current.sprint = keys.has("shift"); updateKeyJoy(); };
+    const onUp = (e: KeyboardEvent) => {
+      keys.delete(e.key.toLowerCase());
+      const k = e.key.toLowerCase();
+      if (k === " " || k === "f") inputRef.current.m1Held = false;
+      inputRef.current.sprint = keys.has("shift");
+      updateKeyJoy();
+    };
     function updateKeyJoy() {
       let x = 0, y = 0;
       if (keys.has("arrowleft") || keys.has("a")) x -= 1;
@@ -210,6 +220,8 @@ export default function Game() {
     unlockAudio();
     inputRef.current.pressed[key] = true;
   };
+  const m1HoldStart = () => { unlockAudio(); inputRef.current.pressed.m1 = true; inputRef.current.m1Held = true; };
+  const m1HoldEnd = () => { inputRef.current.m1Held = false; };
 
   const onUseArrow = () => {
     if (arrowsRef.current <= 0 || !worldRef.current) return;
@@ -342,10 +354,11 @@ export default function Game() {
              onClick={() => setShowHelp(false)}>
           <div className="font-bold mb-1 text-sm">How to play (tap to close)</div>
           <div>• Drag the LEFT half to move (or WASD).</div>
-          <div>• Tap M1 / 1-4 to attack (or Space, 1-4).</div>
-          <div>• Pick up <span style={{color:"#caa14a"}}>Arrows</span> to roll a stand.</div>
-          <div>• Pick up <span style={{color:"#cfd2d8"}}>DISCs</span> to remove your current stand.</div>
-          <div>• Hostile NPCs (red) only attack after you provoke them.</div>
+          <div>• Tap M1 / 1-4 to attack (or Space, 1-4). Hold M1 to auto-repeat.</div>
+          <div>• M1 auto-aims at the closest NPC. 1-4 lock onto the closest enemy.</div>
+          <div>• Pick up <span style={{color:"#caa14a"}}>Arrows</span> to roll a stand. <span style={{color:"#cfd2d8"}}>DISCs</span> remove your stand.</div>
+          <div>• Tap "Stand: ON/OFF" to dismiss/resummon your stand.</div>
+          <div>• Hostile NPCs (red) only attack after you provoke them. You slowly regen out of combat.</div>
         </div>
       )}
       {!showHelp && (
@@ -410,7 +423,7 @@ export default function Game() {
           <AbilityBtn label="3" name={abilities.a3.name} damage={abilities.a3.damage} color={abilities.a3.color} cdFrac={cdFrac("a3")} disabled={ui.standId === "none" || abilities.a3.name === "-"} onPress={press("a3")} />
           <AbilityBtn label="4" name={abilities.a4.name} damage={abilities.a4.damage} color={abilities.a4.color} cdFrac={cdFrac("a4")} disabled={ui.standId === "none" || abilities.a4.name === "-" || (ui.standId === "ebony_devil" && ui.rage < 100 && !ui.rageActive)} onPress={press("a4")} />
         </div>
-        <AbilityBtn label="M1" name={abilities.m1.name} damage={abilities.m1.damage} color={abilities.m1.color} cdFrac={cdFrac("m1")} big onPress={press("m1")} />
+        <AbilityBtn label="M1" name={abilities.m1.name} damage={abilities.m1.damage} color={abilities.m1.color} cdFrac={cdFrac("m1")} big onPress={press("m1")} onHoldStart={m1HoldStart} onHoldEnd={m1HoldEnd} />
         {ui.standId !== "none" && (
           <button
             onClick={onToggleStand}
@@ -426,7 +439,7 @@ export default function Game() {
 }
 
 function AbilityBtn({
-  label, name, damage, color, cdFrac, onPress, disabled, big,
+  label, name, damage, color, cdFrac, onPress, disabled, big, onHoldStart, onHoldEnd,
 }: {
   label: string;
   name: string;
@@ -436,11 +449,16 @@ function AbilityBtn({
   onPress: () => void;
   disabled?: boolean;
   big?: boolean;
+  onHoldStart?: () => void;
+  onHoldEnd?: () => void;
 }) {
   const size = big ? 76 : 56;
   return (
     <button
-      onPointerDown={(e) => { e.preventDefault(); if (!disabled) onPress(); }}
+      onPointerDown={(e) => { e.preventDefault(); if (disabled) return; onPress(); onHoldStart?.(); }}
+      onPointerUp={() => { onHoldEnd?.(); }}
+      onPointerCancel={() => { onHoldEnd?.(); }}
+      onPointerLeave={() => { onHoldEnd?.(); }}
       disabled={disabled}
       className="relative rounded-full flex flex-col items-center justify-center font-bold text-white pointer-events-auto"
       style={{

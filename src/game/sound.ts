@@ -99,8 +99,9 @@ export const SFX = {
   tree:         () => { tone(110, 0.45, "sine", 0.4, 220); tone(330, 0.3, "triangle", 0.25, 660); },
   bleed:        () => { noise(0.08, 0.12, 500, "lowpass"); },
   electrocute:  () => { tone(2400, 0.04, "square", 0.18, 3200); },
-  toggleOn:     () => { tone(440, 0.08, "triangle", 0.25, 880); tone(660, 0.08, "triangle", 0.25, 1320); },
-  toggleOff:    () => { tone(660, 0.08, "triangle", 0.25, 440); tone(330, 0.1, "triangle", 0.2, 165); },
+  toggleOn:     () => { tone(220, 0.18, "sawtooth", 0.22, 1500, ); noise(0.18, 0.12, 1800, "highpass"); tone(880, 0.12, "triangle", 0.18, 1760); },
+  toggleOff:    () => { tone(1500, 0.18, "sawtooth", 0.22, 220); noise(0.18, 0.12, 1200, "highpass"); tone(660, 0.12, "triangle", 0.15, 220); },
+  regen:        () => { tone(660, 0.1, "sine", 0.15, 990); },
 };
 
 export type SfxKey = keyof typeof SFX;
