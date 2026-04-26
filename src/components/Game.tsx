@@ -214,6 +214,9 @@ export default function Game() {
   const onAimEnd = (e: React.PointerEvent) => {
     if (aimRef.current.pointerId !== e.pointerId) return;
     aimRef.current = { active: false, pointerId: null };
+    // CRITICAL: clear the aim vector so M1/abilities fall back to auto-aim.
+    // Otherwise the last drag direction stays "stuck" forever and M1 swings into empty air.
+    inputRef.current.aim = null;
   };
 
   const press = (key: "m1" | "a1" | "a2" | "a3" | "a4") => () => {
