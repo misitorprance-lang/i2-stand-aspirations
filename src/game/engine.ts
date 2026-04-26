@@ -730,7 +730,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     return;
   }
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone"].includes(ab.kind)) return;
+  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone", "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop"].includes(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
   if (ab.kind === "rage_mode" && w.rage < 100) {
     w.bannerText = "Rage not ready";
@@ -738,6 +738,33 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 22, color: ab.color, life: 0.22 });
     return;
   }
+
+  // Range-gate targeted abilities: don't burn cooldown on a cast that has nothing to hit.
+  // Skipped for self-AoE, channels, summons, toggles, and pierce (which is fire-along-line).
+  const targetedKinds = ["projectile", "lobbed", "aoe_target", "stun_touch", "knockback", "auto_aim", "chain_projectile", "hologram_stun", "dot_zone"];
+  if (!input.aim && targetedKinds.includes(ab.kind) && ab.range > 0) {
+    const t = nearestTarget(w, w.player.pos, ab.range);
+    if (!t) {
+      w.bannerText = "Out of range";
+      w.bannerUntil = w.time + 0.6;
+      return;
+    }
+  }
+  // M1 range gate: don't swing into empty air. Origin is puppet pos for piloted Ebony Devil.
+  if (key === "m1" && ab.kind === "melee" && !input.aim) {
+    const origin = (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos : w.player.pos;
+    const reach = ab.range + (ab.radius ?? 14);
+    const t = nearestAnyNpc(w, origin, reach + 12);
+    if (!t) return; // silent — feels better than a banner spam on hold
+  }
+
+  // Echoes: act is driven by the LAST ability used (a1 -> 1, a2/a3 -> 2, a4 -> 3).
+  if (w.standId === "echoes") {
+    if (key === "a1") w.echoesAct = 1;
+    else if (key === "a2" || key === "a3") w.echoesAct = 2;
+    else if (key === "a4") w.echoesAct = 3;
+  }
+
   w.cdTimers[key] = ab.cooldown;
 
   const dir = aimDir(w, input, ab, key);
