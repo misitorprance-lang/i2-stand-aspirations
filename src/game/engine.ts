@@ -293,7 +293,21 @@ function makeProps(): Prop[] {
       },
     });
   }
-  // (prop hp tagging — deferred)
+  // ---- prop tagging: assign destruction HP per category by rect signature ----
+  // Trees: 20×16; Rocks: variable ovals; Bushes: 18×14; Houses: 80×60; Fences: w×6.
+  for (const p of props) {
+    const r = p.rect;
+    let hp = 0;
+    if (r.w === 80 && r.h === 60) hp = 60;            // house
+    else if (r.w === 20 && r.h === 16) hp = 12;       // tree
+    else if (r.w === 18 && r.h === 14) hp = 12;       // bush
+    else if (r.h === 6) hp = 12;                      // fence
+    else hp = 30;                                     // rock
+    p.hp = hp;
+    p.maxHp = hp;
+    p.destructible = true;
+    p.original = { rect: { ...r }, hp };
+  }
 
   return props;
 }
