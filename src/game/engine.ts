@@ -1498,15 +1498,22 @@ export function update(w: World, input: InputState, dt: number) {
     e.vel.y *= 0.9;
     tryMove(e, e.vel.x * dt, e.vel.y * dt, w.props);
 
-    if (e.kind === "enemy" && e.provoked && pl.alive && dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO) {
-      const puppetCloser = w.puppet.active && dist2(e.pos, w.puppet.pos) < dist2(e.pos, pl.pos);
-      // Frog interception: if a frog is closer than the player, hit the frog instead
+    if (e.kind === "enemy" && e.provoked && pl.alive && (dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO || (w.puppet.active && dist2(e.pos, w.puppet.pos) < ENEMY_AGGRO * ENEMY_AGGRO) || (w.hangedManActive && dist2(e.pos, w.hangedMan.pos) < ENEMY_AGGRO * ENEMY_AGGRO))) {
+      // Pick the closest player-like body: player, puppet, hanged man.
+      const pd = dist2(e.pos, pl.pos);
+      const ppd = w.puppet.active ? dist2(e.pos, w.puppet.pos) : Infinity;
+      const hpd = w.hangedManActive ? dist2(e.pos, w.hangedMan.pos) : Infinity;
+      const minD = Math.min(pd, ppd, hpd);
+      const aimAtPuppet = ppd === minD && ppd < Infinity;
+      const aimAtHanged = !aimAtPuppet && hpd === minD && hpd < Infinity;
+      // Frog interception: if a frog is closer than chosen target, hit the frog instead
       const aliveFrogs = w.frogs.filter((f) => f.alive);
       let frogTarget: Frog | null = null;
+      const baseTargetPos = aimAtPuppet ? w.puppet.pos : aimAtHanged ? w.hangedMan.pos : pl.pos;
       for (const f of aliveFrogs) {
-        if (dist2(f.pos, e.pos) < dist2(pl.pos, e.pos) && dist2(f.pos, e.pos) < 50 * 50) { frogTarget = f; break; }
+        if (dist2(f.pos, e.pos) < dist2(baseTargetPos, e.pos) && dist2(f.pos, e.pos) < 50 * 50) { frogTarget = f; break; }
       }
-      const targetPos = frogTarget ? frogTarget.pos : (puppetCloser ? w.puppet.pos : pl.pos);
+      const targetPos = frogTarget ? frogTarget.pos : baseTargetPos;
       const dir = norm({ x: targetPos.x - e.pos.x, y: targetPos.y - e.pos.y });
       tryMove(e, dir.x * ENEMY_SPEED * dt, dir.y * ENEMY_SPEED * dt, w.props);
       e.facing = dir;
@@ -1519,7 +1526,8 @@ export function update(w: World, input: InputState, dt: number) {
           spawnParticles(w, frogTarget.pos, "#7fc97f", 14, { gravity: 80, life: 0.6 });
           play("frog");
           damageEntity(w, e, dmg * 0.5);
-        } else if (puppetCloser) damagePuppet(w, dmg);
+        } else if (aimAtPuppet) damagePuppet(w, dmg);
+        else if (aimAtHanged) damageHangedMan(w, dmg, dir);
         else damageEntity(w, pl, dmg, { dir, amount: 40 });
       }
     } else {
