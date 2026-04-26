@@ -128,6 +128,7 @@ interface World {
   standActive: boolean; // can be toggled off (desummon)
   bannerText: string | null;
   bannerUntil: number;
+  banners: { id: number; text: string; color: string | null; expireAt: number }[];
   nextId: number;
   shake: number;
   cam: Vec2;
@@ -425,6 +426,7 @@ export function createWorld(): World {
     standActive: true,
     bannerText: null,
     bannerUntil: 0,
+    banners: [],
     nextId: 1000,
     shake: 0,
     cam: { x: player.pos.x, y: player.pos.y },
