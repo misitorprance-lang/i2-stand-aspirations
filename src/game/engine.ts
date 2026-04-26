@@ -699,20 +699,25 @@ function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
   return "punch";
 }
 
-// Per-stand M1 damage table (normal, critical). Crit chance = 15%.
-// Ebony Devil: owner's M1 is intentionally tiny; the puppet (when active) does the real damage.
-function m1DamageRoll(w: World, puppetSwing: boolean): number {
-  const crit = Math.random() < 0.15;
+// Per-stand M1 damage table. Returns { dmg, crit }. Crit chance = 15% (Hanged Man never crits).
+function m1DamageRoll(w: World, puppetSwing: boolean): { dmg: number; crit: boolean } {
   const sid = w.standId;
+  const crit = sid === "hanged_man" ? false : Math.random() < 0.15;
   if (sid === "ebony_devil") {
-    if (puppetSwing) return crit ? 2.5 : rand(1, 2);
-    return crit ? 0.9 : 0.3;
+    if (puppetSwing) return { dmg: crit ? 2.5 : rand(1, 2), crit };
+    return { dmg: crit ? 0.9 : 0.3, crit };
   }
-  if (sid === "star_platinum")  return crit ? 5   : 3;
-  if (sid === "gold_experience")return crit ? 4   : 2.5;
-  if (sid === "echoes")         return crit ? 3   : 1.5;
-  if (sid === "rhcp")           return crit ? 3   : 1.4;
-  return 1;
+  if (sid === "echoes") {
+    // Act-driven damage
+    if (w.echoesAct === 1) return { dmg: crit ? 0.8 : 0.4, crit };
+    if (w.echoesAct === 2) return { dmg: crit ? 1.5 : 0.9, crit };
+    return { dmg: crit ? 3 : 1.5, crit };
+  }
+  if (sid === "star_platinum")  return { dmg: crit ? 5   : 3,   crit };
+  if (sid === "gold_experience")return { dmg: crit ? 4   : 2.5, crit };
+  if (sid === "rhcp")           return { dmg: crit ? 3   : 1.4, crit };
+  if (sid === "hanged_man")     return { dmg: 1.2, crit: false };
+  return { dmg: 1, crit: false };
 }
 
 function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: InputState) {
