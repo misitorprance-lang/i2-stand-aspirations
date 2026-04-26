@@ -1822,6 +1822,37 @@ export function update(w: World, input: InputState, dt: number) {
   // Shake decays
   w.shake *= 0.85;
 
+  // White Album: bar drain/refill + ice trail + NPC slow on ice.
+  if (w.standId === "white_album") {
+    if (w.whiteAlbumActive) {
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 6 * dt);
+      if (w.whiteAlbumBar <= 0) {
+        w.whiteAlbumActive = false;
+        w.whiteAlbumLockUntil = w.time + 6;
+        w.bannerText = "Suit overheated"; w.bannerUntil = w.time + 1.2;
+      }
+      // Spawn ice tile every ~0.15s while moving.
+      if (pl.alive && w.lastJoyMag > 0.1 && (!w.icePath.length || w.time - w.icePath[w.icePath.length - 1].bornAt > 0.15)) {
+        w.icePath.push({ pos: { x: pl.pos.x, y: pl.pos.y + 6 }, bornAt: w.time, expireAt: w.time + 4 });
+      }
+    } else {
+      w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 10 * dt);
+    }
+    // Slow NPCs on ice.
+    if (w.icePath.length) {
+      for (const tile of w.icePath) {
+        for (const e of w.npcs) {
+          if (!e.alive) continue;
+          if (dist2(e.pos, tile.pos) < 16 * 16) e.slowUntil = Math.max(e.slowUntil ?? 0, w.time + 0.5);
+        }
+      }
+      w.icePath = w.icePath.filter((t) => w.time < t.expireAt);
+    }
+  } else if (w.icePath.length) {
+    w.icePath = [];
+  }
+
+
   // Camera
   const viewW = VW / CAMERA_ZOOM;
   const viewH = VH / CAMERA_ZOOM;
