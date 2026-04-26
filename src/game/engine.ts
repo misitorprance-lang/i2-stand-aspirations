@@ -1385,12 +1385,23 @@ export function tryPickupItems(w: World): { arrows: number; discs: number } {
   return { arrows: a, discs: d };
 }
 
-export function useArrow(w: World) {
-  const { id, shitVariant } = rollStand();
-  w.standId = id;
-  w.shitVariant = shitVariant;
+function resetStandRuntime(w: World) {
+  // Clear ability state that can leak when switching/dropping a stand mid-cast.
   w.cdTimers = { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 };
   w.channel = null;
+  w.standPunchUntil = 0;
+  w.standAimUntil = 0;
+  w.standAimTarget = null;
+  w.puppet.active = false;
+  w.puppet.hp = w.puppet.maxHp;
+  w.standActive = true;
+}
+
+export function useArrow(w: World) {
+  const { id, shitVariant } = rollStand();
+  resetStandRuntime(w);
+  w.standId = id;
+  w.shitVariant = shitVariant;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
   w.bannerText = "Stand: " + name;
   w.bannerUntil = w.time + 2.5;
@@ -1400,9 +1411,9 @@ export function useArrow(w: World) {
 
 export function useDisc(w: World) {
   if (w.standId === "none") return;
+  resetStandRuntime(w);
   w.standId = "none";
   w.shitVariant = false;
-  w.channel = null;
   w.bannerText = "Stand discarded";
   w.bannerUntil = w.time + 1.5;
   play("pickupDisc");
