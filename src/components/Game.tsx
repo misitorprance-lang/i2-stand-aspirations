@@ -116,6 +116,11 @@ export default function Game() {
           kills: w.kills,
           rage: Math.round(w.rage),
           rageActive: w.time < w.rageUntil,
+          echoesAct: w.echoesAct,
+          timeStopActive: w.time < w.timeStopUntil,
+          pilotActive: w.pilotActive || w.puppetPiloted,
+          shardPickerOpen: w.shardPickerOpen,
+          shards: w.shards.map((s) => ({ id: s.id, pos: { ...s.pos } })),
         });
       }
     };
