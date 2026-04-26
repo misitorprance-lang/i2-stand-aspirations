@@ -1905,20 +1905,30 @@ export function update(w: World, input: InputState, dt: number) {
   w.shake *= 0.85;
 
   // White Album: bar drain/refill + ice trail + NPC slow on ice.
+  // Two states: Suit On (drain) and Suit Off (forced lockout while bar refills) — no "regular stand" mode.
   if (w.standId === "white_album") {
     if (w.whiteAlbumActive) {
-      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 6 * dt);
+      // Slow passive drain so the bar lasts ~50s base before any moves are used.
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 2 * dt);
       if (w.whiteAlbumBar <= 0) {
         w.whiteAlbumActive = false;
-        w.whiteAlbumLockUntil = w.time + 6;
-        w.bannerText = "Suit overheated"; w.bannerUntil = w.time + 1.2;
+        w.standActive = false;
+        w.whiteAlbumLockUntil = w.time + 8;
+        w.bannerText = "Suit overheated"; w.bannerUntil = w.time + 1.4;
       }
       // Spawn ice tile every ~0.15s while moving.
       if (pl.alive && w.lastJoyMag > 0.1 && (!w.icePath.length || w.time - w.icePath[w.icePath.length - 1].bornAt > 0.15)) {
         w.icePath.push({ pos: { x: pl.pos.x, y: pl.pos.y + 6 }, bornAt: w.time, expireAt: w.time + 4 });
       }
     } else {
-      w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 10 * dt);
+      // Suit off: refill the bar. Fully cooled at 100, then auto-comes-back online once lockout ends.
+      w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 6 * dt);
+      if (w.whiteAlbumBar >= 100 && w.time >= w.whiteAlbumLockUntil) {
+        w.whiteAlbumActive = true;
+        w.standActive = true;
+        w.bannerText = "Suit recharged"; w.bannerUntil = w.time + 1.0;
+        play("toggleOn");
+      }
     }
     // Slow NPCs on ice.
     if (w.icePath.length) {
