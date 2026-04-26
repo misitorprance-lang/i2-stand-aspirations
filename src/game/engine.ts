@@ -559,9 +559,10 @@ function spawnVfx(w: World, v: Omit<Vfx, "bornAt" | "expireAt"> & { life: number
   w.vfx.push({ ...rest, bornAt: w.time, expireAt: w.time + life });
 }
 
-function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }, crit = false) {
+function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }, crit = false, opts?: { fromPuppet?: boolean }) {
   if (!e.alive) return;
-  if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil) dmg *= 1.55;
+  // Rage Mode now only multiplies damage that originates from the puppet itself.
+  if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil && opts?.fromPuppet) dmg *= 1.55;
   e.hp -= dmg;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg, "#fff", crit);
