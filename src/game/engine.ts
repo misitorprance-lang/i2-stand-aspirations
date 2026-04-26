@@ -1520,6 +1520,20 @@ export function update(w: World, input: InputState, dt: number) {
     }
     w.puppet.pos.x = Math.max(10, Math.min(MAP_W - 10, w.puppet.pos.x));
     w.puppet.pos.y = Math.max(10, Math.min(MAP_H - 10, w.puppet.pos.y));
+    // NPC soft collision (push apart)
+    pushOutOfNpcs(w, w.puppet.pos, 9);
+    // Tether: clamp distance from player. Past tether, drag the puppet back toward player.
+    const dx = w.puppet.pos.x - pl.pos.x, dy = w.puppet.pos.y - pl.pos.y;
+    const td = Math.hypot(dx, dy);
+    if (td > STAND_TETHER) {
+      const k = STAND_TETHER / td;
+      w.puppet.pos.x = pl.pos.x + dx * k;
+      w.puppet.pos.y = pl.pos.y + dy * k;
+      if (!w.bannerText || w.time > w.bannerUntil) {
+        w.bannerText = "Puppet leashed";
+        w.bannerUntil = w.time + 0.5;
+      }
+    }
   }
 
   // Hanged Man pilot movement.
@@ -1536,6 +1550,18 @@ export function update(w: World, input: InputState, dt: number) {
     }
     w.hangedMan.pos.x = Math.max(10, Math.min(MAP_W - 10, w.hangedMan.pos.x));
     w.hangedMan.pos.y = Math.max(10, Math.min(MAP_H - 10, w.hangedMan.pos.y));
+    pushOutOfNpcs(w, w.hangedMan.pos, 9);
+    const dx = w.hangedMan.pos.x - pl.pos.x, dy = w.hangedMan.pos.y - pl.pos.y;
+    const td = Math.hypot(dx, dy);
+    if (td > STAND_TETHER) {
+      const k = STAND_TETHER / td;
+      w.hangedMan.pos.x = pl.pos.x + dx * k;
+      w.hangedMan.pos.y = pl.pos.y + dy * k;
+      if (!w.bannerText || w.time > w.bannerUntil) {
+        w.bannerText = "Hanged Man leashed";
+        w.bannerUntil = w.time + 0.5;
+      }
+    }
   }
 
   // Item use buttons
