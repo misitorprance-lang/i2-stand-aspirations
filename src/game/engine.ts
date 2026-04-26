@@ -414,6 +414,35 @@ function tryMove(e: Entity, dx: number, dy: number, props: Prop[]) {
   if (!blocked) e.pos.y = ny;
 }
 
+// Eject an entity that has somehow ended up overlapping a prop (knockback push, spawn glitch).
+// Walks them out along the shortest axis. Run every tick on every entity.
+function pushOutOfProps(e: Entity, props: Prop[]) {
+  for (let iter = 0; iter < 4; iter++) {
+    let moved = false;
+    for (const p of props) {
+      if (!circleRectOverlap(e.pos.x, e.pos.y, e.radius, p.rect)) continue;
+      // find nearest exit direction
+      const r = p.rect;
+      const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+      const halfW = r.w / 2 + e.radius;
+      const halfH = r.h / 2 + e.radius;
+      const dx = e.pos.x - cx, dy = e.pos.y - cy;
+      const overlapX = halfW - Math.abs(dx);
+      const overlapY = halfH - Math.abs(dy);
+      if (overlapX < overlapY) {
+        e.pos.x += Math.sign(dx || 1) * (overlapX + 0.5);
+      } else {
+        e.pos.y += Math.sign(dy || 1) * (overlapY + 0.5);
+      }
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  // clamp inside map
+  e.pos.x = Math.max(e.radius, Math.min(MAP_W - e.radius, e.pos.x));
+  e.pos.y = Math.max(e.radius, Math.min(MAP_H - e.radius, e.pos.y));
+}
+
 function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff") {
   const tier = dmg >= 15 ? 22 : dmg >= 8 ? 17 : dmg >= 3 ? 13 : 10;
   const text = dmg < 1 ? dmg.toFixed(1) : Math.round(dmg).toString();
