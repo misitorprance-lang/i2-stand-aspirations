@@ -80,7 +80,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "star_platinum",
     name: "Star Platinum",
     color: "#7c5cff",
-    rarityWeight: 1, // rarest
+    rarityWeight: 4, // Epic
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 3, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
       a1: { name: "Star Finger", kind: "pierce", damage: 5, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
@@ -93,7 +93,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "rhcp",
     name: "Red Hot Chili Pepper",
     color: "#ff4444",
-    rarityWeight: 6, // most common
+    rarityWeight: 15, // Uncommon
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 1.4, range: 20, radius: 14, cooldown: 0.32, color: "#ffd0a8" },
       a1: { name: "Electric Shot", kind: "projectile", damage: 4, range: 220, radius: 6, cooldown: 1.2, speed: 380, color: "#fff36b" },
@@ -106,7 +106,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "echoes",
     name: "Echoes",
     color: "#5fd1a0",
-    rarityWeight: 3,
+    rarityWeight: 6, // Rare (Echoes)
     abilities: {
       m1: { name: "Act 3 Punch", kind: "melee", damage: 1.5, range: 18, radius: 12, cooldown: 0.28, color: "#bff5da" },
       a1: { name: "Freeze Touch", kind: "stun_touch", damage: 1, range: 22, radius: 16, cooldown: 4, stunSeconds: 1.6, color: "#a8e8ff" },
@@ -119,7 +119,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "ebony_devil",
     name: "Ebony Devil",
     color: "#8f949c",
-    rarityWeight: 4,
+    rarityWeight: 48, // Common (Ebony Devil)
     abilities: {
       m1: { name: "Slice", kind: "melee", damage: 0.3, range: 24, radius: 16, cooldown: 0.32, color: "#cfd3dc" },
       a1: { name: "Doll / Puppet", kind: "puppet_toggle", damage: 0, range: 0, radius: 0, cooldown: 0.35, color: "#b8bcc6" },
@@ -132,7 +132,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "gold_experience",
     name: "Gold Experience",
     color: "#f5d36b",
-    rarityWeight: 2, // rare
+    rarityWeight: 6, // Rare (GE)
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 2.5, range: 22, radius: 16, cooldown: 0.3, color: "#fff0a8" },
       a1: { name: "Eagle Summon", kind: "chain_projectile", damage: 5, range: 260, radius: 6, cooldown: 3.2, speed: 380, color: "#ffd24a" },
@@ -145,7 +145,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "hanged_man",
     name: "Hanged Man",
     color: "#cfd6e3",
-    rarityWeight: 5,
+    rarityWeight: 15, // Uncommon (Hanged Man)
     abilities: {
       m1: { name: "Saber", kind: "melee", damage: 1.2, range: 28, radius: 14, cooldown: 0.34, color: "#cfd6e3" },
       a1: { name: "Pilot", kind: "pilot_toggle", damage: 0, range: 0, cooldown: 0.4, color: "#cfd6e3" },
@@ -158,7 +158,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "white_album",
     name: "White Album",
     color: "#e8eaff",
-    rarityWeight: 3,
+    rarityWeight: 6, // Rare (White Album)
     abilities: {
       m1: { name: "Frost Punch", kind: "melee", damage: 1.4, range: 22, radius: 14, cooldown: 0.32, color: "#dfe6ff" },
       a1: { name: "Freeze Punch", kind: "melee", damage: 5, range: 24, radius: 16, cooldown: 3, stunSeconds: 1.2, color: "#a8e8ff" },
