@@ -32,6 +32,12 @@ export interface Entity {
   electroUntil?: number;
   hologramUntil?: number;
   hologramOrigin?: Vec2;
+  bleedUntil?: number;
+  bleedNextTickAt?: number;
+  slowUntil?: number;
+  // AI anti-stuck
+  stuckAcc?: number;
+  lastPos?: Vec2;
 }
 
 export interface Frog {
@@ -50,8 +56,25 @@ export interface ProtectionTree {
 }
 
 export interface Prop {
-  rect: Rect; // collision rect
+  rect: Rect; // collision rect (current)
   draw: (ctx: CanvasRenderingContext2D, r: Rect) => void;
+  // destruction state
+  hp?: number;
+  maxHp?: number;
+  destructible?: boolean;
+  destroyedAt?: number;   // game time when destroyed; null/0 = alive
+  respawnAt?: number;     // game time when it should respawn
+  hitFlashUntil?: number;
+  // pristine snapshot for "perfect respawn"
+  original?: { rect: Rect; hp: number };
+}
+
+export interface MirrorShard {
+  id: number;
+  pos: Vec2;
+  expireAt: number;     // life timer; extended while NPC is inside dome
+  radius: number;       // dome radius
+  bornAt: number;
 }
 
 export interface Projectile {
@@ -158,7 +181,11 @@ export type VfxKind =
   | "crater_smoke"   // smoke after explosion
   | "tree_aura"      // protection tree dome
   | "hologram_burst" // out-of-body hologram pop
-  | "chain_arc";     // chain-lightning hop
+  | "chain_arc"      // chain-lightning hop
+  | "crit_burst"     // critical hit yellow sparks
+  | "time_clock"     // big clock during time stop
+  | "shard_flash"    // teleport flash
+  | "mirror_dome";   // dome edge ring
 
 export interface Vfx {
   kind: VfxKind;
