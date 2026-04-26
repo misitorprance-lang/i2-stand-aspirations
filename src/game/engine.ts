@@ -2394,6 +2394,41 @@ function drawPuppet(ctx: CanvasRenderingContext2D, w: World) {
   if (p.hp < p.maxHp) drawHpBar(ctx, p.pos.x, p.pos.y - 15, p.hp / p.maxHp);
 }
 
+function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
+  const h = w.hangedMan;
+  const attacking = w.time < h.attackUntil;
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(h.pos.x, h.pos.y + 9, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+  // pale aura
+  ctx.fillStyle = `rgba(207,214,227,${0.18 + Math.sin(w.time * 5) * 0.05})`;
+  ctx.beginPath(); ctx.arc(h.pos.x, h.pos.y, 14, 0, Math.PI * 2); ctx.fill();
+  // cloak / body — slim & tall
+  ctx.fillStyle = "#3a455c";
+  ctx.fillRect(h.pos.x - 5, h.pos.y - 2, 10, 13);
+  // chest plate
+  ctx.fillStyle = "#cfd6e3";
+  ctx.fillRect(h.pos.x - 4, h.pos.y - 1, 8, 5);
+  // head
+  ctx.fillStyle = "#dfe6f0";
+  ctx.fillRect(h.pos.x - 4, h.pos.y - 11, 8, 9);
+  // visor slit
+  ctx.fillStyle = "#1b2436";
+  ctx.fillRect(h.pos.x - 3, h.pos.y - 7, 6, 2);
+  // saber
+  ctx.save();
+  ctx.translate(h.pos.x, h.pos.y + 1);
+  ctx.rotate(attacking ? w.time * 18 : Math.atan2(h.facing.y, h.facing.x));
+  ctx.strokeStyle = "#9ec0ff";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(20, 0); ctx.stroke();
+  ctx.fillStyle = "#eaf2ff";
+  ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(18, -3); ctx.lineTo(18, 3); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // shared HP indicator (matches player hp)
+  if (w.player.hp < w.player.maxHp) drawHpBar(ctx, h.pos.x, h.pos.y - 17, w.player.hp / w.player.maxHp);
+}
+
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(e.pos.x, e.pos.y + 8, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
