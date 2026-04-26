@@ -454,6 +454,56 @@ export default function Game() {
           </button>
         )}
       </div>
+
+      {/* Pilot / Time Stop status chips */}
+      {(ui.pilotActive || ui.timeStopActive) && (
+        <div className="absolute top-24 left-3 flex flex-col gap-1 z-30 pointer-events-none">
+          {ui.timeStopActive && (
+            <div className="px-2 py-0.5 rounded text-[10px] font-bold"
+                 style={{ background: "rgba(0,0,0,0.7)", color: "#dcd6ff", border: "1px solid #dcd6ff" }}>
+              ⏱ TIME STOPPED
+            </div>
+          )}
+          {ui.pilotActive && (
+            <div className="px-2 py-0.5 rounded text-[10px] font-bold"
+                 style={{ background: "rgba(0,0,0,0.7)", color: "#cfd6e3", border: "1px solid #cfd6e3" }}>
+              🎮 PILOTING
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Shard picker (Hanged Man teleport) */}
+      {ui.shardPickerOpen && worldRef.current && (
+        <div className="absolute inset-0 bg-black/60 z-40 flex items-center justify-center p-6"
+             onClick={() => { if (worldRef.current) closeShardPicker(worldRef.current); }}>
+          <div className="bg-black/80 border border-white/40 rounded p-4 max-w-xs w-full"
+               onClick={(e) => e.stopPropagation()}>
+            <div className="text-white text-sm font-bold mb-2">Teleport to shard</div>
+            {ui.shards.length === 0 ? (
+              <div className="text-white/70 text-xs">No active shards.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {ui.shards.map((s, i) => (
+                  <button
+                    key={s.id}
+                    onClick={() => { if (worldRef.current) teleportToShard(worldRef.current, s.id); }}
+                    className="bg-white/10 hover:bg-white/20 border border-white/30 rounded px-3 py-2 text-white text-xs text-left"
+                  >
+                    Shard #{i + 1} — ({Math.round(s.pos.x)}, {Math.round(s.pos.y)})
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => { if (worldRef.current) closeShardPicker(worldRef.current); }}
+              className="mt-3 w-full bg-white/10 border border-white/30 rounded px-3 py-1 text-white text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
