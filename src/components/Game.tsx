@@ -69,6 +69,8 @@ export default function Game() {
     pilotActive: false,
     shardPickerOpen: false,
     shards: [],
+    whiteAlbumBar: 100,
+    whiteAlbumActive: true,
   });
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
   const [showHelp, setShowHelp] = useState<boolean>(true);
