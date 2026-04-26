@@ -13,6 +13,8 @@ import {
   tryUseDisc,
   teleportToShard,
   closeShardPicker,
+  exportSave,
+  applySave,
   type InputState,
 } from "@/game/engine";
 import { STANDS, SHIT_ABILITY } from "@/game/stands";
@@ -29,6 +31,7 @@ interface UIData {
   maxHp: number;
   cd: { m1: number; a1: number; a2: number; a3: number; a4: number };
   banner: string | null;
+  banners: { id: number; text: string }[];
   kills: number;
   rage: number;
   rageActive: boolean;
@@ -55,6 +58,7 @@ export default function Game() {
     maxHp: 100,
     cd: { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 },
     banner: null,
+    banners: [],
     kills: 0,
     rage: 0,
     rageActive: false,
@@ -115,6 +119,7 @@ export default function Game() {
           maxHp: w.player.maxHp,
           cd: { ...w.cdTimers },
           banner: w.bannerText,
+          banners: w.banners.map((b) => ({ id: b.id, text: b.text })),
           kills: w.kills,
           rage: Math.round(w.rage),
           rageActive: w.time < w.rageUntil,
@@ -262,6 +267,31 @@ export default function Game() {
     toggleStandActive(worldRef.current);
   };
 
+  const SAVE_KEY = "standtest.save.v1";
+  const onSave = () => {
+    if (!worldRef.current) return;
+    const data = exportSave(worldRef.current, arrowsRef.current, discsRef.current);
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch { /* quota */ }
+  };
+  const onLoad = () => {
+    if (!worldRef.current) return;
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      const got = applySave(worldRef.current, data);
+      arrowsRef.current = got.arrows;
+      discsRef.current = got.discs;
+    } catch { /* corrupt */ }
+  };
+
+  // Autosave every 30s
+  useEffect(() => {
+    const id = window.setInterval(() => onSave(), 30000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stand = STANDS[ui.standId as keyof typeof STANDS];
   const a4 = ui.standId === "echoes" && ui.shitVariant ? SHIT_ABILITY : stand.abilities.a4;
   const abilities = {
@@ -325,6 +355,16 @@ export default function Game() {
             >
               {soundOn ? "🔊" : "🔇"}
             </button>
+            <button
+              onClick={onSave}
+              className="bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-[10px]"
+              title="Save game"
+            >Save</button>
+            <button
+              onClick={onLoad}
+              className="bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-[10px]"
+              title="Load saved game"
+            >Load</button>
           </div>
         </div>
         {/* HP bar */}
@@ -356,15 +396,18 @@ export default function Game() {
         )}
       </div>
 
-      {/* Banner */}
-      {ui.banner && (
-        <div className="absolute top-1/3 left-0 right-0 flex justify-center pointer-events-none">
-          <div
-            className="px-4 py-2 rounded text-sm font-bold"
-            style={{ background: "rgba(0,0,0,0.75)", color: standColor, border: `2px solid ${standColor}` }}
-          >
-            {ui.banner}
-          </div>
+      {/* Banners — stacked so multiple notifications never overlap */}
+      {ui.banners.length > 0 && (
+        <div className="absolute top-1/3 left-0 right-0 flex flex-col items-center gap-1 pointer-events-none">
+          {ui.banners.slice(-5).map((b) => (
+            <div
+              key={b.id}
+              className="px-4 py-2 rounded text-sm font-bold"
+              style={{ background: "rgba(0,0,0,0.75)", color: standColor, border: `2px solid ${standColor}` }}
+            >
+              {b.text}
+            </div>
+          ))}
         </div>
       )}
 

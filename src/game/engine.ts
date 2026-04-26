@@ -49,10 +49,10 @@ const ENEMY_MAX_HP = 45;
 const RESPAWN_DELAY = 6;
 const FRIENDLY_COUNT = 7;
 const ENEMY_COUNT = 6;
-const ARROW_INTERVAL = [12, 22] as const;
-const DISC_INTERVAL = [28, 46] as const;
-const MAX_ARROWS_ON_GROUND = 2;
-const MAX_DISCS_ON_GROUND = 1;
+const ARROW_INTERVAL = [6, 11] as const;
+const DISC_INTERVAL = [14, 22] as const;
+const MAX_ARROWS_ON_GROUND = 4;
+const MAX_DISCS_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
 const FROG_MAX = 3;
@@ -128,6 +128,7 @@ interface World {
   standActive: boolean; // can be toggled off (desummon)
   bannerText: string | null;
   bannerUntil: number;
+  banners: { id: number; text: string; color: string | null; expireAt: number }[];
   nextId: number;
   shake: number;
   cam: Vec2;
@@ -156,6 +157,7 @@ interface World {
   pendingPlayerDamage: { amount: number; dir: Vec2 }[];
   // Hanged Man
   hangedManFormed: boolean;     // false until Pilot has been engaged at least once
+  hangedManActive: boolean;     // visible separate model standing on field
   pilotActive: boolean;         // currently piloting Hanged Man
   puppetPiloted: boolean;       // currently piloting Ebony Devil's puppet
   shards: MirrorShard[];
@@ -165,6 +167,12 @@ interface World {
   kickAt: number;
   // Player-input intent magnitude (used by kick detection)
   lastJoyMag: number;
+  // White Album
+  whiteAlbumActive: boolean;
+  whiteAlbumBar: number;          // 0..100
+  whiteAlbumToggleAt: number;     // earliest time a toggle is allowed
+  whiteAlbumLockUntil: number;    // forced-off lockout when bar empty
+  icePath: { pos: Vec2; expireAt: number; bornAt: number }[];
 }
 
 function makeProps(): Prop[] {
@@ -424,6 +432,7 @@ export function createWorld(): World {
     standActive: true,
     bannerText: null,
     bannerUntil: 0,
+    banners: [],
     nextId: 1000,
     shake: 0,
     cam: { x: player.pos.x, y: player.pos.y },
@@ -454,6 +463,7 @@ export function createWorld(): World {
     timeStopStartedAt: 0,
     pendingPlayerDamage: [],
     hangedManFormed: false,
+    hangedManActive: false,
     pilotActive: false,
     puppetPiloted: false,
     shards: [],
@@ -461,6 +471,11 @@ export function createWorld(): World {
     hangedMan: { pos: { ...player.pos }, facing: { x: 0, y: 1 }, attackUntil: 0 },
     kickAt: 0,
     lastJoyMag: 0,
+    whiteAlbumActive: true,
+    whiteAlbumBar: 100,
+    whiteAlbumToggleAt: 0,
+    whiteAlbumLockUntil: 0,
+    icePath: [],
   };
 }
 
@@ -559,9 +574,12 @@ function spawnVfx(w: World, v: Omit<Vfx, "bornAt" | "expireAt"> & { life: number
   w.vfx.push({ ...rest, bornAt: w.time, expireAt: w.time + life });
 }
 
-function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }, crit = false) {
+function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }, crit = false, opts?: { fromPuppet?: boolean }) {
   if (!e.alive) return;
-  if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil) dmg *= 1.55;
+  // Rage Mode now only multiplies damage that originates from the puppet itself.
+  if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil && opts?.fromPuppet) dmg *= 1.55;
+  // White Album suit armor: -1 damage to player while suit is active.
+  if (e.kind === "player" && w.standId === "white_album" && w.whiteAlbumActive) dmg = Math.max(0.1, dmg - 1);
   e.hp -= dmg;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg, "#fff", crit);
@@ -602,6 +620,14 @@ function damagePuppet(w: World, dmg: number) {
     w.puppet.hp = w.puppet.maxHp;
     spawnVfx(w, { kind: "crater_smoke", pos: { ...w.puppet.pos }, radius: 20, color: "#585d66", life: 0.7 });
   }
+}
+
+// Hanged Man takes hits but its HP is shared with the player — route damage straight to player.
+function damageHangedMan(w: World, dmg: number, dir: Vec2) {
+  if (!w.hangedManActive) return;
+  spawnDmg(w, w.hangedMan.pos, dmg, "#cfd6e3");
+  spawnParticles(w, w.hangedMan.pos, "#9ec0ff", 6);
+  damageEntity(w, w.player, dmg, { dir, amount: 30 });
 }
 
 function getAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): Ability {
@@ -759,6 +785,18 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   const ab = getAbility(w, key);
   if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone", "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop"].includes(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
+  // Hanged Man: A2/A3/A4 require the stand to be summoned first.
+  if (w.standId === "hanged_man" && key !== "m1" && ab.kind !== "pilot_toggle" && !w.hangedManActive) {
+    w.bannerText = "Summon Hanged Man first";
+    w.bannerUntil = w.time + 0.9;
+    return;
+  }
+  // Ebony Devil: Rage Mode now requires the puppet to be summoned.
+  if (ab.kind === "rage_mode" && !w.puppet.active) {
+    w.bannerText = "Summon Puppet first";
+    w.bannerUntil = w.time + 0.9;
+    return;
+  }
   if (ab.kind === "rage_mode" && w.rage < 100) {
     w.bannerText = "Rage not ready";
     w.bannerUntil = w.time + 0.8;
@@ -777,9 +815,11 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       return;
     }
   }
-  // M1 range gate: don't swing into empty air. Origin is puppet pos for piloted Ebony Devil.
+  // M1 range gate: don't swing into empty air. Origin is puppet/hangedman pos when summoned.
   if (key === "m1" && ab.kind === "melee" && !input.aim) {
-    const origin = (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos : w.player.pos;
+    let origin = w.player.pos;
+    if (w.standId === "ebony_devil" && w.puppet.active) origin = w.puppet.pos;
+    else if (w.standId === "hanged_man" && w.hangedManActive) origin = w.hangedMan.pos;
     const reach = ab.range + (ab.radius ?? 14);
     const t = nearestAnyNpc(w, origin, reach + 12);
     if (!t) return; // silent — feels better than a banner spam on hold
@@ -810,9 +850,10 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   switch (ab.kind) {
     case "melee": {
       const angle = Math.atan2(dir.y, dir.x);
-      // Ebony Devil M1: only the puppet swings (does its own bigger damage). Owner barely scratches.
+      // Ebony Devil M1: only the puppet swings. Hanged Man M1: swings from the stand body.
       const usePuppetOrigin = w.standId === "ebony_devil" && w.puppet.active && key === "m1";
-      const origin = usePuppetOrigin ? w.puppet.pos : p;
+      const useHangedOrigin = w.standId === "hanged_man" && w.hangedManActive && key === "m1";
+      const origin = usePuppetOrigin ? w.puppet.pos : useHangedOrigin ? w.hangedMan.pos : p;
       const reach = ab.range + (ab.radius ?? 14);
       // slash arc VFX so misses still feel responsive
       spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.2 });
@@ -1203,22 +1244,28 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "pilot_toggle": {
-      // Hanged Man: toggle piloting the stand directly. Player stops moving while piloted.
-      w.pilotActive = !w.pilotActive;
+      // Hanged Man: toggle the stand on/off. While active, it's a separate body that gets piloted
+      // and any incoming damage to it is shared 1:1 with the player.
+      const turningOn = !w.hangedManActive;
+      w.hangedManActive = turningOn;
+      w.pilotActive = turningOn;
       w.hangedManFormed = true;
-      if (w.pilotActive) {
+      if (turningOn) {
         // spawn the stand near the player on first engage
         w.hangedMan.pos = { x: w.player.pos.x + 18, y: w.player.pos.y };
         pushOutOfProps({ ...w.player, pos: w.hangedMan.pos, radius: 9 } as Entity, w.props);
+      } else {
+        // dropping the stand also closes the picker
+        w.shardPickerOpen = false;
       }
-      w.bannerText = w.pilotActive ? "Piloting Hanged Man" : "Released";
+      w.bannerText = turningOn ? "Hanged Man summoned" : "Hanged Man released";
       w.bannerUntil = w.time + 0.8;
       play("pilot");
       break;
     }
     case "mirror_shard": {
       // Drop a chrome shard at the stand's position (or player). Creates a combat dome.
-      const origin = w.pilotActive ? w.hangedMan.pos : w.player.pos;
+      const origin = w.hangedManActive ? w.hangedMan.pos : w.player.pos;
       w.shards.push({
         id: w.nextId++,
         pos: { x: origin.x, y: origin.y },
@@ -1249,7 +1296,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     case "brutal_slash": {
       // Big slash: heavy damage, bleed, stun, slow.
       const angle = Math.atan2(dir.y, dir.x);
-      const origin = w.pilotActive ? w.hangedMan.pos : p;
+      const origin = w.hangedManActive ? w.hangedMan.pos : p;
       const reach = ab.range + (ab.radius ?? 16);
       spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.32 });
       for (const e of w.npcs) {
@@ -1272,6 +1319,41 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       play("brutal");
       break;
     }
+    case "ice_heal": {
+      // Restore HP and drain a chunk of the bar.
+      const heal = 22;
+      w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 35);
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 30, color: ab.color, life: 0.45 });
+      spawnParticles(w, p, ab.color, 18, { speedMin: 30, speedMax: 100, life: 0.6 });
+      spawnDmg(w, p, heal, "#9be7ff");
+      break;
+    }
+    case "ice_stomp": {
+      // Aoe at target with stun + ice burst + chip damage to props.
+      const distToAim = input.aim ? Math.min(ab.range, Math.hypot(input.aim.x, input.aim.y)) : ab.range;
+      const tx = p.x + dir.x * distToAim;
+      const ty = p.y + dir.y * distToAim;
+      for (const e of w.npcs) {
+        if (!e.alive) continue;
+        if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
+          damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - tx, y: e.pos.y - ty }), amount: 60 });
+          e.stunUntil = Math.max(e.stunUntil, w.time + (ab.stunSeconds ?? 1.6));
+          e.slowUntil = w.time + 2;
+        }
+      }
+      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage);
+      spawnVfx(w, { kind: "ice_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
+      spawnVfx(w, { kind: "shockwave", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.4 });
+      spawnParticles(w, { x: tx, y: ty }, ab.color, 22, { shape: "spark", speedMin: 60, speedMax: 200, life: 0.5 });
+      w.shake = Math.max(w.shake, 4);
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 18);
+      break;
+    }
+  }
+  // White Album: drain bar on any other ability cast as well.
+  if (w.standId === "white_album" && w.whiteAlbumActive && key !== "m1" && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
+    w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 8);
   }
 }
 
@@ -1314,7 +1396,7 @@ export function update(w: World, input: InputState, dt: number) {
 
   // Pilot mode: joystick drives the puppet (Ebony Devil) or Hanged Man instead of the player.
   // The player stops moving while piloting; HP is shared.
-  const piloting = (w.puppetPiloted && w.puppet.active) || w.pilotActive;
+  const piloting = w.puppet.active || w.pilotActive || w.hangedManActive;
 
   // Player movement
   const pl = w.player;
@@ -1324,7 +1406,9 @@ export function update(w: World, input: InputState, dt: number) {
     w.lastJoyMag = len;
     if (!piloting && len > 0.05) {
       const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
-      const baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
+      let baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
+      // White Album: ice skating boost while suit is active.
+      if (w.standId === "white_album" && w.whiteAlbumActive) baseSpeed *= 1.2;
       const speed = baseSpeed * Math.min(1, len);
       const before = { x: pl.pos.x, y: pl.pos.y };
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
@@ -1388,26 +1472,18 @@ export function update(w: World, input: InputState, dt: number) {
 
   if (input.aim) w.pointerAim = norm(input.aim);
 
-  // Puppet movement: piloted = joystick, otherwise tail behind player.
+  // Puppet movement: while summoned, the player is frozen and the joystick drives the puppet.
   if (w.puppet.active) {
     if (w.puppet.hp <= 0) { w.puppet.active = false; w.puppetPiloted = false; }
-    if (w.puppetPiloted) {
-      const j = input.joy;
-      const len = Math.hypot(j.x, j.y);
-      if (len > 0.05) {
-        const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
-        const sp = PLAYER_SPEED * Math.min(1, len);
-        const e: Entity = { ...pl, pos: w.puppet.pos, radius: 9 };
-        tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
-        w.puppet.pos.x = e.pos.x; w.puppet.pos.y = e.pos.y;
-        w.puppet.facing = { x: nx, y: ny };
-      }
-    } else {
-      const desired = w.time < w.puppet.attackUntil
-        ? { x: pl.pos.x + w.puppet.facing.x * 28, y: pl.pos.y + w.puppet.facing.y * 24 }
-        : { x: pl.pos.x - pl.facing.x * 28, y: pl.pos.y - pl.facing.y * 22 + 4 };
-      w.puppet.pos.x += (desired.x - w.puppet.pos.x) * Math.min(1, dt * 9);
-      w.puppet.pos.y += (desired.y - w.puppet.pos.y) * Math.min(1, dt * 9);
+    const j = input.joy;
+    const len = Math.hypot(j.x, j.y);
+    if (len > 0.05) {
+      const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
+      const sp = PLAYER_SPEED * Math.min(1, len);
+      const e: Entity = { ...pl, pos: w.puppet.pos, radius: 9 };
+      tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
+      w.puppet.pos.x = e.pos.x; w.puppet.pos.y = e.pos.y;
+      w.puppet.facing = { x: nx, y: ny };
     }
     w.puppet.pos.x = Math.max(10, Math.min(MAP_W - 10, w.puppet.pos.x));
     w.puppet.pos.y = Math.max(10, Math.min(MAP_H - 10, w.puppet.pos.y));
@@ -1466,15 +1542,22 @@ export function update(w: World, input: InputState, dt: number) {
     e.vel.y *= 0.9;
     tryMove(e, e.vel.x * dt, e.vel.y * dt, w.props);
 
-    if (e.kind === "enemy" && e.provoked && pl.alive && dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO) {
-      const puppetCloser = w.puppet.active && dist2(e.pos, w.puppet.pos) < dist2(e.pos, pl.pos);
-      // Frog interception: if a frog is closer than the player, hit the frog instead
+    if (e.kind === "enemy" && e.provoked && pl.alive && (dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO || (w.puppet.active && dist2(e.pos, w.puppet.pos) < ENEMY_AGGRO * ENEMY_AGGRO) || (w.hangedManActive && dist2(e.pos, w.hangedMan.pos) < ENEMY_AGGRO * ENEMY_AGGRO))) {
+      // Pick the closest player-like body: player, puppet, hanged man.
+      const pd = dist2(e.pos, pl.pos);
+      const ppd = w.puppet.active ? dist2(e.pos, w.puppet.pos) : Infinity;
+      const hpd = w.hangedManActive ? dist2(e.pos, w.hangedMan.pos) : Infinity;
+      const minD = Math.min(pd, ppd, hpd);
+      const aimAtPuppet = ppd === minD && ppd < Infinity;
+      const aimAtHanged = !aimAtPuppet && hpd === minD && hpd < Infinity;
+      // Frog interception: if a frog is closer than chosen target, hit the frog instead
       const aliveFrogs = w.frogs.filter((f) => f.alive);
       let frogTarget: Frog | null = null;
+      const baseTargetPos = aimAtPuppet ? w.puppet.pos : aimAtHanged ? w.hangedMan.pos : pl.pos;
       for (const f of aliveFrogs) {
-        if (dist2(f.pos, e.pos) < dist2(pl.pos, e.pos) && dist2(f.pos, e.pos) < 50 * 50) { frogTarget = f; break; }
+        if (dist2(f.pos, e.pos) < dist2(baseTargetPos, e.pos) && dist2(f.pos, e.pos) < 50 * 50) { frogTarget = f; break; }
       }
-      const targetPos = frogTarget ? frogTarget.pos : (puppetCloser ? w.puppet.pos : pl.pos);
+      const targetPos = frogTarget ? frogTarget.pos : baseTargetPos;
       const dir = norm({ x: targetPos.x - e.pos.x, y: targetPos.y - e.pos.y });
       tryMove(e, dir.x * ENEMY_SPEED * dt, dir.y * ENEMY_SPEED * dt, w.props);
       e.facing = dir;
@@ -1487,7 +1570,8 @@ export function update(w: World, input: InputState, dt: number) {
           spawnParticles(w, frogTarget.pos, "#7fc97f", 14, { gravity: 80, life: 0.6 });
           play("frog");
           damageEntity(w, e, dmg * 0.5);
-        } else if (puppetCloser) damagePuppet(w, dmg);
+        } else if (aimAtPuppet) damagePuppet(w, dmg);
+        else if (aimAtHanged) damageHangedMan(w, dmg, dir);
         else damageEntity(w, pl, dmg, { dir, amount: 40 });
       }
     } else {
@@ -1721,10 +1805,53 @@ export function update(w: World, input: InputState, dt: number) {
   }
 
   // Banner timeout
+  // Mirror current bannerText into the stacked banners queue (so multiple notifs can show at once).
+  if (w.bannerText) {
+    const last = w.banners[w.banners.length - 1];
+    if (!last || last.text !== w.bannerText || last.expireAt < w.time) {
+      w.banners.push({ id: w.nextId++, text: w.bannerText, color: null, expireAt: w.bannerUntil });
+    } else {
+      // refresh expiry if same text re-asserted
+      last.expireAt = Math.max(last.expireAt, w.bannerUntil);
+    }
+  }
   if (w.bannerText && w.time >= w.bannerUntil) w.bannerText = null;
+  // Sweep expired stacked banners.
+  if (w.banners.length) w.banners = w.banners.filter((b) => w.time < b.expireAt);
 
   // Shake decays
   w.shake *= 0.85;
+
+  // White Album: bar drain/refill + ice trail + NPC slow on ice.
+  if (w.standId === "white_album") {
+    if (w.whiteAlbumActive) {
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 6 * dt);
+      if (w.whiteAlbumBar <= 0) {
+        w.whiteAlbumActive = false;
+        w.whiteAlbumLockUntil = w.time + 6;
+        w.bannerText = "Suit overheated"; w.bannerUntil = w.time + 1.2;
+      }
+      // Spawn ice tile every ~0.15s while moving.
+      if (pl.alive && w.lastJoyMag > 0.1 && (!w.icePath.length || w.time - w.icePath[w.icePath.length - 1].bornAt > 0.15)) {
+        w.icePath.push({ pos: { x: pl.pos.x, y: pl.pos.y + 6 }, bornAt: w.time, expireAt: w.time + 4 });
+      }
+    } else {
+      w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 10 * dt);
+    }
+    // Slow NPCs on ice.
+    if (w.icePath.length) {
+      for (const tile of w.icePath) {
+        for (const e of w.npcs) {
+          if (!e.alive) continue;
+          if (dist2(e.pos, tile.pos) < 16 * 16) e.slowUntil = Math.max(e.slowUntil ?? 0, w.time + 0.5);
+        }
+      }
+      w.icePath = w.icePath.filter((t) => w.time < t.expireAt);
+    }
+  } else if (w.icePath.length) {
+    w.icePath = [];
+  }
+
 
   // Camera
   const viewW = VW / CAMERA_ZOOM;
@@ -1764,6 +1891,7 @@ function resetStandRuntime(w: World) {
   w.pendingPlayerDamage = [];
   w.pilotActive = false;
   w.puppetPiloted = false;
+  w.hangedManActive = false;
   w.shards = [];
   w.shardPickerOpen = false;
   // Drop any in-flight player projectiles so a stand swap doesn't leak homing locks.
@@ -1942,6 +2070,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     if (e.alive) drawables.push({ y: e.pos.y, draw: () => drawNpc(ctx, w, e) });
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
+  if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
@@ -2107,6 +2236,7 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   else if (id === "echoes") drawEchoes(ctx, w, pos);
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
   else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
+  else if (id === "white_album") drawWhiteAlbum(ctx, w, pos);
 }
 
 function drawGoldExperience(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
@@ -2358,6 +2488,74 @@ function drawPuppet(ctx: CanvasRenderingContext2D, w: World) {
   ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(16, -4); ctx.lineTo(16, 4); ctx.closePath(); ctx.fill();
   ctx.restore();
   if (p.hp < p.maxHp) drawHpBar(ctx, p.pos.x, p.pos.y - 15, p.hp / p.maxHp);
+}
+
+function drawWhiteAlbum(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  // ice trail tiles (under everything)
+  for (const tile of w.icePath) {
+    const a = Math.max(0, 1 - (w.time - tile.bornAt) / 4);
+    ctx.fillStyle = `rgba(190,235,255,${0.35 * a})`;
+    ctx.beginPath(); ctx.arc(tile.pos.x, tile.pos.y, 8, 0, Math.PI * 2); ctx.fill();
+  }
+  // soft white aura
+  ctx.fillStyle = `rgba(232,234,255,${0.25 + Math.sin(w.time * 6) * 0.05})`;
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, 14, 0, Math.PI * 2); ctx.fill();
+  // body — white w/ purple piping
+  ctx.fillStyle = "#f3f4ff";
+  ctx.fillRect(pos.x - 5, pos.y - 2, 10, 12);
+  ctx.fillStyle = "#7c5cff";
+  ctx.fillRect(pos.x - 5, pos.y + 1, 10, 2);
+  // head
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(pos.x - 4, pos.y - 11, 8, 9);
+  // visor (greenish-yellow)
+  ctx.fillStyle = "#c8e64a";
+  ctx.fillRect(pos.x - 3, pos.y - 8, 6, 2);
+  // ice skates
+  ctx.fillStyle = "#bfe9ff";
+  ctx.beginPath(); ctx.moveTo(pos.x - 5, pos.y + 11); ctx.lineTo(pos.x - 1, pos.y + 13); ctx.lineTo(pos.x - 5, pos.y + 13); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(pos.x + 5, pos.y + 11); ctx.lineTo(pos.x + 1, pos.y + 13); ctx.lineTo(pos.x + 5, pos.y + 13); ctx.closePath(); ctx.fill();
+  if (punching) {
+    ctx.strokeStyle = "rgba(190,235,255,0.85)";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
+function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
+  const h = w.hangedMan;
+  const attacking = w.time < h.attackUntil;
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(h.pos.x, h.pos.y + 9, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+  // pale aura
+  ctx.fillStyle = `rgba(207,214,227,${0.18 + Math.sin(w.time * 5) * 0.05})`;
+  ctx.beginPath(); ctx.arc(h.pos.x, h.pos.y, 14, 0, Math.PI * 2); ctx.fill();
+  // cloak / body — slim & tall
+  ctx.fillStyle = "#3a455c";
+  ctx.fillRect(h.pos.x - 5, h.pos.y - 2, 10, 13);
+  // chest plate
+  ctx.fillStyle = "#cfd6e3";
+  ctx.fillRect(h.pos.x - 4, h.pos.y - 1, 8, 5);
+  // head
+  ctx.fillStyle = "#dfe6f0";
+  ctx.fillRect(h.pos.x - 4, h.pos.y - 11, 8, 9);
+  // visor slit
+  ctx.fillStyle = "#1b2436";
+  ctx.fillRect(h.pos.x - 3, h.pos.y - 7, 6, 2);
+  // saber
+  ctx.save();
+  ctx.translate(h.pos.x, h.pos.y + 1);
+  ctx.rotate(attacking ? w.time * 18 : Math.atan2(h.facing.y, h.facing.x));
+  ctx.strokeStyle = "#9ec0ff";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(20, 0); ctx.stroke();
+  ctx.fillStyle = "#eaf2ff";
+  ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(18, -3); ctx.lineTo(18, 3); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // shared HP indicator (matches player hp)
+  if (w.player.hp < w.player.maxHp) drawHpBar(ctx, h.pos.x, h.pos.y - 17, w.player.hp / w.player.maxHp);
 }
 
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
@@ -2692,7 +2890,7 @@ export function teleportToShard(w: World, shardId: number) {
   w.shardPickerOpen = false;
   if (!s) return;
   // flash at origin and destination
-  const origin = w.pilotActive ? w.hangedMan.pos : w.player.pos;
+  const origin = w.hangedManActive ? w.hangedMan.pos : w.player.pos;
   spawnVfx(w, { kind: "shard_flash", pos: { x: origin.x, y: origin.y }, radius: 24, color: "#dfe6f0", life: 0.4 });
   if (w.pilotActive) {
     w.hangedMan.pos = { x: s.pos.x, y: s.pos.y };
@@ -2709,4 +2907,59 @@ export function teleportToShard(w: World, shardId: number) {
 
 export function closeShardPicker(w: World) {
   w.shardPickerOpen = false;
+}
+
+// ---------- Save / Load ----------
+export interface SaveData {
+  v: number;
+  standId: StandId;
+  shitVariant: boolean;
+  arrows: number;
+  discs: number;
+  kills: number;
+  hp: number;
+  maxHp: number;
+  px: number;
+  py: number;
+  echoesAct: number;
+  whiteAlbumActive?: boolean;
+  whiteAlbumBar?: number;
+  boingoTalkedTo?: boolean;
+}
+
+export function exportSave(w: World, arrows: number, discs: number): SaveData {
+  return {
+    v: 1,
+    standId: w.standId,
+    shitVariant: w.shitVariant,
+    arrows,
+    discs,
+    kills: w.kills,
+    hp: w.player.hp,
+    maxHp: w.player.maxHp,
+    px: w.player.pos.x,
+    py: w.player.pos.y,
+    echoesAct: w.echoesAct,
+    whiteAlbumActive: (w as any).whiteAlbumActive ?? true,
+    whiteAlbumBar: (w as any).whiteAlbumBar ?? 100,
+    boingoTalkedTo: (w as any).boingoTalkedTo ?? false,
+  };
+}
+
+export function applySave(w: World, s: SaveData): { arrows: number; discs: number } {
+  resetStandRuntime(w);
+  w.standId = s.standId;
+  w.shitVariant = !!s.shitVariant;
+  w.kills = s.kills | 0;
+  w.player.hp = Math.max(1, Math.min(s.maxHp || w.player.maxHp, s.hp));
+  w.player.maxHp = s.maxHp || w.player.maxHp;
+  w.player.pos = { x: s.px, y: s.py };
+  pushOutOfProps(w.player, w.props);
+  w.echoesAct = (s.echoesAct as 1 | 2 | 3) || 1;
+  if ((w as any).whiteAlbumActive !== undefined) (w as any).whiteAlbumActive = s.whiteAlbumActive ?? true;
+  if ((w as any).whiteAlbumBar !== undefined) (w as any).whiteAlbumBar = s.whiteAlbumBar ?? 100;
+  if ((w as any).boingoTalkedTo !== undefined) (w as any).boingoTalkedTo = !!s.boingoTalkedTo;
+  w.bannerText = "Game loaded";
+  w.bannerUntil = w.time + 1.6;
+  return { arrows: s.arrows | 0, discs: s.discs | 0 };
 }
