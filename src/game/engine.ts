@@ -10,8 +10,10 @@ import type {
   Crater,
   DamageNumber,
   Entity,
+  Frog,
   ItemPickup,
   Particle,
+  ProtectionTree,
   PuppetState,
   Projectile,
   Prop,
@@ -26,29 +28,33 @@ import { play, type SfxKey } from "./sound";
 // ---------- constants ----------
 export const VW = 360;
 export const VH = 640;
-export const MAP_W = 900;
-export const MAP_H = 1400;
-export const CAMERA_ZOOM = 1.35;
+export const MAP_W = 1350;
+export const MAP_H = 2100;
+export const CAMERA_ZOOM = 1.7;
 
 const PLAYER_SPEED = 110;
 const PLAYER_SPRINT_SPEED = 142;
+const PLAYER_ACCEL = 14; // higher = snappier
 const NPC_SPEED = 55;
 const ENEMY_SPEED = 70;
 const ENEMY_AGGRO = 140;
 const ENEMY_ATTACK_RANGE = 22;
-const ENEMY_ATTACK_DMG = 6;
-const ENEMY_ATTACK_CD = 1.2;
+const ENEMY_ATTACK_DMG_MIN = 2;
+const ENEMY_ATTACK_DMG_MAX = 4;
+const ENEMY_ATTACK_CD = 1.3;
 const PLAYER_MAX_HP = 100;
 const NPC_MAX_HP = 30;
 const ENEMY_MAX_HP = 45;
 const RESPAWN_DELAY = 6;
-const FRIENDLY_COUNT = 5;
-const ENEMY_COUNT = 4;
-const ARROW_INTERVAL = [10, 18] as const;
-const DISC_INTERVAL = [22, 38] as const;
-const MAX_ITEMS_ON_GROUND = 4;
+const FRIENDLY_COUNT = 7;
+const ENEMY_COUNT = 6;
+const ARROW_INTERVAL = [12, 22] as const;
+const DISC_INTERVAL = [28, 46] as const;
+const MAX_ARROWS_ON_GROUND = 2;
+const MAX_DISCS_ON_GROUND = 1;
 const PICKUP_RADIUS = 18;
-const AIM_ASSIST_RANGE = 260;
+const AIM_ASSIST_RANGE = 220;
+const FROG_MAX = 3;
 
 // ---------- helpers ----------
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
