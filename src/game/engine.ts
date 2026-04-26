@@ -1261,6 +1261,7 @@ export function update(w: World, input: InputState, dt: number) {
           e.hp = e.maxHp;
           e.alive = true;
           e.provoked = false;
+          pushOutOfProps(e, w.props);
         } else {
           e.respawnAt = w.time + 1; // try again soon
         }
