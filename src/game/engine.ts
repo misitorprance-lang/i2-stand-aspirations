@@ -2540,6 +2540,71 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
       }
       break;
     }
+    case "time_clock": {
+      const r = (v.radius ?? 60);
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r * 0.78, 0, Math.PI * 2); ctx.stroke();
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(v.pos.x + Math.cos(a) * r * 0.82, v.pos.y + Math.sin(a) * r * 0.82);
+        ctx.lineTo(v.pos.x + Math.cos(a) * r * 0.96, v.pos.y + Math.sin(a) * r * 0.96);
+        ctx.stroke();
+      }
+      const ang = t * Math.PI * 4;
+      ctx.beginPath();
+      ctx.moveTo(v.pos.x, v.pos.y);
+      ctx.lineTo(v.pos.x + Math.cos(ang) * r * 0.7, v.pos.y + Math.sin(ang) * r * 0.7);
+      ctx.stroke();
+      break;
+    }
+    case "shard_flash": {
+      const r = (v.radius ?? 20) * (0.4 + t * 1.6);
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.85);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r * 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "mirror_dome": {
+      const r = (v.radius ?? 80);
+      ctx.strokeStyle = hexToRgba(v.color, inv * 0.9);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r * (0.7 + t * 0.4), 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "tree_aura": {
+      const r = (v.radius ?? 60);
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.15);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba(v.color, inv * 0.7);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "hologram_burst": {
+      const r = (v.radius ?? 30) * (0.4 + t * 1.2);
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "chain_arc": {
+      if (!v.to) break;
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(v.pos.x, v.pos.y);
+      const mx = (v.pos.x + v.to.x) / 2 + (Math.random() - 0.5) * 8;
+      const my = (v.pos.y + v.to.y) / 2 + (Math.random() - 0.5) * 8;
+      ctx.lineTo(mx, my);
+      ctx.lineTo(v.to.x, v.to.y);
+      ctx.stroke();
+      break;
+    }
   }
 }
 
