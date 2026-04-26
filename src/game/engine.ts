@@ -2385,12 +2385,15 @@ function drawGoldExperience(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) 
   // round head
   ctx.fillStyle = "#ffe89a";
   ctx.beginPath(); ctx.arc(pos.x, pos.y - 7, 5, 0, Math.PI * 2); ctx.fill();
-  // visor / eyes
-  ctx.fillStyle = "#3b2a08";
+  // visor / eyes — purple-tinted (matches GE's signature look)
+  ctx.fillStyle = "#3a1a5a";
   ctx.fillRect(pos.x - 3, pos.y - 8, 6, 1);
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = "#c79bff";
   ctx.fillRect(pos.x - 2, pos.y - 8, 1, 1);
   ctx.fillRect(pos.x + 1, pos.y - 8, 1, 1);
+  // small purple lip
+  ctx.fillStyle = "#9d6dd1";
+  ctx.fillRect(pos.x - 1, pos.y - 4, 2, 1);
   // shoulder pads
   ctx.fillStyle = "#fff0b8";
   ctx.fillRect(pos.x - 5, pos.y - 2, 2, 3);
