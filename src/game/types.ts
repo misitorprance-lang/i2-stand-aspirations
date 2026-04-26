@@ -70,6 +70,16 @@ export interface Projectile {
   detonateRadius?: number;
   detonateColor?: string;
   detonateCrater?: boolean;
+  // homing toward this target (gentle steering)
+  homingTargetId?: number;
+  homingStrength?: number; // 0..1 each tick
+  speed?: number;
+  // chain lightning style: on hit, jump to next nearest within range
+  chainsLeft?: number;
+  chainRange?: number;
+  chainColor?: string;
+  // applies electrocute status on hit
+  applyElectro?: number;
 }
 
 export interface Zone {
