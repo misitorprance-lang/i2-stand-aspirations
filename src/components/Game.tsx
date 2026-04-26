@@ -73,7 +73,9 @@ export default function Game() {
     shards: [],
     whiteAlbumBar: 100,
     whiteAlbumActive: true,
+    boingoNearby: false,
   });
+  const [boingoOpen, setBoingoOpen] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
   const [showHelp, setShowHelp] = useState<boolean>(true);
 
