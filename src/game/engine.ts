@@ -2207,8 +2207,11 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
 
 function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   const pl = w.player;
-  // Stand drawn UNDER player when behind, OVER when in front. Hidden entirely if standActive=false.
-  const standVisible = w.standId !== "none" && w.standActive;
+  // White Album reskins the player itself instead of using a floating stand body.
+  const wearingWhiteAlbum = w.standId === "white_album" && w.whiteAlbumActive;
+  // Stand drawn UNDER player when behind, OVER when in front. Hidden entirely if standActive=false
+  // OR when White Album is worn (suit replaces the model).
+  const standVisible = w.standId !== "none" && w.standActive && !wearingWhiteAlbum;
   const standPos = computeStandPos(w);
   const standInFront = standPos.y >= pl.pos.y;
   if (standVisible && !standInFront) drawStand(ctx, w, standPos);
