@@ -1,7 +1,7 @@
 // Stand & ability data tables for Stand Test.
 // All ability behavior is data-driven; the engine reads `kind` to decide how to execute.
 
-export type StandId = "none" | "star_platinum" | "rhcp" | "echoes" | "ebony_devil" | "gold_experience";
+export type StandId = "none" | "star_platinum" | "rhcp" | "echoes" | "ebony_devil" | "gold_experience" | "hanged_man";
 
 export type AbilityKind =
   | "melee" // short cone in facing dir
@@ -23,7 +23,12 @@ export type AbilityKind =
   | "chain_projectile" // homing piercing shot that chains to nearby targets
   | "frog_summon"      // summons frog protector(s)
   | "hologram_stun"    // long stun + hologram visual
-  | "tree_zone";       // protection/heal/buff zone with rooting
+  | "tree_zone"        // protection/heal/buff zone with rooting
+  | "time_stop"        // The World — freezes everything but the player
+  | "pilot_toggle"     // Hanged Man pilot / Ebony Devil puppet drive
+  | "mirror_shard"     // drops a chrome shard with a combat dome
+  | "shard_teleport"   // opens a picker, teleports to chosen shard
+  | "brutal_slash";    // big slash w/ bleed + stun + slow
 
 export interface Ability {
   name: string;
@@ -78,7 +83,7 @@ export const STANDS: Record<StandId, Stand> = {
       m1: { name: "Punch", kind: "melee", damage: 3, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
       a1: { name: "Star Finger", kind: "pierce", damage: 6, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
       a2: { name: "Ranged Smash", kind: "projectile", damage: 8, range: 220, radius: 8, cooldown: 2.0, speed: 320, color: "#b8a6ff" },
-      a3: { name: "Ora Ora Rush", kind: "channel_cone", damage: 1.2, range: 30, radius: 22, cooldown: 6, duration: 2.0, tickEvery: 0.09, color: "#ffffff" },
+      a3: { name: "The World", kind: "time_stop", damage: 0, range: 0, cooldown: 18, duration: 5, color: "#dcd6ff" },
       a4: { name: "Launch", kind: "knockback", damage: 14, range: 26, radius: 18, cooldown: 5, knockback: 220, color: "#7c5cff" },
     },
   },
@@ -134,6 +139,19 @@ export const STANDS: Record<StandId, Stand> = {
       a4: { name: "Tree of Life", kind: "tree_zone", damage: 0, range: 70, radius: 78, cooldown: 30, duration: 6, color: "#5fd16a" },
     },
   },
+  hanged_man: {
+    id: "hanged_man",
+    name: "Hanged Man",
+    color: "#cfd6e3",
+    rarityWeight: 5,
+    abilities: {
+      m1: { name: "Saber", kind: "melee", damage: 1.2, range: 28, radius: 14, cooldown: 0.34, color: "#cfd6e3" },
+      a1: { name: "Pilot", kind: "pilot_toggle", damage: 0, range: 0, cooldown: 0.4, color: "#cfd6e3" },
+      a2: { name: "Mirror Shard", kind: "mirror_shard", damage: 0, range: 0, radius: 80, cooldown: 1.2, duration: 12, color: "#dfe6f0" },
+      a3: { name: "Teleport", kind: "shard_teleport", damage: 0, range: 0, cooldown: 6, color: "#dfe6f0" },
+      a4: { name: "Brutal Slash", kind: "brutal_slash", damage: 8, range: 30, radius: 16, cooldown: 9, stunSeconds: 1.5, color: "#9ec0ff" },
+    },
+  },
 };
 
 // S.H.I.T. — rare upgraded variant of Echoes' a4
@@ -148,7 +166,7 @@ export const SHIT_ABILITY: Ability = {
   color: "#222",
 };
 
-const ROLLABLE: StandId[] = ["star_platinum", "rhcp", "echoes", "ebony_devil", "gold_experience"];
+const ROLLABLE: StandId[] = ["star_platinum", "rhcp", "echoes", "ebony_devil", "gold_experience", "hanged_man"];
 
 export function rollStand(): { id: StandId; shitVariant: boolean } {
   const total = ROLLABLE.reduce((s, id) => s + STANDS[id].rarityWeight, 0);
