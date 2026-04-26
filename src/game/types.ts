@@ -28,6 +28,25 @@ export interface Entity {
   nextAttackAt?: number;
   // hostile only retaliates after being damaged
   provoked?: boolean;
+  // status effects
+  electroUntil?: number;
+  hologramUntil?: number;
+  hologramOrigin?: Vec2;
+}
+
+export interface Frog {
+  id: number;
+  pos: Vec2;
+  bobPhase: number;
+  alive: boolean;
+}
+
+export interface ProtectionTree {
+  pos: Vec2;
+  radius: number;
+  expireAt: number;
+  bornAt: number;
+  rooted: Map<number, number>; // entityId -> stun-applied-until
 }
 
 export interface Prop {
