@@ -56,6 +56,11 @@ export default function Game() {
     kills: 0,
     rage: 0,
     rageActive: false,
+    echoesAct: 1,
+    timeStopActive: false,
+    pilotActive: false,
+    shardPickerOpen: false,
+    shards: [],
   });
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
   const [showHelp, setShowHelp] = useState<boolean>(true);
