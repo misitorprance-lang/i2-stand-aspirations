@@ -1229,35 +1229,57 @@ export function update(w: World, input: InputState, dt: number) {
     if (w.cdTimers[k] > 0) w.cdTimers[k] = Math.max(0, w.cdTimers[k] - dt);
   }
 
+  // Pilot mode: joystick drives the puppet (Ebony Devil) or Hanged Man instead of the player.
+  // The player stops moving while piloting; HP is shared.
+  const piloting = (w.puppetPiloted && w.puppet.active) || w.pilotActive;
+
   // Player movement
   const pl = w.player;
   if (pl.alive) {
     const j = input.joy;
     const len = Math.hypot(j.x, j.y);
-    if (len > 0.05) {
+    w.lastJoyMag = len;
+    if (!piloting && len > 0.05) {
       const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
       const baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
       const speed = baseSpeed * Math.min(1, len);
+      const before = { x: pl.pos.x, y: pl.pos.y };
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
       pl.facing = { x: nx, y: ny };
+      // Auto-kick: if we asked to move but barely budged AND a prop sits in our path, push us out hard.
+      const moved = Math.hypot(pl.pos.x - before.x, pl.pos.y - before.y);
+      if (moved < 0.4 * Math.max(0.5, speed * dt) && w.time - w.kickAt > 0.4) {
+        for (const p of w.props) {
+          if (!propSolid(p)) continue;
+          if (circleRectOverlap(pl.pos.x + nx * (pl.radius + 1), pl.pos.y + ny * (pl.radius + 1), pl.radius, p.rect)) {
+            pushOutOfProps(pl, w.props);
+            pl.pos.x -= nx * 6; pl.pos.y -= ny * 6;
+            pushOutOfProps(pl, w.props);
+            spawnParticles(w, { x: pl.pos.x, y: pl.pos.y + 6 }, "#a1814a", 4, {
+              shape: "square", gravity: 80, speedMin: 20, speedMax: 60, life: 0.4,
+            });
+            play("footstep");
+            w.kickAt = w.time;
+            break;
+          }
+        }
+      }
       w.footstepAcc += dt * Math.min(1, len);
       if (w.footstepAcc >= 0.32) {
         w.footstepAcc = 0;
         play("footstep");
-        // walking dust puff (brown, gravity)
         const back = { x: -nx, y: -ny };
         spawnParticles(w, { x: pl.pos.x + back.x * 4, y: pl.pos.y + 6 + back.y * 2 }, "#a1814a", input.sprint ? 5 : 3, {
           shape: "square", gravity: 60, speedMin: 8, speedMax: input.sprint ? 60 : 35, life: 0.45,
         });
       }
     } else {
-      w.footstepAcc = 0.32; // ready to step on next move
+      w.footstepAcc = 0.32;
     }
-    // Player regen — slow out-of-combat heal (faster while standing in tree zone, handled later).
+    // Player regen — disabled while piloting (HP shared with puppet/Hanged Man).
     const recentlyHurt = w.time - pl.hitFlashUntil < 4.0;
-    if (!recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
+    if (!piloting && !recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
 
-    // Bleed particles when below half HP
     if (pl.hp < pl.maxHp * 0.5 && Math.random() < dt * 5) {
       spawnParticles(w, { x: pl.pos.x + rand(-3, 3), y: pl.pos.y - 2 }, "#b21717", 1, {
         shape: "circle", gravity: 120, speedMin: 8, speedMax: 24, life: 0.5,
@@ -1268,10 +1290,14 @@ export function update(w: World, input: InputState, dt: number) {
       pl.alive = true;
       pl.hp = pl.maxHp;
       pl.pos = { x: MAP_W / 2, y: MAP_H / 2 };
+      pushOutOfProps(pl, w.props);
+      // dropping pilot states on death
+      w.pilotActive = false;
+      w.puppetPiloted = false;
     }
   }
 
-  // M1 hold-to-repeat (input-driven)
+  // M1 hold-to-repeat (input-driven). Allowed during time stop because player still acts.
   w.m1Held = input.m1Held;
   if (pl.alive && w.m1Held && w.cdTimers.m1 <= 0 && (w.standId === "none" || w.standActive)) {
     castAbility(w, "m1", input);
@@ -1279,15 +1305,45 @@ export function update(w: World, input: InputState, dt: number) {
 
   if (input.aim) w.pointerAim = norm(input.aim);
 
+  // Puppet movement: piloted = joystick, otherwise tail behind player.
   if (w.puppet.active) {
-    if (w.puppet.hp <= 0) w.puppet.active = false;
-    const desired = w.time < w.puppet.attackUntil
-      ? { x: pl.pos.x + w.puppet.facing.x * 28, y: pl.pos.y + w.puppet.facing.y * 24 }
-      : { x: pl.pos.x - pl.facing.x * 28, y: pl.pos.y - pl.facing.y * 22 + 4 };
-    w.puppet.pos.x += (desired.x - w.puppet.pos.x) * Math.min(1, dt * 9);
-    w.puppet.pos.y += (desired.y - w.puppet.pos.y) * Math.min(1, dt * 9);
+    if (w.puppet.hp <= 0) { w.puppet.active = false; w.puppetPiloted = false; }
+    if (w.puppetPiloted) {
+      const j = input.joy;
+      const len = Math.hypot(j.x, j.y);
+      if (len > 0.05) {
+        const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
+        const sp = PLAYER_SPEED * Math.min(1, len);
+        const e: Entity = { ...pl, pos: w.puppet.pos, radius: 9 };
+        tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
+        w.puppet.pos.x = e.pos.x; w.puppet.pos.y = e.pos.y;
+        w.puppet.facing = { x: nx, y: ny };
+      }
+    } else {
+      const desired = w.time < w.puppet.attackUntil
+        ? { x: pl.pos.x + w.puppet.facing.x * 28, y: pl.pos.y + w.puppet.facing.y * 24 }
+        : { x: pl.pos.x - pl.facing.x * 28, y: pl.pos.y - pl.facing.y * 22 + 4 };
+      w.puppet.pos.x += (desired.x - w.puppet.pos.x) * Math.min(1, dt * 9);
+      w.puppet.pos.y += (desired.y - w.puppet.pos.y) * Math.min(1, dt * 9);
+    }
     w.puppet.pos.x = Math.max(10, Math.min(MAP_W - 10, w.puppet.pos.x));
     w.puppet.pos.y = Math.max(10, Math.min(MAP_H - 10, w.puppet.pos.y));
+  }
+
+  // Hanged Man pilot movement.
+  if (w.standId === "hanged_man" && w.pilotActive) {
+    const j = input.joy;
+    const len = Math.hypot(j.x, j.y);
+    if (len > 0.05) {
+      const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
+      const sp = PLAYER_SPEED * Math.min(1, len);
+      const e: Entity = { ...pl, pos: w.hangedMan.pos, radius: 9 };
+      tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
+      w.hangedMan.pos.x = e.pos.x; w.hangedMan.pos.y = e.pos.y;
+      w.hangedMan.facing = { x: nx, y: ny };
+    }
+    w.hangedMan.pos.x = Math.max(10, Math.min(MAP_W - 10, w.hangedMan.pos.x));
+    w.hangedMan.pos.y = Math.max(10, Math.min(MAP_H - 10, w.hangedMan.pos.y));
   }
 
   // Item use buttons
