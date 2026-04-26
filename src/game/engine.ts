@@ -1346,7 +1346,7 @@ export function update(w: World, input: InputState, dt: number) {
 
   // Pilot mode: joystick drives the puppet (Ebony Devil) or Hanged Man instead of the player.
   // The player stops moving while piloting; HP is shared.
-  const piloting = (w.puppetPiloted && w.puppet.active) || w.pilotActive;
+  const piloting = w.puppet.active || w.pilotActive || w.hangedManActive;
 
   // Player movement
   const pl = w.player;
