@@ -8,7 +8,7 @@
 import { STANDS } from "./stands";
 import type { StandId } from "./stands";
 
-export const CODEX_VERSION = "1.0.0";
+export const CODEX_VERSION = "1.1.0";
 
 export interface ModelSpec {
   description: string;     // verbal description of the visible model
@@ -55,7 +55,7 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       m1: moveOf("star_platinum", "m1", "Cone melee in front of player."),
       a1: moveOf("star_platinum", "a1", "Forward stab pierce, hits multiple in line."),
       a2: moveOf("star_platinum", "a2", "Straight-line projectile aimed at target."),
-      a3: moveOf("star_platinum", "a3", "Rapid channeled cone of small hits."),
+      a3: moveOf("star_platinum", "a3", "Time stop — freezes the world for 5s; player can still attack and move."),
       a4: moveOf("star_platinum", "a4", "Close knockback strike."),
     },
   },
@@ -77,7 +77,7 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
   echoes: {
     id: "echoes",
     model: {
-      description: "Evolves through 3 acts based on player kill count.",
+      description: "Three acts. Form is driven by the last ability cast (a1=Act1, a2/a3=Act2, a4=Act3).",
       silhouette: [
         "Act 1: small egg+tail",
         "Act 2: bigger humanoid w/ green torso",
@@ -121,6 +121,21 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       a2: moveOf("gold_experience", "a2", "Spawns frog protector (max 3); intercepts attack and reflects 50% damage."),
       a3: moveOf("gold_experience", "a3", "Long single-target stun with hologram exit/return visual."),
       a4: moveOf("gold_experience", "a4", "Tree of Life zone: roots enemies, heals + boosts player."),
+    },
+  },
+  hanged_man: {
+    id: "hanged_man",
+    model: {
+      description: "Tall draped figure that lives in mirror shards; dormant until Pilot is engaged.",
+      silhouette: ["dark cloak", "pale face", "saber arm"],
+      auraColor: "#cfd6e3",
+    },
+    moves: {
+      m1: moveOf("hanged_man", "m1", "Saber slash, fixed 1.2 dmg, no crits. Only inside an active mirror dome."),
+      a1: moveOf("hanged_man", "a1", "Pilot toggle: control the stand directly; HP shared, regen disabled."),
+      a2: moveOf("hanged_man", "a2", "Drop a mirror shard with a combat dome (max 5, 12s)."),
+      a3: moveOf("hanged_man", "a3", "Open shard picker; teleport to chosen shard."),
+      a4: moveOf("hanged_man", "a4", "Brutal slash — bleed + stun + slow."),
     },
   },
 };

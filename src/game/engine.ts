@@ -12,6 +12,7 @@ import type {
   Entity,
   Frog,
   ItemPickup,
+  MirrorShard,
   Particle,
   ProtectionTree,
   PuppetState,
@@ -147,6 +148,22 @@ interface World {
   hologramHits: { entityId: number; expireAt: number; from: Vec2 }[];
   // M1 hold-to-repeat
   m1Held: boolean;
+  // Echoes act state (drives model + M1 damage)
+  echoesAct: 1 | 2 | 3;
+  // Star Platinum — The World
+  timeStopUntil: number;
+  timeStopStartedAt: number;
+  pendingPlayerDamage: { amount: number; dir: Vec2 }[];
+  // Hanged Man
+  hangedManFormed: boolean;     // false until Pilot has been engaged at least once
+  pilotActive: boolean;         // currently piloting Hanged Man
+  puppetPiloted: boolean;       // currently piloting Ebony Devil's puppet
+  shards: MirrorShard[];
+  shardPickerOpen: boolean;
+  // Auto-kick (anti-stuck) cooldown
+  kickAt: number;
+  // Player-input intent magnitude (used by kick detection)
+  lastJoyMag: number;
 }
 
 function makeProps(): Prop[] {
@@ -183,6 +200,7 @@ function makeProps(): Prop[] {
       },
     });
   }
+  // (prop hp tagging — deferred to next round)
 
   // Rocks (gray ovals)
   for (let i = 0; i < 21; i++) {
@@ -255,8 +273,9 @@ function makeProps(): Prop[] {
       },
     });
   }
+  // (prop hp tagging — deferred)
 
-  // Fence segments
+
   for (let i = 0; i < 9; i++) {
     const x = rand(50, MAP_W - 100);
     const y = rand(50, MAP_H - 50);
@@ -274,6 +293,7 @@ function makeProps(): Prop[] {
       },
     });
   }
+  // (prop hp tagging — deferred)
 
   return props;
 }
@@ -410,6 +430,17 @@ export function createWorld(): World {
     },
     rage: 0,
     rageUntil: 0,
+    echoesAct: 1,
+    timeStopUntil: 0,
+    timeStopStartedAt: 0,
+    pendingPlayerDamage: [],
+    hangedManFormed: false,
+    pilotActive: false,
+    puppetPiloted: false,
+    shards: [],
+    shardPickerOpen: false,
+    kickAt: 0,
+    lastJoyMag: 0,
   };
 }
 
