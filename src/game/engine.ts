@@ -613,6 +613,22 @@ function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
   return "punch";
 }
 
+// Per-stand M1 damage table (normal, critical). Crit chance = 15%.
+// Ebony Devil: owner's M1 is intentionally tiny; the puppet (when active) does the real damage.
+function m1DamageRoll(w: World, puppetSwing: boolean): number {
+  const crit = Math.random() < 0.15;
+  const sid = w.standId;
+  if (sid === "ebony_devil") {
+    if (puppetSwing) return crit ? 2.5 : rand(1, 2);
+    return crit ? 0.9 : 0.3;
+  }
+  if (sid === "star_platinum")  return crit ? 5   : 3;
+  if (sid === "gold_experience")return crit ? 4   : 2.5;
+  if (sid === "echoes")         return crit ? 3   : 1.5;
+  if (sid === "rhcp")           return crit ? 3   : 1.4;
+  return 1;
+}
+
 function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: InputState) {
   const stand = STANDS[w.standId];
   if (stand.id === "none" && key !== "m1") return;
