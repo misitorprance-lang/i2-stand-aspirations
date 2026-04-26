@@ -1438,6 +1438,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   for (const it of w.items) {
     const bob = Math.sin((w.time - it.bornAt) * 4) * 2;
     const cx = it.pos.x, cy = it.pos.y + bob;
+    const SC = 0.7; // smaller items
     // soft drop shadow
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath(); ctx.ellipse(it.pos.x, it.pos.y + 6, 6, 2, 0, 0, Math.PI * 2); ctx.fill();
