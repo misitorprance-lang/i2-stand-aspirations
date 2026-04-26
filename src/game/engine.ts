@@ -346,7 +346,7 @@ const freeSpotOrCenter = freeSpotOrGrid;
 
 function makeNpc(props: Prop[], kind: "friendly" | "enemy", id: number): Entity {
   const pos = freeSpotOrGrid(props, 10);
-  return {
+  const e: Entity = {
     id,
     kind,
     pos,
@@ -360,6 +360,9 @@ function makeNpc(props: Prop[], kind: "friendly" | "enemy", id: number): Entity 
     stunUntil: 0,
     hitFlashUntil: 0,
   };
+  // Belt-and-braces: eject in case the spawn brushed a prop edge.
+  pushOutOfProps(e, props);
+  return e;
 }
 
 export function createWorld(): World {
@@ -383,6 +386,7 @@ export function createWorld(): World {
     stunUntil: 0,
     hitFlashUntil: 0,
   };
+  pushOutOfProps(player, props);
 
   return {
     time: 0,
@@ -491,18 +495,19 @@ function pushOutOfProps(e: Entity, props: Prop[]) {
   e.pos.y = Math.max(e.radius, Math.min(MAP_H - e.radius, e.pos.y));
 }
 
-function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff") {
-  const tier = dmg >= 15 ? 22 : dmg >= 8 ? 17 : dmg >= 3 ? 13 : 10;
-  const text = dmg < 1 ? dmg.toFixed(1) : Math.round(dmg).toString();
+function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false) {
+  let tier = dmg >= 15 ? 22 : dmg >= 8 ? 17 : dmg >= 3 ? 13 : 10;
+  if (crit) tier = Math.round(tier * 1.35);
+  const text = (dmg < 1 ? dmg.toFixed(1) : Math.round(dmg).toString()) + (crit ? "!" : "");
   w.damageNumbers.push({
     id: w.nextId++,
     pos: { x: pos.x + rand(-6, 6), y: pos.y - 6 },
     text,
-    color: dmg >= 15 ? "#ffd24a" : dmg >= 8 ? "#ff8a3a" : color,
+    color: crit ? "#ffd24a" : (dmg >= 15 ? "#ffd24a" : dmg >= 8 ? "#ff8a3a" : color),
     size: tier,
-    vy: -28,
+    vy: crit ? -52 : -28,
     bornAt: w.time,
-    expireAt: w.time + 0.9,
+    expireAt: w.time + (crit ? 1.1 : 0.9),
   });
 }
 
@@ -531,13 +536,19 @@ function spawnVfx(w: World, v: Omit<Vfx, "bornAt" | "expireAt"> & { life: number
   w.vfx.push({ ...rest, bornAt: w.time, expireAt: w.time + life });
 }
 
-function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }) {
+function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }, crit = false) {
   if (!e.alive) return;
   if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil) dmg *= 1.55;
   e.hp -= dmg;
   e.hitFlashUntil = w.time + 0.12;
-  spawnDmg(w, e.pos, dmg);
+  spawnDmg(w, e.pos, dmg, "#fff", crit);
   spawnParticles(w, e.pos, "#ffd0a8", 4);
+  if (crit) {
+    spawnVfx(w, { kind: "crit_burst", pos: { ...e.pos }, color: "#ffd24a", radius: 18, life: 0.35 });
+    spawnParticles(w, e.pos, "#ffd24a", 8, { shape: "spark", speedMin: 80, speedMax: 220, life: 0.45 });
+    w.shake = Math.max(w.shake, 3);
+    play("crit");
+  }
   if (e.kind === "enemy") e.provoked = true;
   if (e.kind === "player") {
     w.rage = Math.min(100, w.rage + dmg * 3.5);
@@ -546,6 +557,7 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   if (knockback) {
     e.vel.x += knockback.dir.x * knockback.amount;
     e.vel.y += knockback.dir.y * knockback.amount;
+    pushOutOfProps(e, w.props);
   }
   if (e.hp <= 0) {
     e.alive = false;
@@ -633,7 +645,7 @@ function resolveTargetPos(w: World, ab: Ability, dir: Vec2, origin: Vec2): { tar
   };
 }
 
-function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: number, damage: number, knockbackAmount?: number) {
+function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: number, damage: number, knockbackAmount?: number, crit = false) {
   const reach = range + radius;
   let hitAny = false;
   for (const e of w.npcs) {
@@ -643,7 +655,7 @@ function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: n
     if (d > reach + e.radius) continue;
     const dot = d <= e.radius + 8 ? 1 : (dx * dir.x + dy * dir.y) / (d || 1);
     if (dot > 0.15) {
-      damageEntity(w, e, damage, knockbackAmount ? { dir, amount: knockbackAmount } : undefined);
+      damageEntity(w, e, damage, knockbackAmount ? { dir, amount: knockbackAmount } : undefined, crit);
       hitAny = true;
     }
   }
@@ -691,20 +703,25 @@ function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
   return "punch";
 }
 
-// Per-stand M1 damage table (normal, critical). Crit chance = 15%.
-// Ebony Devil: owner's M1 is intentionally tiny; the puppet (when active) does the real damage.
-function m1DamageRoll(w: World, puppetSwing: boolean): number {
-  const crit = Math.random() < 0.15;
+// Per-stand M1 damage table. Returns { dmg, crit }. Crit chance = 15% (Hanged Man never crits).
+function m1DamageRoll(w: World, puppetSwing: boolean): { dmg: number; crit: boolean } {
   const sid = w.standId;
+  const crit = sid === "hanged_man" ? false : Math.random() < 0.15;
   if (sid === "ebony_devil") {
-    if (puppetSwing) return crit ? 2.5 : rand(1, 2);
-    return crit ? 0.9 : 0.3;
+    if (puppetSwing) return { dmg: crit ? 2.5 : rand(1, 2), crit };
+    return { dmg: crit ? 0.9 : 0.3, crit };
   }
-  if (sid === "star_platinum")  return crit ? 5   : 3;
-  if (sid === "gold_experience")return crit ? 4   : 2.5;
-  if (sid === "echoes")         return crit ? 3   : 1.5;
-  if (sid === "rhcp")           return crit ? 3   : 1.4;
-  return 1;
+  if (sid === "echoes") {
+    // Act-driven damage
+    if (w.echoesAct === 1) return { dmg: crit ? 0.8 : 0.4, crit };
+    if (w.echoesAct === 2) return { dmg: crit ? 1.5 : 0.9, crit };
+    return { dmg: crit ? 3 : 1.5, crit };
+  }
+  if (sid === "star_platinum")  return { dmg: crit ? 5   : 3,   crit };
+  if (sid === "gold_experience")return { dmg: crit ? 4   : 2.5, crit };
+  if (sid === "rhcp")           return { dmg: crit ? 3   : 1.4, crit };
+  if (sid === "hanged_man")     return { dmg: 1.2, crit: false };
+  return { dmg: 1, crit: false };
 }
 
 function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: InputState) {
@@ -717,7 +734,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     return;
   }
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone"].includes(ab.kind)) return;
+  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone", "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop"].includes(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
   if (ab.kind === "rage_mode" && w.rage < 100) {
     w.bannerText = "Rage not ready";
@@ -725,6 +742,33 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 22, color: ab.color, life: 0.22 });
     return;
   }
+
+  // Range-gate targeted abilities: don't burn cooldown on a cast that has nothing to hit.
+  // Skipped for self-AoE, channels, summons, toggles, and pierce (which is fire-along-line).
+  const targetedKinds = ["projectile", "lobbed", "aoe_target", "stun_touch", "knockback", "auto_aim", "chain_projectile", "hologram_stun", "dot_zone"];
+  if (!input.aim && targetedKinds.includes(ab.kind) && ab.range > 0) {
+    const t = nearestTarget(w, w.player.pos, ab.range);
+    if (!t) {
+      w.bannerText = "Out of range";
+      w.bannerUntil = w.time + 0.6;
+      return;
+    }
+  }
+  // M1 range gate: don't swing into empty air. Origin is puppet pos for piloted Ebony Devil.
+  if (key === "m1" && ab.kind === "melee" && !input.aim) {
+    const origin = (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos : w.player.pos;
+    const reach = ab.range + (ab.radius ?? 14);
+    const t = nearestAnyNpc(w, origin, reach + 12);
+    if (!t) return; // silent — feels better than a banner spam on hold
+  }
+
+  // Echoes: act is driven by the LAST ability used (a1 -> 1, a2/a3 -> 2, a4 -> 3).
+  if (w.standId === "echoes") {
+    if (key === "a1") w.echoesAct = 1;
+    else if (key === "a2" || key === "a3") w.echoesAct = 2;
+    else if (key === "a4") w.echoesAct = 3;
+  }
+
   w.cdTimers[key] = ab.cooldown;
 
   const dir = aimDir(w, input, ab, key);
@@ -751,9 +795,10 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.2 });
       // M1 punches: roll critical per stand table.
       let dmg = ab.damage;
-      if (key === "m1") dmg = m1DamageRoll(w, usePuppetOrigin);
+      let crit = false;
+      if (key === "m1") { const r = m1DamageRoll(w, usePuppetOrigin); dmg = r.dmg; crit = r.crit; }
       // Hit any NPC within an arc in front of the player (cone test).
-      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, dmg, key === "m1" && w.time < w.rageUntil ? 45 : undefined);
+      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, dmg, key === "m1" && w.time < w.rageUntil ? 45 : undefined, crit);
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
@@ -901,7 +946,8 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "knockback": {
-      const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
+      const { pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const tx = aimPos.x, ty = aimPos.y;
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
@@ -914,7 +960,8 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "stun_touch": {
-      const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
+      const { pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const tx = aimPos.x, ty = aimPos.y;
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
@@ -926,7 +973,12 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "dot_zone": {
-      const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
+      // Burning Text: snap landing point to the actual target so it lands ON the enemy, not past them.
+      const { target, pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const distToAim = Math.hypot(aimPos.x - p.x, aimPos.y - p.y);
+      const drop = Math.min(ab.range, distToAim);
+      const tx = target ? target.pos.x : p.x + dir.x * drop;
+      const ty = target ? target.pos.y : p.y + dir.y * drop;
       w.zones.push({
         id: w.nextId++,
         pos: { x: tx, y: ty },
@@ -1209,6 +1261,7 @@ export function update(w: World, input: InputState, dt: number) {
           e.hp = e.maxHp;
           e.alive = true;
           e.provoked = false;
+          pushOutOfProps(e, w.props);
         } else {
           e.respawnAt = w.time + 1; // try again soon
         }
@@ -1501,6 +1554,15 @@ function resetStandRuntime(w: World) {
   w.puppet.active = false;
   w.puppet.hp = w.puppet.maxHp;
   w.standActive = true;
+  w.echoesAct = 1;
+  w.timeStopUntil = 0;
+  w.pendingPlayerDamage = [];
+  w.pilotActive = false;
+  w.puppetPiloted = false;
+  w.shards = [];
+  w.shardPickerOpen = false;
+  // Drop any in-flight player projectiles so a stand swap doesn't leak homing locks.
+  w.projectiles = [];
 }
 
 export function useArrow(w: World) {
@@ -1912,9 +1974,9 @@ function drawRhcp(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
 }
 
 function drawEchoes(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
-  // Echoes form depends on how many enemies the player has hit/killed (act progression).
-  // Act 1: small with tail. Act 2: bigger humanoid. Act 3: white with green accents.
-  const act = w.shitVariant ? 3 : (w.kills >= 6 ? 3 : w.kills >= 2 ? 2 : 1);
+  // Echoes form is driven by which ability the player last used.
+  // a1 -> Act 1, a2/a3 -> Act 2, a4 (or S.H.I.T.) -> Act 3.
+  const act = w.shitVariant ? 3 : w.echoesAct;
   const punching = w.time < w.standPunchUntil;
   if (act === 1) {
     // small egg-like creature with tail
@@ -2236,6 +2298,22 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
         ctx.beginPath();
         ctx.arc(v.pos.x + dx, v.pos.y + dy, r * 0.3, 0, Math.PI * 2);
         ctx.fill();
+      }
+      break;
+    }
+    case "crit_burst": {
+      // Bright yellow ring + radiating spokes
+      const r = (v.radius ?? 18) * (0.3 + t * 1.4);
+      ctx.strokeStyle = hexToRgba("#ffd24a", inv);
+      ctx.lineWidth = 2.5 * inv + 0.5;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.85);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(v.pos.x + Math.cos(a) * r * 0.55, v.pos.y + Math.sin(a) * r * 0.55);
+        ctx.lineTo(v.pos.x + Math.cos(a) * r * 1.1, v.pos.y + Math.sin(a) * r * 1.1);
+        ctx.stroke();
       }
       break;
     }
