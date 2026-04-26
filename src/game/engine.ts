@@ -1539,6 +1539,24 @@ export function update(w: World, input: InputState, dt: number) {
   if (pl.alive) pushOutOfProps(pl, w.props);
   for (const e of w.npcs) if (e.alive) pushOutOfProps(e, w.props);
 
+  // Sweep expired Hanged Man mirror shards.
+  if (w.shards.length) w.shards = w.shards.filter((s) => w.time < s.expireAt);
+  // Auto-close shard picker if all shards have died while it was open.
+  if (w.shardPickerOpen && w.shards.length === 0) w.shardPickerOpen = false;
+
+  // Prop respawn loop — destructible props come back fully healed after their timer.
+  for (const p of w.props) {
+    if (p.destroyedAt && p.respawnAt && w.time >= p.respawnAt) {
+      if (p.original) {
+        p.rect = { ...p.original.rect };
+        p.hp = p.original.hp;
+      }
+      p.destroyedAt = 0;
+      p.respawnAt = 0;
+      p.hitFlashUntil = 0;
+    }
+  }
+
   if (pl.alive) {
     if (input.pressed.m1) { input.pressed.m1 = false; castAbility(w, "m1", input); }
     if (input.pressed.a1) { input.pressed.a1 = false; castAbility(w, "a1", input); }
