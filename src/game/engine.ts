@@ -1796,6 +1796,7 @@ function resetStandRuntime(w: World) {
   w.pendingPlayerDamage = [];
   w.pilotActive = false;
   w.puppetPiloted = false;
+  w.hangedManActive = false;
   w.shards = [];
   w.shardPickerOpen = false;
   // Drop any in-flight player projectiles so a stand swap doesn't leak homing locks.
