@@ -1739,43 +1739,17 @@ export function update(w: World, input: InputState, dt: number) {
       b.pageIndex = (b.pageIndex + 1) % 4;
       b.pageFlipAt = w.time + rand(2.2, 4.8);
     }
-    const FLEE_R = 70;
-    let fleeX = 0, fleeY = 0, threats = 0;
-    const consider = (pos: Vec2) => {
-      const dx = b.pos.x - pos.x;
-      const dy = b.pos.y - pos.y;
-      const d2v = dx * dx + dy * dy;
-      if (d2v > 0 && d2v < FLEE_R * FLEE_R) {
-        const d = Math.sqrt(d2v);
-        fleeX += dx / d;
-        fleeY += dy / d;
-        threats++;
-      }
-    };
-    if (pl.alive) consider(pl.pos);
-    if (w.puppet.active) consider(w.puppet.pos);
-    if (w.hangedManActive) consider(w.hangedMan.pos);
-    for (const e of w.npcs) if (e.alive && e.kind === "enemy") consider(e.pos);
-
-    if (threats > 0) {
-      const dir = norm({ x: fleeX, y: fleeY });
-      tryMove(b as unknown as Entity, dir.x * (NPC_SPEED * 1.15) * dt, dir.y * (NPC_SPEED * 1.15) * dt, w.props);
+    // Calm wander only — no flee behavior.
+    if (!b.wanderTarget || w.time >= b.wanderUntil) {
+      b.wanderTarget = freeSpotOrCenter(w.props, 10);
+      b.wanderUntil = w.time + rand(2.5, 5);
+    }
+    const tgt = b.wanderTarget;
+    const d = dist(b.pos, tgt);
+    if (d > 4) {
+      const dir = norm({ x: tgt.x - b.pos.x, y: tgt.y - b.pos.y });
+      tryMove(b as unknown as Entity, dir.x * (NPC_SPEED * 0.6) * dt, dir.y * (NPC_SPEED * 0.6) * dt, w.props);
       b.facing = dir;
-      // a fled-from Boingo doesn't keep his old wander goal
-      b.wanderTarget = null;
-      b.wanderUntil = w.time + 0.5;
-    } else {
-      if (!b.wanderTarget || w.time >= b.wanderUntil) {
-        b.wanderTarget = freeSpotOrCenter(w.props, 10);
-        b.wanderUntil = w.time + rand(2.5, 5);
-      }
-      const tgt = b.wanderTarget;
-      const d = dist(b.pos, tgt);
-      if (d > 4) {
-        const dir = norm({ x: tgt.x - b.pos.x, y: tgt.y - b.pos.y });
-        tryMove(b as unknown as Entity, dir.x * (NPC_SPEED * 0.6) * dt, dir.y * (NPC_SPEED * 0.6) * dt, w.props);
-        b.facing = dir;
-      }
     }
 
     // Soft-collide Boingo against the player + every alive NPC + puppet + hanged man.
