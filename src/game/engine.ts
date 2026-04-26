@@ -1559,7 +1559,8 @@ export function update(w: World, input: InputState, dt: number) {
       }
       const targetPos = frogTarget ? frogTarget.pos : baseTargetPos;
       const dir = norm({ x: targetPos.x - e.pos.x, y: targetPos.y - e.pos.y });
-      tryMove(e, dir.x * ENEMY_SPEED * dt, dir.y * ENEMY_SPEED * dt, w.props);
+      const slowMul = w.time < (e.slowUntil ?? 0) ? 0.45 : 1;
+      tryMove(e, dir.x * ENEMY_SPEED * slowMul * dt, dir.y * ENEMY_SPEED * slowMul * dt, w.props);
       e.facing = dir;
       if (dist(e.pos, targetPos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
         e.nextAttackAt = w.time + ENEMY_ATTACK_CD;
@@ -1584,7 +1585,8 @@ export function update(w: World, input: InputState, dt: number) {
       const d = dist(e.pos, tgt);
       if (d > 4) {
         const dir = norm({ x: tgt.x - e.pos.x, y: tgt.y - e.pos.y });
-        tryMove(e, dir.x * NPC_SPEED * dt, dir.y * NPC_SPEED * dt, w.props);
+        const slowMul = w.time < (e.slowUntil ?? 0) ? 0.45 : 1;
+        tryMove(e, dir.x * NPC_SPEED * slowMul * dt, dir.y * NPC_SPEED * slowMul * dt, w.props);
         e.facing = dir;
       }
     }
