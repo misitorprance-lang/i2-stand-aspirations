@@ -174,6 +174,18 @@ interface World {
   whiteAlbumToggleAt: number;     // earliest time a toggle is allowed
   whiteAlbumLockUntil: number;    // forced-off lockout when bar empty
   icePath: { pos: Vec2; expireAt: number; bornAt: number }[];
+  // Boingo (tutorial-ish friendly NPC; no HP, scared AI, holds a purple book)
+  boingo: {
+    pos: Vec2;
+    vel: Vec2;
+    radius: number;
+    facing: Vec2;
+    wanderTarget: Vec2 | null;
+    wanderUntil: number;
+    bobPhase: number;
+    pageFlipAt: number;
+    pageIndex: number;
+  };
 }
 
 function makeProps(): Prop[] {
