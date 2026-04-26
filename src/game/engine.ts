@@ -532,13 +532,19 @@ function spawnVfx(w: World, v: Omit<Vfx, "bornAt" | "expireAt"> & { life: number
   w.vfx.push({ ...rest, bornAt: w.time, expireAt: w.time + life });
 }
 
-function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }) {
+function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2; amount: number }, crit = false) {
   if (!e.alive) return;
   if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil) dmg *= 1.55;
   e.hp -= dmg;
   e.hitFlashUntil = w.time + 0.12;
-  spawnDmg(w, e.pos, dmg);
+  spawnDmg(w, e.pos, dmg, "#fff", crit);
   spawnParticles(w, e.pos, "#ffd0a8", 4);
+  if (crit) {
+    spawnVfx(w, { kind: "crit_burst", pos: { ...e.pos }, color: "#ffd24a", radius: 18, life: 0.35 });
+    spawnParticles(w, e.pos, "#ffd24a", 8, { shape: "spark", speedMin: 80, speedMax: 220, life: 0.45 });
+    w.shake = Math.max(w.shake, 3);
+    play("crit");
+  }
   if (e.kind === "enemy") e.provoked = true;
   if (e.kind === "player") {
     w.rage = Math.min(100, w.rage + dmg * 3.5);
@@ -547,6 +553,7 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   if (knockback) {
     e.vel.x += knockback.dir.x * knockback.amount;
     e.vel.y += knockback.dir.y * knockback.amount;
+    pushOutOfProps(e, w.props);
   }
   if (e.hp <= 0) {
     e.alive = false;
