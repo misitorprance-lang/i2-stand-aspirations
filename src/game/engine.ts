@@ -56,6 +56,7 @@ const MAX_DISCS_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
 const FROG_MAX = 3;
+const STAND_TETHER = 220; // max distance puppet/hangedman can be from player before snap-back
 
 // ---------- helpers ----------
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -533,6 +534,27 @@ function pushOutOfProps(e: Entity, props: Prop[]) {
   e.pos.y = Math.max(e.radius, Math.min(MAP_H - e.radius, e.pos.y));
 }
 
+// Soft-collide a free body (puppet/hanged man) with all alive NPCs at the given pos.
+// Mutates `pos` in place.
+function pushOutOfNpcs(w: World, pos: Vec2, radius: number) {
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    const dx = pos.x - e.pos.x, dy = pos.y - e.pos.y;
+    const min = radius + e.radius;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > 0 && d2 < min * min) {
+      const d = Math.sqrt(d2);
+      const overlap = min - d;
+      const nx = dx / d, ny = dy / d;
+      // Free body absorbs 60% of push so NPCs don't get launched.
+      pos.x += nx * overlap * 0.6;
+      pos.y += ny * overlap * 0.6;
+      e.pos.x -= nx * overlap * 0.4;
+      e.pos.y -= ny * overlap * 0.4;
+    }
+  }
+}
+
 function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false) {
   let tier = dmg >= 15 ? 22 : dmg >= 8 ? 17 : dmg >= 3 ? 13 : 10;
   if (crit) tier = Math.round(tier * 1.35);
@@ -614,6 +636,8 @@ function damagePuppet(w: World, dmg: number) {
   w.rage = Math.min(100, w.rage + dmg * 2.2);
   spawnDmg(w, w.puppet.pos, dmg, "#d6d8dd");
   spawnParticles(w, w.puppet.pos, "#8f949c", 7);
+  // HP link: damage to the puppet also drains the player (Ebony Devil's lore — he's tied to it).
+  damageEntity(w, w.player, dmg, undefined, false);
   play("hurt");
   if (w.puppet.hp <= 0) {
     w.puppet.active = false;
@@ -667,19 +691,25 @@ function nearestAnyNpc(w: World, from: Vec2, range = AIM_ASSIST_RANGE): Entity |
 function aimDir(w: World, input: InputState, ab?: Ability, key?: "m1" | "a1" | "a2" | "a3" | "a4"): Vec2 {
   // Manual aim wins
   if (input.aim) return norm(input.aim);
-  // M1: lock onto closest NPC of any kind. For Ebony Devil w/ active puppet, aim from puppet's pos.
+  // Resolve the body that's actually attacking — for Ebony Devil/Hanged Man with their stand summoned,
+  // the puppet/Hanged Man is the one swinging, so they should aim from THEIR position.
+  const body =
+    (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos :
+    (w.standId === "hanged_man" && w.hangedManActive) ? w.hangedMan.pos :
+    w.player.pos;
   if (key === "m1") {
-    const origin = (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos : w.player.pos;
-    const t = nearestAnyNpc(w, origin, AIM_ASSIST_RANGE);
-    if (t) return norm({ x: t.pos.x - origin.x, y: t.pos.y - origin.y });
+    const t = nearestAnyNpc(w, body, AIM_ASSIST_RANGE);
+    if (t) return norm({ x: t.pos.x - body.x, y: t.pos.y - body.y });
   } else {
-    // Target-locked aim: use the ability's range (with fallback) so long-range moves still find targets
     const range = ab?.range && ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : AIM_ASSIST_RANGE;
-    const target = nearestTarget(w, w.player.pos, range);
-    if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+    const target = nearestTarget(w, body, range);
+    if (target) return norm({ x: target.pos.x - body.x, y: target.pos.y - body.y });
   }
   // Fall back to joystick / facing
   if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
+  // Use the stand body's facing if it has one
+  if (w.standId === "ebony_devil" && w.puppet.active) return w.puppet.facing;
+  if (w.standId === "hanged_man" && w.hangedManActive) return w.hangedMan.facing;
   return w.player.facing;
 }
 
@@ -832,7 +862,14 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     else if (key === "a4") w.echoesAct = 3;
   }
 
-  w.cdTimers[key] = ab.cooldown;
+  // Tree of Life buff: while Gold Experience stands inside an active Tree zone, frog/eagle spam (75% reduced cd).
+  let cdMul = 1;
+  if (w.standId === "gold_experience" && (key === "a1" || key === "a2")) {
+    for (const t of w.trees) {
+      if (w.time < t.expireAt && dist2(w.player.pos, t.pos) < t.radius * t.radius) { cdMul = 0.25; break; }
+    }
+  }
+  w.cdTimers[key] = ab.cooldown * cdMul;
 
   const dir = aimDir(w, input, ab, key);
   const p = w.player.pos;
@@ -1511,6 +1548,20 @@ export function update(w: World, input: InputState, dt: number) {
     }
     w.puppet.pos.x = Math.max(10, Math.min(MAP_W - 10, w.puppet.pos.x));
     w.puppet.pos.y = Math.max(10, Math.min(MAP_H - 10, w.puppet.pos.y));
+    // NPC soft collision (push apart)
+    pushOutOfNpcs(w, w.puppet.pos, 9);
+    // Tether: clamp distance from player. Past tether, drag the puppet back toward player.
+    const dx = w.puppet.pos.x - pl.pos.x, dy = w.puppet.pos.y - pl.pos.y;
+    const td = Math.hypot(dx, dy);
+    if (td > STAND_TETHER) {
+      const k = STAND_TETHER / td;
+      w.puppet.pos.x = pl.pos.x + dx * k;
+      w.puppet.pos.y = pl.pos.y + dy * k;
+      if (!w.bannerText || w.time > w.bannerUntil) {
+        w.bannerText = "Puppet leashed";
+        w.bannerUntil = w.time + 0.5;
+      }
+    }
   }
 
   // Hanged Man pilot movement.
@@ -1527,6 +1578,18 @@ export function update(w: World, input: InputState, dt: number) {
     }
     w.hangedMan.pos.x = Math.max(10, Math.min(MAP_W - 10, w.hangedMan.pos.x));
     w.hangedMan.pos.y = Math.max(10, Math.min(MAP_H - 10, w.hangedMan.pos.y));
+    pushOutOfNpcs(w, w.hangedMan.pos, 9);
+    const dx = w.hangedMan.pos.x - pl.pos.x, dy = w.hangedMan.pos.y - pl.pos.y;
+    const td = Math.hypot(dx, dy);
+    if (td > STAND_TETHER) {
+      const k = STAND_TETHER / td;
+      w.hangedMan.pos.x = pl.pos.x + dx * k;
+      w.hangedMan.pos.y = pl.pos.y + dy * k;
+      if (!w.bannerText || w.time > w.bannerUntil) {
+        w.bannerText = "Hanged Man leashed";
+        w.bannerUntil = w.time + 0.5;
+      }
+    }
   }
 
   // Item use buttons
@@ -1849,20 +1912,30 @@ export function update(w: World, input: InputState, dt: number) {
   w.shake *= 0.85;
 
   // White Album: bar drain/refill + ice trail + NPC slow on ice.
+  // Two states: Suit On (drain) and Suit Off (forced lockout while bar refills) — no "regular stand" mode.
   if (w.standId === "white_album") {
     if (w.whiteAlbumActive) {
-      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 6 * dt);
+      // Slow passive drain so the bar lasts ~50s base before any moves are used.
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 2 * dt);
       if (w.whiteAlbumBar <= 0) {
         w.whiteAlbumActive = false;
-        w.whiteAlbumLockUntil = w.time + 6;
-        w.bannerText = "Suit overheated"; w.bannerUntil = w.time + 1.2;
+        w.standActive = false;
+        w.whiteAlbumLockUntil = w.time + 8;
+        w.bannerText = "Suit overheated"; w.bannerUntil = w.time + 1.4;
       }
       // Spawn ice tile every ~0.15s while moving.
       if (pl.alive && w.lastJoyMag > 0.1 && (!w.icePath.length || w.time - w.icePath[w.icePath.length - 1].bornAt > 0.15)) {
         w.icePath.push({ pos: { x: pl.pos.x, y: pl.pos.y + 6 }, bornAt: w.time, expireAt: w.time + 4 });
       }
     } else {
-      w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 10 * dt);
+      // Suit off: refill the bar. Fully cooled at 100, then auto-comes-back online once lockout ends.
+      w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 6 * dt);
+      if (w.whiteAlbumBar >= 100 && w.time >= w.whiteAlbumLockUntil) {
+        w.whiteAlbumActive = true;
+        w.standActive = true;
+        w.bannerText = "Suit recharged"; w.bannerUntil = w.time + 1.0;
+        play("toggleOn");
+      }
     }
     // Slow NPCs on ice.
     if (w.icePath.length) {
@@ -1879,11 +1952,15 @@ export function update(w: World, input: InputState, dt: number) {
   }
 
 
-  // Camera
+  // Camera — focus on the active stand body (puppet/Hanged Man) when present, else the player.
+  const camFocus =
+    w.standId === "ebony_devil" && w.puppet.active ? w.puppet.pos :
+    w.standId === "hanged_man" && w.hangedManActive ? w.hangedMan.pos :
+    pl.pos;
   const viewW = VW / CAMERA_ZOOM;
   const viewH = VH / CAMERA_ZOOM;
-  const camTargetX = Math.max(viewW / 2, Math.min(MAP_W - viewW / 2, pl.pos.x));
-  const camTargetY = Math.max(viewH / 2, Math.min(MAP_H - viewH / 2, pl.pos.y));
+  const camTargetX = Math.max(viewW / 2, Math.min(MAP_W - viewW / 2, camFocus.x));
+  const camTargetY = Math.max(viewH / 2, Math.min(MAP_H - viewH / 2, camFocus.y));
   w.cam.x += (camTargetX - w.cam.x) * Math.min(1, dt * 6);
   w.cam.y += (camTargetY - w.cam.y) * Math.min(1, dt * 6);
 }
@@ -2109,6 +2186,14 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
+  // Trees (drawn as ground-anchored zones — sort by their root Y)
+  for (const t of w.trees) {
+    drawables.push({ y: t.pos.y - 4, draw: () => drawProtectionTree(ctx, w, t) });
+  }
+  // Frogs
+  for (const f of w.frogs) {
+    if (f.alive) drawables.push({ y: f.pos.y, draw: () => drawFrog(ctx, w, f) });
+  }
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
@@ -2315,12 +2400,15 @@ function drawGoldExperience(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) 
   // round head
   ctx.fillStyle = "#ffe89a";
   ctx.beginPath(); ctx.arc(pos.x, pos.y - 7, 5, 0, Math.PI * 2); ctx.fill();
-  // visor / eyes
-  ctx.fillStyle = "#3b2a08";
+  // visor / eyes — purple-tinted (matches GE's signature look)
+  ctx.fillStyle = "#3a1a5a";
   ctx.fillRect(pos.x - 3, pos.y - 8, 6, 1);
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = "#c79bff";
   ctx.fillRect(pos.x - 2, pos.y - 8, 1, 1);
   ctx.fillRect(pos.x + 1, pos.y - 8, 1, 1);
+  // small purple lip
+  ctx.fillStyle = "#9d6dd1";
+  ctx.fillRect(pos.x - 1, pos.y - 4, 2, 1);
   // shoulder pads
   ctx.fillStyle = "#fff0b8";
   ctx.fillRect(pos.x - 5, pos.y - 2, 2, 3);
@@ -2591,30 +2679,160 @@ function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
   // pale aura
   ctx.fillStyle = `rgba(207,214,227,${0.18 + Math.sin(w.time * 5) * 0.05})`;
   ctx.beginPath(); ctx.arc(h.pos.x, h.pos.y, 14, 0, Math.PI * 2); ctx.fill();
-  // cloak / body — slim & tall
-  ctx.fillStyle = "#3a455c";
+  // ----- mummy body: linen wraps -----
+  // base body (slightly cream)
+  ctx.fillStyle = "#d8cfb0";
   ctx.fillRect(h.pos.x - 5, h.pos.y - 2, 10, 13);
-  // chest plate
-  ctx.fillStyle = "#cfd6e3";
-  ctx.fillRect(h.pos.x - 4, h.pos.y - 1, 8, 5);
-  // head
-  ctx.fillStyle = "#dfe6f0";
+  // bandage strips (diagonal darker tan)
+  ctx.fillStyle = "#a8987a";
+  for (let i = 0; i < 4; i++) {
+    const yy = h.pos.y - 1 + i * 3;
+    ctx.fillRect(h.pos.x - 5, yy, 10, 1);
+  }
+  // shoulder gap
+  ctx.fillStyle = "#1b1611";
+  ctx.fillRect(h.pos.x - 5, h.pos.y + 5, 10, 1);
+  // ----- mummy head -----
+  ctx.fillStyle = "#e6dcc0";
   ctx.fillRect(h.pos.x - 4, h.pos.y - 11, 8, 9);
-  // visor slit
-  ctx.fillStyle = "#1b2436";
-  ctx.fillRect(h.pos.x - 3, h.pos.y - 7, 6, 2);
-  // saber
+  // wrappings on head
+  ctx.fillStyle = "#a8987a";
+  ctx.fillRect(h.pos.x - 4, h.pos.y - 9, 8, 1);
+  ctx.fillRect(h.pos.x - 4, h.pos.y - 5, 8, 1);
+  // dark eye sockets (glowing pale blue)
+  ctx.fillStyle = "#0a0d14";
+  ctx.fillRect(h.pos.x - 3, h.pos.y - 8, 2, 2);
+  ctx.fillRect(h.pos.x + 1, h.pos.y - 8, 2, 2);
+  ctx.fillStyle = "#9ec0ff";
+  ctx.fillRect(h.pos.x - 3, h.pos.y - 8, 1, 1);
+  ctx.fillRect(h.pos.x + 1, h.pos.y - 8, 1, 1);
+  // trailing bandage tail (animated wave)
+  ctx.strokeStyle = "#d8cfb0";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(h.pos.x - 5, h.pos.y + 6);
+  ctx.lineTo(h.pos.x - 9 + Math.sin(w.time * 3) * 1.5, h.pos.y + 9);
+  ctx.lineTo(h.pos.x - 11 + Math.sin(w.time * 3 + 1) * 2, h.pos.y + 12);
+  ctx.stroke();
+  // ----- curved saber (scimitar) — clearly different from a straight spear -----
   ctx.save();
   ctx.translate(h.pos.x, h.pos.y + 1);
   ctx.rotate(attacking ? w.time * 18 : Math.atan2(h.facing.y, h.facing.x));
-  ctx.strokeStyle = "#9ec0ff";
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(20, 0); ctx.stroke();
+  // hilt (gold)
+  ctx.fillStyle = "#c9a14a";
+  ctx.fillRect(-1, -2, 5, 4);
+  // guard
+  ctx.fillStyle = "#7a5a1c";
+  ctx.fillRect(4, -3, 2, 6);
+  // curved blade — drawn as a quadratic curve filled
   ctx.fillStyle = "#eaf2ff";
-  ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(18, -3); ctx.lineTo(18, 3); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "#9ec0ff";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(6, -2);
+  ctx.quadraticCurveTo(16, -6, 22, -1);
+  ctx.quadraticCurveTo(16, 0, 6, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // glint
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillRect(12, -3, 4, 1);
   ctx.restore();
   // shared HP indicator (matches player hp)
   if (w.player.hp < w.player.maxHp) drawHpBar(ctx, h.pos.x, h.pos.y - 17, w.player.hp / w.player.maxHp);
+}
+
+function drawFrog(ctx: CanvasRenderingContext2D, w: World, f: Frog) {
+  const bob = Math.sin(w.time * 4 + f.bobPhase) * 1.2;
+  const y = f.pos.y + bob;
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath(); ctx.ellipse(f.pos.x, f.pos.y + 5, 6, 2, 0, 0, Math.PI * 2); ctx.fill();
+  // body — dark green ellipse
+  ctx.fillStyle = "#2f7a3a";
+  ctx.beginPath(); ctx.ellipse(f.pos.x, y, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+  // back highlight (lighter green)
+  ctx.fillStyle = "#5fd16a";
+  ctx.beginPath(); ctx.ellipse(f.pos.x, y - 1, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+  // belly
+  ctx.fillStyle = "#bff5da";
+  ctx.beginPath(); ctx.ellipse(f.pos.x, y + 2, 4, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+  // eyes — bulging
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath(); ctx.arc(f.pos.x - 3, y - 3, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(f.pos.x + 3, y - 3, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#1a1a1f";
+  ctx.fillRect(f.pos.x - 3, y - 3, 1, 1);
+  ctx.fillRect(f.pos.x + 3, y - 3, 1, 1);
+  // mouth
+  ctx.strokeStyle = "#1a3a1a";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(f.pos.x - 2, y + 1);
+  ctx.lineTo(f.pos.x + 2, y + 1);
+  ctx.stroke();
+}
+
+function drawProtectionTree(ctx: CanvasRenderingContext2D, w: World, t: ProtectionTree) {
+  const remaining = Math.max(0, t.expireAt - w.time);
+  const total = t.expireAt - t.bornAt;
+  const lifeFrac = total > 0 ? remaining / total : 0;
+  const pulse = 0.5 + Math.sin(w.time * 3) * 0.15;
+  // ----- protection dome (golden-green circle) -----
+  ctx.save();
+  ctx.fillStyle = `rgba(95,209,106,${0.10 * pulse})`;
+  ctx.beginPath(); ctx.arc(t.pos.x, t.pos.y, t.radius, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = `rgba(159,247,170,${0.45 * pulse})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(t.pos.x, t.pos.y, t.radius, 0, Math.PI * 2); ctx.stroke();
+  // inner ring
+  ctx.strokeStyle = `rgba(255,232,154,${0.35 * pulse})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(t.pos.x, t.pos.y, t.radius * 0.7, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+  // ----- roots radiating out (curved tendrils) -----
+  ctx.strokeStyle = "#5a3a1c";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + Math.sin(w.time * 0.5 + i) * 0.05;
+    const r1 = 14, r2 = 30;
+    const x1 = t.pos.x + Math.cos(a) * r1;
+    const y1 = t.pos.y + Math.sin(a) * r1;
+    const x2 = t.pos.x + Math.cos(a) * r2;
+    const y2 = t.pos.y + Math.sin(a) * r2 * 0.6; // squashed for ground perspective
+    ctx.beginPath();
+    ctx.moveTo(t.pos.x, t.pos.y + 4);
+    ctx.quadraticCurveTo(x1, y1 + 2, x2, y2);
+    ctx.stroke();
+  }
+  // ----- trunk -----
+  ctx.fillStyle = "#5a3a1c";
+  ctx.fillRect(t.pos.x - 4, t.pos.y - 8, 8, 14);
+  ctx.fillStyle = "#3a2410";
+  ctx.fillRect(t.pos.x - 4, t.pos.y - 4, 8, 1);
+  ctx.fillRect(t.pos.x - 4, t.pos.y + 1, 8, 1);
+  // ----- canopy (layered green) -----
+  ctx.fillStyle = "#1f5d2a";
+  ctx.beginPath(); ctx.arc(t.pos.x, t.pos.y - 14, 18, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#2a7a38";
+  ctx.beginPath(); ctx.arc(t.pos.x - 6, t.pos.y - 18, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#5fd16a";
+  ctx.beginPath(); ctx.arc(t.pos.x + 5, t.pos.y - 20, 10, 0, Math.PI * 2); ctx.fill();
+  // golden fruits
+  ctx.fillStyle = "#ffd24a";
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + w.time * 0.5;
+    const fx = t.pos.x + Math.cos(a) * 12;
+    const fy = t.pos.y - 15 + Math.sin(a) * 8;
+    ctx.beginPath(); ctx.arc(fx, fy, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // ----- life timer ring -----
+  ctx.strokeStyle = "rgba(255,232,154,0.9)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(t.pos.x, t.pos.y - 14, 22, -Math.PI / 2, -Math.PI / 2 + lifeFrac * Math.PI * 2);
+  ctx.stroke();
 }
 
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
@@ -2936,28 +3154,17 @@ function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg
 // ---- public toggles for UI ----
 export function toggleStandActive(w: World): boolean {
   if (w.standId === "none") return w.standActive;
-  // White Album has its own toggle gating (longer cooldown + bar lockout).
+  // White Album: no manual toggle — the suit only flips when the bar overheats / recharges.
+  // Tapping the toggle just informs the user.
   if (w.standId === "white_album") {
-    if (w.time < w.whiteAlbumToggleAt) {
-      const left = Math.ceil(w.whiteAlbumToggleAt - w.time);
-      w.bannerText = `Suit cooling (${left}s)`;
-      w.bannerUntil = w.time + 1.0;
-      return w.whiteAlbumActive;
+    if (w.whiteAlbumActive) {
+      w.bannerText = `Suit: ${Math.round(w.whiteAlbumBar)}%`;
+    } else {
+      const left = Math.max(0, Math.ceil(w.whiteAlbumLockUntil - w.time));
+      w.bannerText = left > 0 ? `Suit cooling (${left}s)` : `Recharging ${Math.round(w.whiteAlbumBar)}%`;
     }
-    if (!w.whiteAlbumActive && w.time < w.whiteAlbumLockUntil) {
-      const left = Math.ceil(w.whiteAlbumLockUntil - w.time);
-      w.bannerText = `Suit overheated (${left}s)`;
-      w.bannerUntil = w.time + 1.0;
-      return w.whiteAlbumActive;
-    }
-    w.whiteAlbumActive = !w.whiteAlbumActive;
-    w.standActive = w.whiteAlbumActive;
-    w.whiteAlbumToggleAt = w.time + 4; // 4s toggle cooldown
-    w.bannerText = w.whiteAlbumActive ? "Suit online" : "Suit offline";
     w.bannerUntil = w.time + 1.0;
-    if (w.whiteAlbumActive) play("toggleOn");
-    else { play("toggleOff"); w.channel = null; }
-    return w.standActive;
+    return w.whiteAlbumActive;
   }
   w.standActive = !w.standActive;
   w.bannerText = w.standActive ? "Stand summoned" : "Stand desummoned";

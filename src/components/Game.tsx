@@ -40,6 +40,8 @@ interface UIData {
   pilotActive: boolean;
   shardPickerOpen: boolean;
   shards: { id: number; pos: { x: number; y: number } }[];
+  whiteAlbumBar: number;
+  whiteAlbumActive: boolean;
 }
 
 export default function Game() {
@@ -67,6 +69,8 @@ export default function Game() {
     pilotActive: false,
     shardPickerOpen: false,
     shards: [],
+    whiteAlbumBar: 100,
+    whiteAlbumActive: true,
   });
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
   const [showHelp, setShowHelp] = useState<boolean>(true);
@@ -128,6 +132,8 @@ export default function Game() {
           pilotActive: w.pilotActive || w.puppetPiloted,
           shardPickerOpen: w.shardPickerOpen,
           shards: w.shards.map((s) => ({ id: s.id, pos: { ...s.pos } })),
+          whiteAlbumBar: Math.round(w.whiteAlbumBar),
+          whiteAlbumActive: w.whiteAlbumActive,
         });
       }
     };
@@ -392,6 +398,22 @@ export default function Game() {
               className="h-full transition-[width]"
               style={{ width: `${ui.rage}%`, background: ui.rageActive ? "#ff3d3d" : "#d04848" }}
             />
+          </div>
+        )}
+        {ui.standId === "white_album" && (
+          <div className="flex items-center gap-1 self-start">
+            <div className="bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-32">
+              <div
+                className="h-full transition-[width]"
+                style={{
+                  width: `${ui.whiteAlbumBar}%`,
+                  background: ui.whiteAlbumActive ? "#bff5ff" : "#5b6a8c",
+                }}
+              />
+            </div>
+            <span className="text-[9px] text-white/80 font-bold">
+              {ui.whiteAlbumActive ? "SUIT" : "COOL"}
+            </span>
           </div>
         )}
       </div>
