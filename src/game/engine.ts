@@ -1623,15 +1623,16 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
 
 function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   const pl = w.player;
-  // Stand drawn UNDER player when behind, OVER when in front. We compute pos and z-order.
+  // Stand drawn UNDER player when behind, OVER when in front. Hidden entirely if standActive=false.
+  const standVisible = w.standId !== "none" && w.standActive;
   const standPos = computeStandPos(w);
   const standInFront = standPos.y >= pl.pos.y;
-  if (w.standId !== "none" && !standInFront) drawStand(ctx, w, standPos);
+  if (standVisible && !standInFront) drawStand(ctx, w, standPos);
   // shadow
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(pl.pos.x, pl.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
-  // stand aura
-  if (w.standId !== "none") {
+  // stand aura — only when active
+  if (standVisible) {
     const auraColor = STANDS[w.standId].color;
     ctx.fillStyle = hexToRgba(auraColor, 0.18 + Math.sin(w.time * 6) * 0.05);
     ctx.beginPath(); ctx.arc(pl.pos.x, pl.pos.y, 16, 0, Math.PI * 2); ctx.fill();
@@ -1650,10 +1651,7 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
   // hp bar (only if damaged)
   if (pl.hp < pl.maxHp) drawHpBar(ctx, pl.pos.x, pl.pos.y - 16, pl.hp / pl.maxHp);
-  if (w.standId !== "none") {
-    const standPos = computeStandPos(w);
-    if (standPos.y >= pl.pos.y) drawStand(ctx, w, standPos);
-  }
+  if (standVisible && standInFront) drawStand(ctx, w, standPos);
   if (w.time < w.rageUntil) {
     ctx.strokeStyle = `rgba(255,61,61,${0.45 + Math.sin(w.time * 16) * 0.18})`;
     ctx.lineWidth = 2;
