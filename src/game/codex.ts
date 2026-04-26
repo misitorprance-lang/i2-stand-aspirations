@@ -8,7 +8,7 @@
 import { STANDS } from "./stands";
 import type { StandId } from "./stands";
 
-export const CODEX_VERSION = "1.0.0";
+export const CODEX_VERSION = "1.1.0";
 
 export interface ModelSpec {
   description: string;     // verbal description of the visible model
