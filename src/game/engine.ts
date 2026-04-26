@@ -2618,22 +2618,33 @@ function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
 }
 
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
+  // Match player silhouette: shadow 8x3, body 12x10, head 10x9, hp bar at -16.
   ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.beginPath(); ctx.ellipse(e.pos.x, e.pos.y + 8, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(e.pos.x, e.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
   const flash = w.time < e.hitFlashUntil;
   // body
   ctx.fillStyle = flash ? "#ffffff" : (e.kind === "enemy" ? "#5a1a1a" : "#1d3a7a");
-  ctx.fillRect(e.pos.x - 5, e.pos.y - 2, 10, 9);
+  ctx.fillRect(e.pos.x - 6, e.pos.y - 2, 12, 10);
   // head
   ctx.fillStyle = flash ? "#ffffff" : e.color;
-  ctx.fillRect(e.pos.x - 4, e.pos.y - 9, 8, 8);
+  ctx.fillRect(e.pos.x - 5, e.pos.y - 10, 10, 9);
+  // eyes (face direction)
+  const fx = e.facing.x, fy = e.facing.y;
+  ctx.fillStyle = "#222";
+  ctx.fillRect(e.pos.x - 3 + Math.sign(fx) * 1, e.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+  ctx.fillRect(e.pos.x + 1 + Math.sign(fx) * 1, e.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
   // stunned mark
   if (w.time < e.stunUntil) {
     ctx.fillStyle = "#a8e8ff";
-    ctx.fillRect(e.pos.x - 1, e.pos.y - 14, 2, 2);
-    ctx.fillRect(e.pos.x + 2, e.pos.y - 13, 2, 2);
+    ctx.fillRect(e.pos.x - 1, e.pos.y - 15, 2, 2);
+    ctx.fillRect(e.pos.x + 2, e.pos.y - 14, 2, 2);
   }
-  if (e.hp < e.maxHp) drawHpBar(ctx, e.pos.x, e.pos.y - 14, e.hp / e.maxHp);
+  // slowed (icy) overlay
+  if (w.time < (e.slowUntil ?? 0)) {
+    ctx.fillStyle = "rgba(190,235,255,0.35)";
+    ctx.fillRect(e.pos.x - 6, e.pos.y - 10, 12, 19);
+  }
+  if (e.hp < e.maxHp) drawHpBar(ctx, e.pos.x, e.pos.y - 16, e.hp / e.maxHp);
 }
 
 function drawHpBar(ctx: CanvasRenderingContext2D, x: number, y: number, frac: number) {
