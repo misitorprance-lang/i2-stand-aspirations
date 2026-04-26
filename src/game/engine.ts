@@ -764,9 +764,10 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.2 });
       // M1 punches: roll critical per stand table.
       let dmg = ab.damage;
-      if (key === "m1") dmg = m1DamageRoll(w, usePuppetOrigin);
+      let crit = false;
+      if (key === "m1") { const r = m1DamageRoll(w, usePuppetOrigin); dmg = r.dmg; crit = r.crit; }
       // Hit any NPC within an arc in front of the player (cone test).
-      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, dmg, key === "m1" && w.time < w.rageUntil ? 45 : undefined);
+      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, dmg, key === "m1" && w.time < w.rageUntil ? 45 : undefined, crit);
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
