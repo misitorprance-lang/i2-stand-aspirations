@@ -102,6 +102,14 @@ export const SFX = {
   toggleOn:     () => { tone(220, 0.18, "sawtooth", 0.22, 1500, ); noise(0.18, 0.12, 1800, "highpass"); tone(880, 0.12, "triangle", 0.18, 1760); },
   toggleOff:    () => { tone(1500, 0.18, "sawtooth", 0.22, 220); noise(0.18, 0.12, 1200, "highpass"); tone(660, 0.12, "triangle", 0.15, 220); },
   regen:        () => { tone(660, 0.1, "sine", 0.15, 990); },
+  crit:         () => { tone(1800, 0.06, "square", 0.35, 2600); tone(2600, 0.05, "triangle", 0.25, 3400); },
+  timeStop:     () => { tone(220, 0.7, "sawtooth", 0.45, 55); tone(80, 0.7, "sine", 0.35, 30); noise(0.5, 0.18, 200, "lowpass"); },
+  timeResume:   () => { tone(60, 0.5, "sine", 0.35, 220); tone(440, 0.4, "triangle", 0.3, 880); },
+  pilot:        () => { tone(440, 0.18, "triangle", 0.3, 1320); tone(880, 0.12, "sine", 0.22, 660); },
+  shard:        () => { tone(1900, 0.12, "triangle", 0.28, 2800); noise(0.05, 0.15, 3200, "highpass"); },
+  teleport:     () => { tone(880, 0.18, "sine", 0.3, 2400); noise(0.12, 0.18, 2400, "highpass"); },
+  brutal:       () => { tone(180, 0.22, "sawtooth", 0.5, 60); noise(0.18, 0.4, 600); tone(900, 0.1, "square", 0.3, 200); },
+  propBreak:    () => { noise(0.22, 0.4, 800); tone(180, 0.15, "sawtooth", 0.3, 70); },
 };
 
 export type SfxKey = keyof typeof SFX;
