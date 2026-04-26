@@ -220,6 +220,8 @@ export default function Game() {
     unlockAudio();
     inputRef.current.pressed[key] = true;
   };
+  const m1HoldStart = () => { unlockAudio(); inputRef.current.pressed.m1 = true; inputRef.current.m1Held = true; };
+  const m1HoldEnd = () => { inputRef.current.m1Held = false; };
 
   const onUseArrow = () => {
     if (arrowsRef.current <= 0 || !worldRef.current) return;
