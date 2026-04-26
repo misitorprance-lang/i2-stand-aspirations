@@ -1691,6 +1691,49 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   else if (id === "rhcp") drawRhcp(ctx, w, pos);
   else if (id === "echoes") drawEchoes(ctx, w, pos);
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
+  else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
+}
+
+function drawGoldExperience(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  // soft golden aura
+  ctx.fillStyle = "rgba(245,211,107,0.28)";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, 14, 0, Math.PI * 2); ctx.fill();
+  // body — slim gold humanoid
+  ctx.fillStyle = "#b58a2c";
+  ctx.fillRect(pos.x - 4, pos.y - 2, 8, 12);
+  ctx.fillStyle = "#f5d36b";
+  ctx.fillRect(pos.x - 3, pos.y - 1, 6, 5);
+  // ladybug-style chest spots
+  ctx.fillStyle = "#8a5a14";
+  ctx.fillRect(pos.x - 2, pos.y + 2, 1, 1);
+  ctx.fillRect(pos.x + 1, pos.y + 4, 1, 1);
+  // round head
+  ctx.fillStyle = "#ffe89a";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y - 7, 5, 0, Math.PI * 2); ctx.fill();
+  // visor / eyes
+  ctx.fillStyle = "#3b2a08";
+  ctx.fillRect(pos.x - 3, pos.y - 8, 6, 1);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(pos.x - 2, pos.y - 8, 1, 1);
+  ctx.fillRect(pos.x + 1, pos.y - 8, 1, 1);
+  // shoulder pads
+  ctx.fillStyle = "#fff0b8";
+  ctx.fillRect(pos.x - 5, pos.y - 2, 2, 3);
+  ctx.fillRect(pos.x + 3, pos.y - 2, 2, 3);
+  // arms — punch extension
+  if (punching) {
+    const d = w.standPunchDir;
+    ctx.fillStyle = "#f5d36b";
+    ctx.fillRect(pos.x - 1 + d.x * 7, pos.y - 1 + d.y * 7, 5, 4);
+    // gold sparkle on fist
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(pos.x + d.x * 9, pos.y + d.y * 9, 2, 2);
+  } else {
+    ctx.fillStyle = "#f5d36b";
+    ctx.fillRect(pos.x - 6, pos.y + 1, 3, 5);
+    ctx.fillRect(pos.x + 3, pos.y + 1, 3, 5);
+  }
 }
 
 function drawStarPlatinum(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
