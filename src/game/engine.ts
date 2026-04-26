@@ -1320,40 +1320,64 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "ice_heal": {
-      // Restore HP and drain a chunk of the bar.
-      const heal = 22;
+      // Restore HP and drain a hefty chunk of the bar.
+      const heal = 28;
+      const before = w.player.hp;
       w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
-      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 35);
-      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 30, color: ab.color, life: 0.45 });
-      spawnParticles(w, p, ab.color, 18, { speedMin: 30, speedMax: 100, life: 0.6 });
-      spawnDmg(w, p, heal, "#9be7ff");
+      const actual = Math.round(w.player.hp - before);
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 45);
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 36, color: ab.color, life: 0.55 });
+      spawnVfx(w, { kind: "ice_burst", pos: { ...p }, radius: 30, color: ab.color, life: 0.5 });
+      spawnParticles(w, p, ab.color, 22, { shape: "spark", speedMin: 30, speedMax: 120, life: 0.7 });
+      // Always show feedback even if at full HP, so the move never feels "broken".
+      spawnDmg(w, p, actual > 0 ? actual : heal, actual > 0 ? "#9be7ff" : "#7c5cff");
+      w.bannerText = actual > 0 ? `+${actual} Suit` : "Suit at full";
+      w.bannerUntil = w.time + 1.0;
+      play("standSummon");
       break;
     }
     case "ice_stomp": {
-      // Aoe at target with stun + ice burst + chip damage to props.
-      const distToAim = input.aim ? Math.min(ab.range, Math.hypot(input.aim.x, input.aim.y)) : ab.range;
-      const tx = p.x + dir.x * distToAim;
-      const ty = p.y + dir.y * distToAim;
-      for (const e of w.npcs) {
-        if (!e.alive) continue;
-        if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
-          damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - tx, y: e.pos.y - ty }), amount: 60 });
+      // Ice spikes shoot out from the player toward the closest enemies in range.
+      const candidates = w.npcs
+        .filter((e) => e.alive && dist2(e.pos, p) < ab.range * ab.range)
+        .map((e) => ({ e, d2: dist2(e.pos, p) }))
+        .sort((a, b) => a.d2 - b.d2)
+        .slice(0, 5);
+      if (candidates.length === 0) {
+        // Fallback: forward fan of 3 spikes.
+        const baseAng = Math.atan2(dir.y, dir.x);
+        for (let i = -1; i <= 1; i++) {
+          const a = baseAng + i * 0.35;
+          const tx = p.x + Math.cos(a) * ab.range * 0.6;
+          const ty = p.y + Math.sin(a) * ab.range * 0.6;
+          spawnVfx(w, { kind: "stab_line", pos: { ...p }, to: { x: tx, y: ty }, color: ab.color, life: 0.35 });
+          spawnVfx(w, { kind: "ice_burst", pos: { x: tx, y: ty }, radius: 18, color: ab.color, life: 0.45 });
+          spawnParticles(w, { x: tx, y: ty }, ab.color, 8, { shape: "spark", life: 0.4 });
+        }
+      } else {
+        for (const { e } of candidates) {
+          // damage + stun + slow
+          const knockDir = norm({ x: e.pos.x - p.x, y: e.pos.y - p.y });
+          damageEntity(w, e, ab.damage, { dir: knockDir, amount: 70 });
           e.stunUntil = Math.max(e.stunUntil, w.time + (ab.stunSeconds ?? 1.6));
-          e.slowUntil = w.time + 2;
+          e.slowUntil = Math.max(e.slowUntil ?? 0, w.time + 2.5);
+          // Spike VFX from player to target, plus burst at target.
+          spawnVfx(w, { kind: "stab_line", pos: { ...p }, to: { ...e.pos }, color: ab.color, life: 0.3 });
+          spawnVfx(w, { kind: "ice_burst", pos: { ...e.pos }, radius: 22, color: ab.color, life: 0.5 });
+          spawnParticles(w, e.pos, ab.color, 12, { shape: "spark", speedMin: 60, speedMax: 180, life: 0.5 });
         }
       }
-      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage);
-      spawnVfx(w, { kind: "ice_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
-      spawnVfx(w, { kind: "shockwave", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.4 });
-      spawnParticles(w, { x: tx, y: ty }, ab.color, 22, { shape: "spark", speedMin: 60, speedMax: 200, life: 0.5 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 24, color: ab.color, life: 0.3 });
       w.shake = Math.max(w.shake, 4);
-      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 18);
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 22);
+      play("iceCast");
       break;
     }
   }
-  // White Album: drain bar on any other ability cast as well.
-  if (w.standId === "white_album" && w.whiteAlbumActive && key !== "m1" && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
-    w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 8);
+  // White Album: every move drains the suit bar (Ice Heal / Ice Stomp already drained above).
+  if (w.standId === "white_album" && w.whiteAlbumActive && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
+    const drain = key === "m1" ? 3 : 12;
+    w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - drain);
   }
 }
 
