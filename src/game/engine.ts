@@ -2179,6 +2179,14 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
+  // Trees (drawn as ground-anchored zones — sort by their root Y)
+  for (const t of w.trees) {
+    drawables.push({ y: t.pos.y - 4, draw: () => drawProtectionTree(ctx, w, t) });
+  }
+  // Frogs
+  for (const f of w.frogs) {
+    if (f.alive) drawables.push({ y: f.pos.y, draw: () => drawFrog(ctx, w, f) });
+  }
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
