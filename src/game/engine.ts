@@ -2736,6 +2736,98 @@ function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
   if (w.player.hp < w.player.maxHp) drawHpBar(ctx, h.pos.x, h.pos.y - 17, w.player.hp / w.player.maxHp);
 }
 
+function drawFrog(ctx: CanvasRenderingContext2D, w: World, f: Frog) {
+  const bob = Math.sin(w.time * 4 + f.bobPhase) * 1.2;
+  const y = f.pos.y + bob;
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath(); ctx.ellipse(f.pos.x, f.pos.y + 5, 6, 2, 0, 0, Math.PI * 2); ctx.fill();
+  // body — dark green ellipse
+  ctx.fillStyle = "#2f7a3a";
+  ctx.beginPath(); ctx.ellipse(f.pos.x, y, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+  // back highlight (lighter green)
+  ctx.fillStyle = "#5fd16a";
+  ctx.beginPath(); ctx.ellipse(f.pos.x, y - 1, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+  // belly
+  ctx.fillStyle = "#bff5da";
+  ctx.beginPath(); ctx.ellipse(f.pos.x, y + 2, 4, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+  // eyes — bulging
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath(); ctx.arc(f.pos.x - 3, y - 3, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(f.pos.x + 3, y - 3, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#1a1a1f";
+  ctx.fillRect(f.pos.x - 3, y - 3, 1, 1);
+  ctx.fillRect(f.pos.x + 3, y - 3, 1, 1);
+  // mouth
+  ctx.strokeStyle = "#1a3a1a";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(f.pos.x - 2, y + 1);
+  ctx.lineTo(f.pos.x + 2, y + 1);
+  ctx.stroke();
+}
+
+function drawProtectionTree(ctx: CanvasRenderingContext2D, w: World, t: ProtectionTree) {
+  const remaining = Math.max(0, t.expireAt - w.time);
+  const total = t.expireAt - t.bornAt;
+  const lifeFrac = total > 0 ? remaining / total : 0;
+  const pulse = 0.5 + Math.sin(w.time * 3) * 0.15;
+  // ----- protection dome (golden-green circle) -----
+  ctx.save();
+  ctx.fillStyle = `rgba(95,209,106,${0.10 * pulse})`;
+  ctx.beginPath(); ctx.arc(t.pos.x, t.pos.y, t.radius, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = `rgba(159,247,170,${0.45 * pulse})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(t.pos.x, t.pos.y, t.radius, 0, Math.PI * 2); ctx.stroke();
+  // inner ring
+  ctx.strokeStyle = `rgba(255,232,154,${0.35 * pulse})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(t.pos.x, t.pos.y, t.radius * 0.7, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+  // ----- roots radiating out (curved tendrils) -----
+  ctx.strokeStyle = "#5a3a1c";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + Math.sin(w.time * 0.5 + i) * 0.05;
+    const r1 = 14, r2 = 30;
+    const x1 = t.pos.x + Math.cos(a) * r1;
+    const y1 = t.pos.y + Math.sin(a) * r1;
+    const x2 = t.pos.x + Math.cos(a) * r2;
+    const y2 = t.pos.y + Math.sin(a) * r2 * 0.6; // squashed for ground perspective
+    ctx.beginPath();
+    ctx.moveTo(t.pos.x, t.pos.y + 4);
+    ctx.quadraticCurveTo(x1, y1 + 2, x2, y2);
+    ctx.stroke();
+  }
+  // ----- trunk -----
+  ctx.fillStyle = "#5a3a1c";
+  ctx.fillRect(t.pos.x - 4, t.pos.y - 8, 8, 14);
+  ctx.fillStyle = "#3a2410";
+  ctx.fillRect(t.pos.x - 4, t.pos.y - 4, 8, 1);
+  ctx.fillRect(t.pos.x - 4, t.pos.y + 1, 8, 1);
+  // ----- canopy (layered green) -----
+  ctx.fillStyle = "#1f5d2a";
+  ctx.beginPath(); ctx.arc(t.pos.x, t.pos.y - 14, 18, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#2a7a38";
+  ctx.beginPath(); ctx.arc(t.pos.x - 6, t.pos.y - 18, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#5fd16a";
+  ctx.beginPath(); ctx.arc(t.pos.x + 5, t.pos.y - 20, 10, 0, Math.PI * 2); ctx.fill();
+  // golden fruits
+  ctx.fillStyle = "#ffd24a";
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + w.time * 0.5;
+    const fx = t.pos.x + Math.cos(a) * 12;
+    const fy = t.pos.y - 15 + Math.sin(a) * 8;
+    ctx.beginPath(); ctx.arc(fx, fy, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // ----- life timer ring -----
+  ctx.strokeStyle = "rgba(255,232,154,0.9)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(t.pos.x, t.pos.y - 14, 22, -Math.PI / 2, -Math.PI / 2 + lifeFrac * Math.PI * 2);
+  ctx.stroke();
+}
+
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
   // Match player silhouette: shadow 8x3, body 12x10, head 10x9, hp bar at -16.
   ctx.fillStyle = "rgba(0,0,0,0.35)";
