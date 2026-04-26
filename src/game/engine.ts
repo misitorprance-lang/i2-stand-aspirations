@@ -2871,6 +2871,105 @@ function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
   if (w.player.hp < w.player.maxHp) drawHpBar(ctx, h.pos.x, h.pos.y - 17, w.player.hp / w.player.maxHp);
 }
 
+function drawBoingo(ctx: CanvasRenderingContext2D, w: World) {
+  const b = w.boingo;
+  const bob = Math.sin(w.time * 3 + b.bobPhase) * 0.8;
+  const x = b.pos.x;
+  const y = b.pos.y + bob;
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(b.pos.x, b.pos.y + 9, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+  // small kid body — bright yellow shirt
+  ctx.fillStyle = "#f5d24a";
+  ctx.fillRect(x - 5, y - 1, 10, 11);
+  // brown shorts
+  ctx.fillStyle = "#5a3a22";
+  ctx.fillRect(x - 5, y + 7, 10, 3);
+  // legs
+  ctx.fillStyle = "#3a2614";
+  ctx.fillRect(x - 4, y + 10, 3, 2);
+  ctx.fillRect(x + 1, y + 10, 3, 2);
+  // head — pale skin tone
+  ctx.fillStyle = "#f3d9b1";
+  ctx.fillRect(x - 4, y - 11, 8, 9);
+  // dark messy hair cap on top
+  ctx.fillStyle = "#1a1410";
+  ctx.fillRect(x - 4, y - 11, 8, 3);
+  ctx.fillRect(x - 5, y - 10, 1, 2);
+  ctx.fillRect(x + 4, y - 10, 1, 2);
+  // wide nervous eyes (look the way he's facing)
+  const ex = Math.max(-1, Math.min(1, b.facing.x));
+  const ey = Math.max(-1, Math.min(1, b.facing.y));
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(x - 3, y - 7, 2, 2);
+  ctx.fillRect(x + 1, y - 7, 2, 2);
+  ctx.fillStyle = "#0a0d14";
+  ctx.fillRect(x - 3 + Math.round(ex * 0.5), y - 7 + Math.round(ey * 0.5), 1, 1);
+  ctx.fillRect(x + 1 + Math.round(ex * 0.5), y - 7 + Math.round(ey * 0.5), 1, 1);
+  // tiny worried mouth
+  ctx.fillStyle = "#5a2a1a";
+  ctx.fillRect(x - 1, y - 3, 2, 1);
+
+  // ----- purple book held in front -----
+  ctx.save();
+  // book sits slightly in front of his torso
+  const bx = x;
+  const by = y + 4;
+  // back cover
+  ctx.fillStyle = "#3a1a5a";
+  ctx.fillRect(bx - 6, by - 3, 12, 7);
+  // spine highlight
+  ctx.fillStyle = "#5a2c8a";
+  ctx.fillRect(bx - 6, by - 3, 12, 1);
+  // open pages — pale lavender
+  ctx.fillStyle = "#e7dcff";
+  ctx.fillRect(bx - 5, by - 2, 11, 5);
+  // page split
+  ctx.fillStyle = "#3a1a5a";
+  ctx.fillRect(bx, by - 2, 1, 5);
+  // strange unidentifiable glyphs (vary with pageIndex so it looks alive)
+  ctx.fillStyle = "#3a1a5a";
+  const pi = b.pageIndex;
+  // left page glyphs
+  if (pi === 0) {
+    ctx.fillRect(bx - 4, by - 1, 1, 1); ctx.fillRect(bx - 2, by - 1, 2, 1);
+    ctx.fillRect(bx - 4, by + 1, 3, 1); ctx.fillRect(bx - 4, by + 2, 1, 1);
+  } else if (pi === 1) {
+    ctx.fillRect(bx - 4, by - 1, 3, 1); ctx.fillRect(bx - 3, by + 1, 1, 2);
+    ctx.fillRect(bx - 1, by + 2, 1, 1);
+  } else if (pi === 2) {
+    ctx.fillRect(bx - 4, by, 1, 2); ctx.fillRect(bx - 3, by - 1, 2, 1);
+    ctx.fillRect(bx - 2, by + 2, 2, 1);
+  } else {
+    ctx.fillRect(bx - 4, by - 1, 1, 3); ctx.fillRect(bx - 3, by + 2, 2, 1);
+    ctx.fillRect(bx - 1, by - 1, 1, 1);
+  }
+  // right page glyphs (mirrored-ish)
+  if (pi === 0) {
+    ctx.fillRect(bx + 2, by - 1, 2, 1); ctx.fillRect(bx + 4, by + 1, 1, 2);
+    ctx.fillRect(bx + 1, by + 2, 1, 1);
+  } else if (pi === 1) {
+    ctx.fillRect(bx + 1, by - 1, 3, 1); ctx.fillRect(bx + 4, by, 1, 2);
+    ctx.fillRect(bx + 2, by + 2, 2, 1);
+  } else if (pi === 2) {
+    ctx.fillRect(bx + 4, by - 1, 1, 1); ctx.fillRect(bx + 2, by, 2, 1);
+    ctx.fillRect(bx + 1, by + 2, 3, 1);
+  } else {
+    ctx.fillRect(bx + 4, by - 1, 1, 3); ctx.fillRect(bx + 2, by + 1, 1, 1);
+    ctx.fillRect(bx + 3, by + 2, 1, 1);
+  }
+  // faint mystic shimmer above the book
+  const shimmer = (Math.sin(w.time * 4 + b.bobPhase) + 1) * 0.5;
+  ctx.fillStyle = `rgba(186,140,255,${0.18 + shimmer * 0.18})`;
+  ctx.fillRect(bx - 4, by - 5, 8, 1);
+  ctx.restore();
+
+  // little hands gripping the book sides
+  ctx.fillStyle = "#f3d9b1";
+  ctx.fillRect(x - 7, y + 3, 2, 2);
+  ctx.fillRect(x + 5, y + 3, 2, 2);
+}
+
 function drawFrog(ctx: CanvasRenderingContext2D, w: World, f: Frog) {
   const bob = Math.sin(w.time * 4 + f.bobPhase) * 1.2;
   const y = f.pos.y + bob;
