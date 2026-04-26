@@ -615,6 +615,8 @@ function damagePuppet(w: World, dmg: number) {
   w.rage = Math.min(100, w.rage + dmg * 2.2);
   spawnDmg(w, w.puppet.pos, dmg, "#d6d8dd");
   spawnParticles(w, w.puppet.pos, "#8f949c", 7);
+  // HP link: damage to the puppet also drains the player (Ebony Devil's lore — he's tied to it).
+  damageEntity(w, w.player, dmg, undefined, false);
   play("hurt");
   if (w.puppet.hp <= 0) {
     w.puppet.active = false;
