@@ -151,7 +151,7 @@ function makeProps(): Prop[] {
 
   // Trees (round canopies + brown trunk; collision = trunk + roots area, smaller than canopy)
   const treeSpots: Vec2[] = [];
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < 42; i++) {
     let tries = 0;
     while (tries++ < 20) {
       const x = rand(40, MAP_W - 60);
@@ -182,7 +182,7 @@ function makeProps(): Prop[] {
   }
 
   // Rocks (gray ovals)
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 21; i++) {
     const x = rand(30, MAP_W - 30), y = rand(30, MAP_H - 30);
     const w = rand(18, 30), h = rand(12, 18);
     const r: Rect = { x: x - w / 2, y: y - h / 2, w, h };
@@ -202,7 +202,7 @@ function makeProps(): Prop[] {
   }
 
   // Bushes (small dark green) — non-blocking? Make them blocking small
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 27; i++) {
     const x = rand(20, MAP_W - 20), y = rand(20, MAP_H - 20);
     const r: Rect = { x: x - 9, y: y - 7, w: 18, h: 14 };
     props.push({
