@@ -430,6 +430,17 @@ export function createWorld(): World {
     },
     rage: 0,
     rageUntil: 0,
+    echoesAct: 1,
+    timeStopUntil: 0,
+    timeStopStartedAt: 0,
+    pendingPlayerDamage: [],
+    hangedManFormed: false,
+    pilotActive: false,
+    puppetPiloted: false,
+    shards: [],
+    shardPickerOpen: false,
+    kickAt: 0,
+    lastJoyMag: 0,
   };
 }
 
