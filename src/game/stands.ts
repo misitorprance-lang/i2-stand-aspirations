@@ -121,6 +121,19 @@ export const STANDS: Record<StandId, Stand> = {
       a4: { name: "Rage Mode", kind: "rage_mode", damage: 0, range: 0, radius: 0, cooldown: 10, duration: 5, color: "#ff3d3d" },
     },
   },
+  gold_experience: {
+    id: "gold_experience",
+    name: "Gold Experience",
+    color: "#f5d36b",
+    rarityWeight: 2, // rare
+    abilities: {
+      m1: { name: "Punch", kind: "melee", damage: 3.5, range: 22, radius: 16, cooldown: 0.3, color: "#fff0a8" },
+      a1: { name: "Eagle Summon", kind: "chain_projectile", damage: 6, range: 260, radius: 6, cooldown: 3.2, speed: 380, color: "#ffd24a" },
+      a2: { name: "Frog Summon", kind: "frog_summon", damage: 0, range: 0, cooldown: 4.5, color: "#7fc97f" },
+      a3: { name: "Out of Body", kind: "hologram_stun", damage: 7, range: 36, radius: 18, cooldown: 12, stunSeconds: 3.5, color: "#bff5da" },
+      a4: { name: "Tree of Life", kind: "tree_zone", damage: 0, range: 70, radius: 78, cooldown: 30, duration: 6, color: "#5fd16a" },
+    },
+  },
 };
 
 // S.H.I.T. — rare upgraded variant of Echoes' a4
@@ -135,7 +148,7 @@ export const SHIT_ABILITY: Ability = {
   color: "#222",
 };
 
-const ROLLABLE: StandId[] = ["star_platinum", "rhcp", "echoes", "ebony_devil"];
+const ROLLABLE: StandId[] = ["star_platinum", "rhcp", "echoes", "ebony_devil", "gold_experience"];
 
 export function rollStand(): { id: StandId; shitVariant: boolean } {
   const total = ROLLABLE.reduce((s, id) => s + STANDS[id].rarityWeight, 0);
