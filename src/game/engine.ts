@@ -534,6 +534,27 @@ function pushOutOfProps(e: Entity, props: Prop[]) {
   e.pos.y = Math.max(e.radius, Math.min(MAP_H - e.radius, e.pos.y));
 }
 
+// Soft-collide a free body (puppet/hanged man) with all alive NPCs at the given pos.
+// Mutates `pos` in place.
+function pushOutOfNpcs(w: World, pos: Vec2, radius: number) {
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    const dx = pos.x - e.pos.x, dy = pos.y - e.pos.y;
+    const min = radius + e.radius;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > 0 && d2 < min * min) {
+      const d = Math.sqrt(d2);
+      const overlap = min - d;
+      const nx = dx / d, ny = dy / d;
+      // Free body absorbs 60% of push so NPCs don't get launched.
+      pos.x += nx * overlap * 0.6;
+      pos.y += ny * overlap * 0.6;
+      e.pos.x -= nx * overlap * 0.4;
+      e.pos.y -= ny * overlap * 0.4;
+    }
+  }
+}
+
 function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false) {
   let tier = dmg >= 15 ? 22 : dmg >= 8 ? 17 : dmg >= 3 ? 13 : 10;
   if (crit) tier = Math.round(tier * 1.35);
