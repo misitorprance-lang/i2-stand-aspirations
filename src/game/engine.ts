@@ -1061,12 +1061,16 @@ export function update(w: World, input: InputState, dt: number) {
   for (const e of w.npcs) {
     if (!e.alive) {
       if (e.respawnAt && w.time >= e.respawnAt) {
-        // respawn at random spot
-        const spot = freeSpot(w.props, 10);
-        e.pos = spot;
-        e.hp = e.maxHp;
-        e.alive = true;
-        e.provoked = false;
+        // respawn at strict free spot
+        const spot = freeSpot(w.props, 10, { avoid: w.player.pos, avoidR: 80, craters: w.craters });
+        if (spot) {
+          e.pos = spot;
+          e.hp = e.maxHp;
+          e.alive = true;
+          e.provoked = false;
+        } else {
+          e.respawnAt = w.time + 1; // try again soon
+        }
       }
       continue;
     }
