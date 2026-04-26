@@ -942,7 +942,8 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "knockback": {
-      const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
+      const { pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const tx = aimPos.x, ty = aimPos.y;
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
@@ -955,7 +956,8 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "stun_touch": {
-      const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
+      const { pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const tx = aimPos.x, ty = aimPos.y;
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
@@ -967,7 +969,12 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "dot_zone": {
-      const tx = p.x + dir.x * ab.range, ty = p.y + dir.y * ab.range;
+      // Burning Text: snap landing point to the actual target so it lands ON the enemy, not past them.
+      const { target, pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const distToAim = Math.hypot(aimPos.x - p.x, aimPos.y - p.y);
+      const drop = Math.min(ab.range, distToAim);
+      const tx = target ? target.pos.x : p.x + dir.x * drop;
+      const ty = target ? target.pos.y : p.y + dir.y * drop;
       w.zones.push({
         id: w.nextId++,
         pos: { x: tx, y: ty },
