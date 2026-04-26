@@ -30,6 +30,11 @@ interface UIData {
   kills: number;
   rage: number;
   rageActive: boolean;
+  echoesAct: number;
+  timeStopActive: boolean;
+  pilotActive: boolean;
+  shardPickerOpen: boolean;
+  shards: { id: number; pos: { x: number; y: number } }[];
 }
 
 export default function Game() {
