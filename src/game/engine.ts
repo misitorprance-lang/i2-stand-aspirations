@@ -862,7 +862,14 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     else if (key === "a4") w.echoesAct = 3;
   }
 
-  w.cdTimers[key] = ab.cooldown;
+  // Tree of Life buff: while Gold Experience stands inside an active Tree zone, frog/eagle spam (75% reduced cd).
+  let cdMul = 1;
+  if (w.standId === "gold_experience" && (key === "a1" || key === "a2")) {
+    for (const t of w.trees) {
+      if (w.time < t.expireAt && dist2(w.player.pos, t.pos) < t.radius * t.radius) { cdMul = 0.25; break; }
+    }
+  }
+  w.cdTimers[key] = ab.cooldown * cdMul;
 
   const dir = aimDir(w, input, ab, key);
   const p = w.player.pos;
