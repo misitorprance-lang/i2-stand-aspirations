@@ -13,6 +13,8 @@ import {
   tryUseDisc,
   teleportToShard,
   closeShardPicker,
+  exportSave,
+  applySave,
   type InputState,
 } from "@/game/engine";
 import { STANDS, SHIT_ABILITY } from "@/game/stands";
