@@ -2287,6 +2287,22 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
       }
       break;
     }
+    case "crit_burst": {
+      // Bright yellow ring + radiating spokes
+      const r = (v.radius ?? 18) * (0.3 + t * 1.4);
+      ctx.strokeStyle = hexToRgba("#ffd24a", inv);
+      ctx.lineWidth = 2.5 * inv + 0.5;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = hexToRgba("#ffffff", inv * 0.85);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(v.pos.x + Math.cos(a) * r * 0.55, v.pos.y + Math.sin(a) * r * 0.55);
+        ctx.lineTo(v.pos.x + Math.cos(a) * r * 1.1, v.pos.y + Math.sin(a) * r * 1.1);
+        ctx.stroke();
+      }
+      break;
+    }
   }
 }
 
