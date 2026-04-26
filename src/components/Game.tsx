@@ -138,6 +138,7 @@ export default function Game() {
           shards: w.shards.map((s) => ({ id: s.id, pos: { ...s.pos } })),
           whiteAlbumBar: Math.round(w.whiteAlbumBar),
           whiteAlbumActive: w.whiteAlbumActive,
+          boingoNearby: Math.hypot(w.player.pos.x - w.boingo.pos.x, w.player.pos.y - w.boingo.pos.y) < 26,
         });
       }
     };
