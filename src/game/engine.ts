@@ -2892,6 +2892,29 @@ function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg
 // ---- public toggles for UI ----
 export function toggleStandActive(w: World): boolean {
   if (w.standId === "none") return w.standActive;
+  // White Album has its own toggle gating (longer cooldown + bar lockout).
+  if (w.standId === "white_album") {
+    if (w.time < w.whiteAlbumToggleAt) {
+      const left = Math.ceil(w.whiteAlbumToggleAt - w.time);
+      w.bannerText = `Suit cooling (${left}s)`;
+      w.bannerUntil = w.time + 1.0;
+      return w.whiteAlbumActive;
+    }
+    if (!w.whiteAlbumActive && w.time < w.whiteAlbumLockUntil) {
+      const left = Math.ceil(w.whiteAlbumLockUntil - w.time);
+      w.bannerText = `Suit overheated (${left}s)`;
+      w.bannerUntil = w.time + 1.0;
+      return w.whiteAlbumActive;
+    }
+    w.whiteAlbumActive = !w.whiteAlbumActive;
+    w.standActive = w.whiteAlbumActive;
+    w.whiteAlbumToggleAt = w.time + 4; // 4s toggle cooldown
+    w.bannerText = w.whiteAlbumActive ? "Suit online" : "Suit offline";
+    w.bannerUntil = w.time + 1.0;
+    if (w.whiteAlbumActive) play("toggleOn");
+    else { play("toggleOff"); w.channel = null; }
+    return w.standActive;
+  }
   w.standActive = !w.standActive;
   w.bannerText = w.standActive ? "Stand summoned" : "Stand desummoned";
   w.bannerUntil = w.time + 1.0;
