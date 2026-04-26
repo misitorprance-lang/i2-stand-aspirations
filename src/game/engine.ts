@@ -2279,6 +2279,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
+  drawables.push({ y: w.boingo.pos.y, draw: () => drawBoingo(ctx, w) });
   // Trees (drawn as ground-anchored zones — sort by their root Y)
   for (const t of w.trees) {
     drawables.push({ y: t.pos.y - 4, draw: () => drawProtectionTree(ctx, w, t) });
