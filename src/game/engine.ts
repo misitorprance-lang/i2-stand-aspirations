@@ -12,6 +12,7 @@ import type {
   Entity,
   Frog,
   ItemPickup,
+  MirrorShard,
   Particle,
   ProtectionTree,
   PuppetState,
@@ -147,6 +148,22 @@ interface World {
   hologramHits: { entityId: number; expireAt: number; from: Vec2 }[];
   // M1 hold-to-repeat
   m1Held: boolean;
+  // Echoes act state (drives model + M1 damage)
+  echoesAct: 1 | 2 | 3;
+  // Star Platinum — The World
+  timeStopUntil: number;
+  timeStopStartedAt: number;
+  pendingPlayerDamage: { amount: number; dir: Vec2 }[];
+  // Hanged Man
+  hangedManFormed: boolean;     // false until Pilot has been engaged at least once
+  pilotActive: boolean;         // currently piloting Hanged Man
+  puppetPiloted: boolean;       // currently piloting Ebony Devil's puppet
+  shards: MirrorShard[];
+  shardPickerOpen: boolean;
+  // Auto-kick (anti-stuck) cooldown
+  kickAt: number;
+  // Player-input intent magnitude (used by kick detection)
+  lastJoyMag: number;
 }
 
 function makeProps(): Prop[] {
