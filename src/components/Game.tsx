@@ -29,6 +29,7 @@ interface UIData {
   maxHp: number;
   cd: { m1: number; a1: number; a2: number; a3: number; a4: number };
   banner: string | null;
+  banners: { id: number; text: string }[];
   kills: number;
   rage: number;
   rageActive: boolean;
@@ -55,6 +56,7 @@ export default function Game() {
     maxHp: 100,
     cd: { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 },
     banner: null,
+    banners: [],
     kills: 0,
     rage: 0,
     rageActive: false,
@@ -115,6 +117,7 @@ export default function Game() {
           maxHp: w.player.maxHp,
           cd: { ...w.cdTimers },
           banner: w.bannerText,
+          banners: w.banners.map((b) => ({ id: b.id, text: b.text })),
           kills: w.kills,
           rage: Math.round(w.rage),
           rageActive: w.time < w.rageUntil,
