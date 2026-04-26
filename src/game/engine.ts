@@ -678,10 +678,12 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "projectile": {
+      const { target } = resolveTargetPos(w, ab, dir, p);
+      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
       w.projectiles.push({
         id: w.nextId++,
         pos: { x: p.x, y: p.y },
-        vel: { x: dir.x * ab.speed!, y: dir.y * ab.speed! },
+        vel: { x: shootDir.x * ab.speed!, y: shootDir.y * ab.speed! },
         radius: ab.radius || 6,
         damage: ab.damage,
         color: ab.color,
@@ -689,17 +691,25 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         pierce: false,
         hitSet: new Set(),
         expireAt: w.time + ab.range / ab.speed!,
+        homingTargetId: target?.id,
+        homingStrength: 0.12,
+        speed: ab.speed,
+        applyElectro: w.standId === "rhcp" ? 0.7 : undefined,
       });
+      if (target) w.standAimTarget = { ...target.pos };
       // muzzle flash
-      spawnParticles(w, { x: p.x + dir.x * 10, y: p.y + dir.y * 10 }, ab.color, 6, { speedMin: 40, speedMax: 120, life: 0.2 });
+      spawnParticles(w, { x: p.x + shootDir.x * 10, y: p.y + shootDir.y * 10 }, ab.color, 6, { speedMin: 40, speedMax: 120, life: 0.2 });
       break;
     }
     case "lobbed": {
-      const travelTime = ab.range / ab.speed!;
+      const { target, pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const lobDir = target ? norm({ x: aimPos.x - p.x, y: aimPos.y - p.y }) : dir;
+      const dist = target ? Math.hypot(aimPos.x - p.x, aimPos.y - p.y) : ab.range;
+      const travelTime = Math.min(ab.range, dist) / ab.speed!;
       w.projectiles.push({
         id: w.nextId++,
         pos: { x: p.x, y: p.y },
-        vel: { x: dir.x * ab.speed!, y: dir.y * ab.speed! },
+        vel: { x: lobDir.x * ab.speed!, y: lobDir.y * ab.speed! },
         radius: 5,
         damage: 0,
         color: ab.color,
