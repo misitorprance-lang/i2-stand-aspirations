@@ -489,6 +489,17 @@ export function createWorld(): World {
     whiteAlbumToggleAt: 0,
     whiteAlbumLockUntil: 0,
     icePath: [],
+    boingo: {
+      pos: freeSpot(props, 9, { avoid: player.pos, avoidR: 120 }) ?? { x: player.pos.x + 120, y: player.pos.y + 80 },
+      vel: { x: 0, y: 0 },
+      radius: 9,
+      facing: { x: 0, y: 1 },
+      wanderTarget: null,
+      wanderUntil: 0,
+      bobPhase: Math.random() * Math.PI * 2,
+      pageFlipAt: 0,
+      pageIndex: 0,
+    },
   };
 }
 
