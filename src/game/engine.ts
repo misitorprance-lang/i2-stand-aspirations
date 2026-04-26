@@ -1554,6 +1554,15 @@ function resetStandRuntime(w: World) {
   w.puppet.active = false;
   w.puppet.hp = w.puppet.maxHp;
   w.standActive = true;
+  w.echoesAct = 1;
+  w.timeStopUntil = 0;
+  w.pendingPlayerDamage = [];
+  w.pilotActive = false;
+  w.puppetPiloted = false;
+  w.shards = [];
+  w.shardPickerOpen = false;
+  // Drop any in-flight player projectiles so a stand swap doesn't leak homing locks.
+  w.projectiles = [];
 }
 
 export function useArrow(w: World) {
