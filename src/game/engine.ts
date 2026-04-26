@@ -1320,40 +1320,64 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "ice_heal": {
-      // Restore HP and drain a chunk of the bar.
-      const heal = 22;
+      // Restore HP and drain a hefty chunk of the bar.
+      const heal = 28;
+      const before = w.player.hp;
       w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
-      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 35);
-      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 30, color: ab.color, life: 0.45 });
-      spawnParticles(w, p, ab.color, 18, { speedMin: 30, speedMax: 100, life: 0.6 });
-      spawnDmg(w, p, heal, "#9be7ff");
+      const actual = Math.round(w.player.hp - before);
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 45);
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 36, color: ab.color, life: 0.55 });
+      spawnVfx(w, { kind: "ice_burst", pos: { ...p }, radius: 30, color: ab.color, life: 0.5 });
+      spawnParticles(w, p, ab.color, 22, { shape: "spark", speedMin: 30, speedMax: 120, life: 0.7 });
+      // Always show feedback even if at full HP, so the move never feels "broken".
+      spawnDmg(w, p, actual > 0 ? actual : heal, actual > 0 ? "#9be7ff" : "#7c5cff");
+      w.bannerText = actual > 0 ? `+${actual} Suit` : "Suit at full";
+      w.bannerUntil = w.time + 1.0;
+      play("standSummon");
       break;
     }
     case "ice_stomp": {
-      // Aoe at target with stun + ice burst + chip damage to props.
-      const distToAim = input.aim ? Math.min(ab.range, Math.hypot(input.aim.x, input.aim.y)) : ab.range;
-      const tx = p.x + dir.x * distToAim;
-      const ty = p.y + dir.y * distToAim;
-      for (const e of w.npcs) {
-        if (!e.alive) continue;
-        if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
-          damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - tx, y: e.pos.y - ty }), amount: 60 });
+      // Ice spikes shoot out from the player toward the closest enemies in range.
+      const candidates = w.npcs
+        .filter((e) => e.alive && dist2(e.pos, p) < ab.range * ab.range)
+        .map((e) => ({ e, d2: dist2(e.pos, p) }))
+        .sort((a, b) => a.d2 - b.d2)
+        .slice(0, 5);
+      if (candidates.length === 0) {
+        // Fallback: forward fan of 3 spikes.
+        const baseAng = Math.atan2(dir.y, dir.x);
+        for (let i = -1; i <= 1; i++) {
+          const a = baseAng + i * 0.35;
+          const tx = p.x + Math.cos(a) * ab.range * 0.6;
+          const ty = p.y + Math.sin(a) * ab.range * 0.6;
+          spawnVfx(w, { kind: "stab_line", pos: { ...p }, to: { x: tx, y: ty }, color: ab.color, life: 0.35 });
+          spawnVfx(w, { kind: "ice_burst", pos: { x: tx, y: ty }, radius: 18, color: ab.color, life: 0.45 });
+          spawnParticles(w, { x: tx, y: ty }, ab.color, 8, { shape: "spark", life: 0.4 });
+        }
+      } else {
+        for (const { e } of candidates) {
+          // damage + stun + slow
+          const knockDir = norm({ x: e.pos.x - p.x, y: e.pos.y - p.y });
+          damageEntity(w, e, ab.damage, { dir: knockDir, amount: 70 });
           e.stunUntil = Math.max(e.stunUntil, w.time + (ab.stunSeconds ?? 1.6));
-          e.slowUntil = w.time + 2;
+          e.slowUntil = Math.max(e.slowUntil ?? 0, w.time + 2.5);
+          // Spike VFX from player to target, plus burst at target.
+          spawnVfx(w, { kind: "stab_line", pos: { ...p }, to: { ...e.pos }, color: ab.color, life: 0.3 });
+          spawnVfx(w, { kind: "ice_burst", pos: { ...e.pos }, radius: 22, color: ab.color, life: 0.5 });
+          spawnParticles(w, e.pos, ab.color, 12, { shape: "spark", speedMin: 60, speedMax: 180, life: 0.5 });
         }
       }
-      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage);
-      spawnVfx(w, { kind: "ice_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
-      spawnVfx(w, { kind: "shockwave", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.4 });
-      spawnParticles(w, { x: tx, y: ty }, ab.color, 22, { shape: "spark", speedMin: 60, speedMax: 200, life: 0.5 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 24, color: ab.color, life: 0.3 });
       w.shake = Math.max(w.shake, 4);
-      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 18);
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 22);
+      play("freezeTouch");
       break;
     }
   }
-  // White Album: drain bar on any other ability cast as well.
-  if (w.standId === "white_album" && w.whiteAlbumActive && key !== "m1" && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
-    w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 8);
+  // White Album: every move drains the suit bar (Ice Heal / Ice Stomp already drained above).
+  if (w.standId === "white_album" && w.whiteAlbumActive && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
+    const drain = key === "m1" ? 3 : 12;
+    w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - drain);
   }
 }
 
@@ -1559,7 +1583,8 @@ export function update(w: World, input: InputState, dt: number) {
       }
       const targetPos = frogTarget ? frogTarget.pos : baseTargetPos;
       const dir = norm({ x: targetPos.x - e.pos.x, y: targetPos.y - e.pos.y });
-      tryMove(e, dir.x * ENEMY_SPEED * dt, dir.y * ENEMY_SPEED * dt, w.props);
+      const slowMul = w.time < (e.slowUntil ?? 0) ? 0.45 : 1;
+      tryMove(e, dir.x * ENEMY_SPEED * slowMul * dt, dir.y * ENEMY_SPEED * slowMul * dt, w.props);
       e.facing = dir;
       if (dist(e.pos, targetPos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
         e.nextAttackAt = w.time + ENEMY_ATTACK_CD;
@@ -1584,7 +1609,8 @@ export function update(w: World, input: InputState, dt: number) {
       const d = dist(e.pos, tgt);
       if (d > 4) {
         const dir = norm({ x: tgt.x - e.pos.x, y: tgt.y - e.pos.y });
-        tryMove(e, dir.x * NPC_SPEED * dt, dir.y * NPC_SPEED * dt, w.props);
+        const slowMul = w.time < (e.slowUntil ?? 0) ? 0.45 : 1;
+        tryMove(e, dir.x * NPC_SPEED * slowMul * dt, dir.y * NPC_SPEED * slowMul * dt, w.props);
         e.facing = dir;
       }
     }
@@ -1985,6 +2011,18 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fill();
   }
 
+  // Ice trail (ground layer, behind entities) — White Album passive
+  if (w.icePath.length) {
+    for (const tile of w.icePath) {
+      const age = w.time - tile.bornAt;
+      const a = Math.max(0, 1 - age / 4);
+      ctx.fillStyle = `rgba(190,235,255,${0.5 * a})`;
+      ctx.beginPath(); ctx.ellipse(tile.pos.x, tile.pos.y, 13, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,255,255,${0.4 * a})`;
+      ctx.beginPath(); ctx.ellipse(tile.pos.x, tile.pos.y, 6, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
   // Items
   for (const it of w.items) {
     const bob = Math.sin((w.time - it.bornAt) * 4) * 2;
@@ -2169,8 +2207,11 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
 
 function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   const pl = w.player;
-  // Stand drawn UNDER player when behind, OVER when in front. Hidden entirely if standActive=false.
-  const standVisible = w.standId !== "none" && w.standActive;
+  // White Album reskins the player itself instead of using a floating stand body.
+  const wearingWhiteAlbum = w.standId === "white_album" && w.whiteAlbumActive;
+  // Stand drawn UNDER player when behind, OVER when in front. Hidden entirely if standActive=false
+  // OR when White Album is worn (suit replaces the model).
+  const standVisible = w.standId !== "none" && w.standActive && !wearingWhiteAlbum;
   const standPos = computeStandPos(w);
   const standInFront = standPos.y >= pl.pos.y;
   if (standVisible && !standInFront) drawStand(ctx, w, standPos);
@@ -2185,16 +2226,34 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   }
   // body
   const flash = w.time < pl.hitFlashUntil;
-  ctx.fillStyle = flash ? "#ffffff" : "#caa14a";
-  ctx.fillRect(pl.pos.x - 6, pl.pos.y - 2, 12, 10);
-  // head
-  ctx.fillStyle = flash ? "#ffffff" : pl.color;
-  ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
-  // eyes (face direction)
-  const fx = pl.facing.x, fy = pl.facing.y;
-  ctx.fillStyle = "#222";
-  ctx.fillRect(pl.pos.x - 3 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
-  ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+  if (wearingWhiteAlbum) {
+    // Suit body — same silhouette as the player but reskinned white w/ purple trim.
+    ctx.fillStyle = flash ? "#ffffff" : "#f3f4ff";
+    ctx.fillRect(pl.pos.x - 6, pl.pos.y - 2, 12, 10);
+    ctx.fillStyle = flash ? "#ffffff" : "#7c5cff";
+    ctx.fillRect(pl.pos.x - 6, pl.pos.y + 1, 12, 2);
+    // head / helmet
+    ctx.fillStyle = flash ? "#ffffff" : "#ffffff";
+    ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
+    // greenish-yellow visor strip
+    ctx.fillStyle = "#c8e64a";
+    ctx.fillRect(pl.pos.x - 4, pl.pos.y - 7, 8, 2);
+    // ice skate triangles under feet
+    ctx.fillStyle = "#bfe9ff";
+    ctx.beginPath(); ctx.moveTo(pl.pos.x - 6, pl.pos.y + 9); ctx.lineTo(pl.pos.x - 1, pl.pos.y + 12); ctx.lineTo(pl.pos.x - 6, pl.pos.y + 12); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(pl.pos.x + 6, pl.pos.y + 9); ctx.lineTo(pl.pos.x + 1, pl.pos.y + 12); ctx.lineTo(pl.pos.x + 6, pl.pos.y + 12); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle = flash ? "#ffffff" : "#caa14a";
+    ctx.fillRect(pl.pos.x - 6, pl.pos.y - 2, 12, 10);
+    // head
+    ctx.fillStyle = flash ? "#ffffff" : pl.color;
+    ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
+    // eyes (face direction)
+    const fx = pl.facing.x, fy = pl.facing.y;
+    ctx.fillStyle = "#222";
+    ctx.fillRect(pl.pos.x - 3 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+    ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+  }
   // hp bar (only if damaged)
   if (pl.hp < pl.maxHp) drawHpBar(ctx, pl.pos.x, pl.pos.y - 16, pl.hp / pl.maxHp);
   if (standVisible && standInFront) drawStand(ctx, w, standPos);
@@ -2559,22 +2618,33 @@ function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
 }
 
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
+  // Match player silhouette: shadow 8x3, body 12x10, head 10x9, hp bar at -16.
   ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.beginPath(); ctx.ellipse(e.pos.x, e.pos.y + 8, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(e.pos.x, e.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
   const flash = w.time < e.hitFlashUntil;
   // body
   ctx.fillStyle = flash ? "#ffffff" : (e.kind === "enemy" ? "#5a1a1a" : "#1d3a7a");
-  ctx.fillRect(e.pos.x - 5, e.pos.y - 2, 10, 9);
+  ctx.fillRect(e.pos.x - 6, e.pos.y - 2, 12, 10);
   // head
   ctx.fillStyle = flash ? "#ffffff" : e.color;
-  ctx.fillRect(e.pos.x - 4, e.pos.y - 9, 8, 8);
+  ctx.fillRect(e.pos.x - 5, e.pos.y - 10, 10, 9);
+  // eyes (face direction)
+  const fx = e.facing.x, fy = e.facing.y;
+  ctx.fillStyle = "#222";
+  ctx.fillRect(e.pos.x - 3 + Math.sign(fx) * 1, e.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+  ctx.fillRect(e.pos.x + 1 + Math.sign(fx) * 1, e.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
   // stunned mark
   if (w.time < e.stunUntil) {
     ctx.fillStyle = "#a8e8ff";
-    ctx.fillRect(e.pos.x - 1, e.pos.y - 14, 2, 2);
-    ctx.fillRect(e.pos.x + 2, e.pos.y - 13, 2, 2);
+    ctx.fillRect(e.pos.x - 1, e.pos.y - 15, 2, 2);
+    ctx.fillRect(e.pos.x + 2, e.pos.y - 14, 2, 2);
   }
-  if (e.hp < e.maxHp) drawHpBar(ctx, e.pos.x, e.pos.y - 14, e.hp / e.maxHp);
+  // slowed (icy) overlay
+  if (w.time < (e.slowUntil ?? 0)) {
+    ctx.fillStyle = "rgba(190,235,255,0.35)";
+    ctx.fillRect(e.pos.x - 6, e.pos.y - 10, 12, 19);
+  }
+  if (e.hp < e.maxHp) drawHpBar(ctx, e.pos.x, e.pos.y - 16, e.hp / e.maxHp);
 }
 
 function drawHpBar(ctx: CanvasRenderingContext2D, x: number, y: number, frac: number) {
@@ -2866,6 +2936,29 @@ function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg
 // ---- public toggles for UI ----
 export function toggleStandActive(w: World): boolean {
   if (w.standId === "none") return w.standActive;
+  // White Album has its own toggle gating (longer cooldown + bar lockout).
+  if (w.standId === "white_album") {
+    if (w.time < w.whiteAlbumToggleAt) {
+      const left = Math.ceil(w.whiteAlbumToggleAt - w.time);
+      w.bannerText = `Suit cooling (${left}s)`;
+      w.bannerUntil = w.time + 1.0;
+      return w.whiteAlbumActive;
+    }
+    if (!w.whiteAlbumActive && w.time < w.whiteAlbumLockUntil) {
+      const left = Math.ceil(w.whiteAlbumLockUntil - w.time);
+      w.bannerText = `Suit overheated (${left}s)`;
+      w.bannerUntil = w.time + 1.0;
+      return w.whiteAlbumActive;
+    }
+    w.whiteAlbumActive = !w.whiteAlbumActive;
+    w.standActive = w.whiteAlbumActive;
+    w.whiteAlbumToggleAt = w.time + 4; // 4s toggle cooldown
+    w.bannerText = w.whiteAlbumActive ? "Suit online" : "Suit offline";
+    w.bannerUntil = w.time + 1.0;
+    if (w.whiteAlbumActive) play("toggleOn");
+    else { play("toggleOff"); w.channel = null; }
+    return w.standActive;
+  }
   w.standActive = !w.standActive;
   w.bannerText = w.standActive ? "Stand summoned" : "Stand desummoned";
   w.bannerUntil = w.time + 1.0;
