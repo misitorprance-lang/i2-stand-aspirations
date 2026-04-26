@@ -283,7 +283,7 @@ function makeProps(): Prop[] {
       },
     });
   }
-  tag(5, 60, true); // houses
+  // (prop hp tagging — deferred)
 
 
   for (let i = 0; i < 9; i++) {
@@ -303,7 +303,7 @@ function makeProps(): Prop[] {
       },
     });
   }
-  tag(9, 14, true); // fences
+  // (prop hp tagging — deferred)
 
   return props;
 }
