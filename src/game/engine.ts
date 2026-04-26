@@ -279,9 +279,10 @@ function makeProps(): Prop[] {
 }
 
 // Strict spawn: never inside a prop, never inside an existing crater, never on player.
-function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?: number; craters?: Crater[] }): Vec2 | null {
-  const padding = 6;
-  for (let i = 0; i < 80; i++) {
+function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?: number; craters?: Crater[]; tries?: number }): Vec2 | null {
+  const padding = 8;
+  const tries = opts?.tries ?? 200;
+  for (let i = 0; i < tries; i++) {
     const x = rand(40, MAP_W - 40);
     const y = rand(40, MAP_H - 40);
     let ok = true;
@@ -305,13 +306,26 @@ function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?:
   return null;
 }
 
-// Fallback when caller MUST have a spot (npc creation at world init)
-function freeSpotOrCenter(props: Prop[], radius: number): Vec2 {
-  return freeSpot(props, radius) ?? { x: MAP_W / 2, y: MAP_H / 2 };
+// Fallback when caller MUST have a spot (npc creation at world init).
+// Walks a grid as a last resort so we never return a position inside a prop.
+function freeSpotOrGrid(props: Prop[], radius: number): Vec2 {
+  const random = freeSpot(props, radius, { tries: 200 });
+  if (random) return random;
+  const step = 24;
+  for (let y = 40; y < MAP_H - 40; y += step) {
+    for (let x = 40; x < MAP_W - 40; x += step) {
+      let ok = true;
+      for (const p of props) if (circleRectOverlap(x, y, radius + 6, p.rect)) { ok = false; break; }
+      if (ok) return { x, y };
+    }
+  }
+  return { x: MAP_W / 2, y: MAP_H / 2 };
 }
 
+const freeSpotOrCenter = freeSpotOrGrid;
+
 function makeNpc(props: Prop[], kind: "friendly" | "enemy", id: number): Entity {
-  const pos = freeSpotOrCenter(props, 10);
+  const pos = freeSpotOrGrid(props, 10);
   return {
     id,
     kind,
