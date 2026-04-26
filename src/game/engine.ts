@@ -2009,7 +2009,33 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fillText(dn.text, Math.round(dn.pos.x), Math.round(dn.pos.y));
   }
 
+  // Mirror shards (Hanged Man) — chrome diamond markers + soft dome ring.
+  for (const s of w.shards) {
+    const lifeLeft = s.expireAt - w.time;
+    const a = Math.min(1, lifeLeft / 2);
+    ctx.strokeStyle = hexToRgba("#dfe6f0", a * 0.55);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(s.pos.x, s.pos.y, s.radius, 0, Math.PI * 2); ctx.stroke();
+    // diamond
+    ctx.fillStyle = hexToRgba("#dfe6f0", a);
+    ctx.beginPath();
+    ctx.moveTo(s.pos.x, s.pos.y - 8);
+    ctx.lineTo(s.pos.x + 6, s.pos.y);
+    ctx.lineTo(s.pos.x, s.pos.y + 8);
+    ctx.lineTo(s.pos.x - 6, s.pos.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba("#7a8aa0", a);
+    ctx.stroke();
+  }
+
   ctx.restore();
+
+  // Time Stop tint — desaturated blue overlay across the whole viewport.
+  if (w.time < w.timeStopUntil) {
+    ctx.fillStyle = "rgba(120, 130, 180, 0.18)";
+    ctx.fillRect(0, 0, VW, VH);
+  }
 }
 
 function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
