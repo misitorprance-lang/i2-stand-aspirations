@@ -2624,15 +2624,49 @@ function drawPuppet(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillStyle = "#1b1714";
   ctx.fillRect(p.pos.x - 3, p.pos.y - 6, 2, 2);
   ctx.fillRect(p.pos.x + 1, p.pos.y - 6, 2, 2);
+  // ----- proper spear -----
   ctx.save();
   ctx.translate(p.pos.x, p.pos.y + 1);
   if (attacking) ctx.rotate(spin);
   else ctx.rotate(Math.atan2(p.facing.y, p.facing.x));
-  ctx.strokeStyle = "#d6d8dd";
+  // long wooden shaft (dark brown) with binding wraps
+  ctx.strokeStyle = "#5a3a22";
   ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(18, 0); ctx.stroke();
-  ctx.fillStyle = "#f2f3f5";
-  ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(16, -4); ctx.lineTo(16, 4); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(20, 0); ctx.stroke();
+  // shaft binding (leather wraps)
+  ctx.strokeStyle = "#2a1a0e";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    const x = 2 + i * 5;
+    ctx.beginPath(); ctx.moveTo(x, -1); ctx.lineTo(x, 1); ctx.stroke();
+  }
+  // butt cap
+  ctx.fillStyle = "#3a2614";
+  ctx.fillRect(-4, -1, 2, 3);
+  // metal collar at base of head
+  ctx.fillStyle = "#9aa0aa";
+  ctx.fillRect(19, -2, 2, 4);
+  // spearhead — narrow pointed leaf shape
+  ctx.fillStyle = "#e8ecf2";
+  ctx.strokeStyle = "#3a4252";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(21, -3);
+  ctx.lineTo(29, 0);
+  ctx.lineTo(21, 3);
+  ctx.lineTo(23, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // side fins (the small wings near the base of the head)
+  ctx.fillStyle = "#c8ccd4";
+  ctx.beginPath();
+  ctx.moveTo(21, -3); ctx.lineTo(19, -5); ctx.lineTo(22, -2); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(21, 3); ctx.lineTo(19, 5); ctx.lineTo(22, 2); ctx.closePath(); ctx.fill();
+  // central blood-groove highlight
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillRect(23, 0, 4, 1);
   ctx.restore();
   if (p.hp < p.maxHp) drawHpBar(ctx, p.pos.x, p.pos.y - 15, p.hp / p.maxHp);
 }
