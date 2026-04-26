@@ -132,6 +132,8 @@ export default function Game() {
           pilotActive: w.pilotActive || w.puppetPiloted,
           shardPickerOpen: w.shardPickerOpen,
           shards: w.shards.map((s) => ({ id: s.id, pos: { ...s.pos } })),
+          whiteAlbumBar: Math.round(w.whiteAlbumBar),
+          whiteAlbumActive: w.whiteAlbumActive,
         });
       }
     };
