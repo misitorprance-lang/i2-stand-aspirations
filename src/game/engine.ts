@@ -168,6 +168,16 @@ interface World {
 
 function makeProps(): Prop[] {
   const props: Prop[] = [];
+  // Tag groups so we can assign HP/destructibility after construction without changing each push site.
+  const tag = (count: number, hp: number, destructible: boolean) => {
+    const start = props.length - count;
+    for (let i = start; i < props.length; i++) {
+      props[i].destructible = destructible;
+      props[i].hp = hp;
+      props[i].maxHp = hp;
+      props[i].original = { rect: { ...props[i].rect }, hp };
+    }
+  };
 
   // Trees (round canopies + brown trunk; collision = trunk + roots area, smaller than canopy)
   const treeSpots: Vec2[] = [];
@@ -200,8 +210,7 @@ function makeProps(): Prop[] {
       },
     });
   }
-
-  // Rocks (gray ovals)
+  tag(treeSpots.length, 18, true); // trees
   for (let i = 0; i < 21; i++) {
     const x = rand(30, MAP_W - 30), y = rand(30, MAP_H - 30);
     const w = rand(18, 30), h = rand(12, 18);
