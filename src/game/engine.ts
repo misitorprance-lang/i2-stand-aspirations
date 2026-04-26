@@ -458,6 +458,7 @@ export function createWorld(): World {
     puppetPiloted: false,
     shards: [],
     shardPickerOpen: false,
+    hangedMan: { pos: { ...player.pos }, facing: { x: 0, y: 1 }, attackUntil: 0 },
     kickAt: 0,
     lastJoyMag: 0,
   };
