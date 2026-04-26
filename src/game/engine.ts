@@ -1204,6 +1204,26 @@ function trySpawnItem(w: World, kind: "arrow" | "disc") {
 export function update(w: World, input: InputState, dt: number) {
   w.time += dt;
 
+  // Time Stop gating — Star Platinum's "The World" freezes everything except the player and their stand.
+  const timeStopped = w.time < w.timeStopUntil;
+  if (timeStopped && w.timeStopStartedAt === 0) w.timeStopStartedAt = w.time;
+  if (!timeStopped && w.timeStopStartedAt > 0) {
+    // Just resumed — apply pending damage in one burst.
+    if (w.pendingPlayerDamage.length > 0) {
+      let total = 0;
+      for (const d of w.pendingPlayerDamage) total += d.amount;
+      damageEntity(w, w.player, total);
+      w.shake = Math.max(w.shake, 8);
+      play("timeResume");
+      w.bannerText = "Time resumes";
+      w.bannerUntil = w.time + 1.0;
+    } else {
+      play("timeResume");
+    }
+    w.pendingPlayerDamage = [];
+    w.timeStopStartedAt = 0;
+  }
+
   // Cooldowns
   for (const k of ["m1", "a1", "a2", "a3", "a4"] as const) {
     if (w.cdTimers[k] > 0) w.cdTimers[k] = Math.max(0, w.cdTimers[k] - dt);
