@@ -2011,6 +2011,18 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fill();
   }
 
+  // Ice trail (ground layer, behind entities) — White Album passive
+  if (w.icePath.length) {
+    for (const tile of w.icePath) {
+      const age = w.time - tile.bornAt;
+      const a = Math.max(0, 1 - age / 4);
+      ctx.fillStyle = `rgba(190,235,255,${0.5 * a})`;
+      ctx.beginPath(); ctx.ellipse(tile.pos.x, tile.pos.y, 13, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,255,255,${0.4 * a})`;
+      ctx.beginPath(); ctx.ellipse(tile.pos.x, tile.pos.y, 6, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
   // Items
   for (const it of w.items) {
     const bob = Math.sin((w.time - it.bornAt) * 4) * 2;
