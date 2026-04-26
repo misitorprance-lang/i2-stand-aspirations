@@ -1,7 +1,7 @@
 // Stand & ability data tables for Stand Test.
 // All ability behavior is data-driven; the engine reads `kind` to decide how to execute.
 
-export type StandId = "none" | "star_platinum" | "rhcp" | "echoes" | "ebony_devil" | "gold_experience" | "hanged_man";
+export type StandId = "none" | "star_platinum" | "rhcp" | "echoes" | "ebony_devil" | "gold_experience" | "hanged_man" | "white_album";
 
 export type AbilityKind =
   | "melee" // short cone in facing dir
@@ -28,7 +28,9 @@ export type AbilityKind =
   | "pilot_toggle"     // Hanged Man pilot / Ebony Devil puppet drive
   | "mirror_shard"     // drops a chrome shard with a combat dome
   | "shard_teleport"   // opens a picker, teleports to chosen shard
-  | "brutal_slash";    // big slash w/ bleed + stun + slow
+  | "brutal_slash"     // big slash w/ bleed + stun + slow
+  | "ice_heal"         // White Album: regen suit
+  | "ice_stomp";       // White Album: ice barrage
 
 export interface Ability {
   name: string;
