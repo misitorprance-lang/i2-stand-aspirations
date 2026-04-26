@@ -1878,6 +1878,19 @@ export function update(w: World, input: InputState, dt: number) {
     w.icePath = [];
   }
 
+  // Ice trail (ground layer, behind entities) — White Album passive
+  if (w.icePath.length) {
+    for (const tile of w.icePath) {
+      const age = w.time - tile.bornAt;
+      const a = Math.max(0, 1 - age / 4);
+      // pale blue puddle
+      ctx.fillStyle = `rgba(190,235,255,${0.45 * a})`;
+      ctx.beginPath(); ctx.ellipse(tile.pos.x, tile.pos.y, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
+      // bright core
+      ctx.fillStyle = `rgba(255,255,255,${0.35 * a})`;
+      ctx.beginPath(); ctx.ellipse(tile.pos.x, tile.pos.y, 6, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
 
   // Camera
   const viewW = VW / CAMERA_ZOOM;
