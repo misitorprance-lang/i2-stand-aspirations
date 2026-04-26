@@ -354,10 +354,11 @@ export default function Game() {
              onClick={() => setShowHelp(false)}>
           <div className="font-bold mb-1 text-sm">How to play (tap to close)</div>
           <div>• Drag the LEFT half to move (or WASD).</div>
-          <div>• Tap M1 / 1-4 to attack (or Space, 1-4).</div>
-          <div>• Pick up <span style={{color:"#caa14a"}}>Arrows</span> to roll a stand.</div>
-          <div>• Pick up <span style={{color:"#cfd2d8"}}>DISCs</span> to remove your current stand.</div>
-          <div>• Hostile NPCs (red) only attack after you provoke them.</div>
+          <div>• Tap M1 / 1-4 to attack (or Space, 1-4). Hold M1 to auto-repeat.</div>
+          <div>• M1 auto-aims at the closest NPC. 1-4 lock onto the closest enemy.</div>
+          <div>• Pick up <span style={{color:"#caa14a"}}>Arrows</span> to roll a stand. <span style={{color:"#cfd2d8"}}>DISCs</span> remove your stand.</div>
+          <div>• Tap "Stand: ON/OFF" to dismiss/resummon your stand.</div>
+          <div>• Hostile NPCs (red) only attack after you provoke them. You slowly regen out of combat.</div>
         </div>
       )}
       {!showHelp && (
