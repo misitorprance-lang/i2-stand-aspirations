@@ -81,10 +81,10 @@ export const STANDS: Record<StandId, Stand> = {
     rarityWeight: 1, // rarest
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 3, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
-      a1: { name: "Star Finger", kind: "pierce", damage: 6, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
-      a2: { name: "Ranged Smash", kind: "projectile", damage: 8, range: 220, radius: 8, cooldown: 2.0, speed: 320, color: "#b8a6ff" },
+      a1: { name: "Star Finger", kind: "pierce", damage: 5, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
+      a2: { name: "Ranged Smash", kind: "projectile", damage: 6, range: 220, radius: 8, cooldown: 2.0, speed: 320, color: "#b8a6ff" },
       a3: { name: "The World", kind: "time_stop", damage: 0, range: 0, cooldown: 18, duration: 5, color: "#dcd6ff" },
-      a4: { name: "Launch", kind: "knockback", damage: 14, range: 26, radius: 18, cooldown: 5, knockback: 220, color: "#7c5cff" },
+      a4: { name: "Launch", kind: "knockback", damage: 11, range: 26, radius: 18, cooldown: 5, knockback: 220, color: "#7c5cff" },
     },
   },
   rhcp: {
@@ -94,10 +94,10 @@ export const STANDS: Record<StandId, Stand> = {
     rarityWeight: 6, // most common
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 1.4, range: 20, radius: 14, cooldown: 0.32, color: "#ffd0a8" },
-      a1: { name: "Electric Shot", kind: "projectile", damage: 5, range: 220, radius: 6, cooldown: 1.2, speed: 380, color: "#fff36b" },
-      a2: { name: "Electric Discharge", kind: "aoe_self", damage: 7, range: 0, radius: 70, cooldown: 4, color: "#fff36b" },
-      a3: { name: "Ground Bomber", kind: "aoe_target", damage: 12, range: 120, radius: 50, cooldown: 6, crater: true, color: "#ff8a3a" },
-      a4: { name: "Tesla Coil", kind: "tesla", damage: 2.5, range: 0, radius: 90, cooldown: 12, duration: 4, tickEvery: 0.4, color: "#9be7ff" },
+      a1: { name: "Electric Shot", kind: "projectile", damage: 4, range: 220, radius: 6, cooldown: 1.2, speed: 380, color: "#fff36b" },
+      a2: { name: "Electric Discharge", kind: "aoe_self", damage: 5, range: 0, radius: 70, cooldown: 4, color: "#fff36b" },
+      a3: { name: "Ground Bomber", kind: "aoe_target", damage: 9, range: 120, radius: 50, cooldown: 6, crater: true, color: "#ff8a3a" },
+      a4: { name: "Tesla Coil", kind: "tesla", damage: 1.8, range: 0, radius: 90, cooldown: 12, duration: 4, tickEvery: 0.4, color: "#9be7ff" },
     },
   },
   echoes: {
@@ -108,9 +108,9 @@ export const STANDS: Record<StandId, Stand> = {
     abilities: {
       m1: { name: "Act 3 Punch", kind: "melee", damage: 1.5, range: 18, radius: 12, cooldown: 0.28, color: "#bff5da" },
       a1: { name: "Freeze Touch", kind: "stun_touch", damage: 1, range: 22, radius: 16, cooldown: 4, stunSeconds: 1.6, color: "#a8e8ff" },
-      a2: { name: "Explosive Text", kind: "lobbed", damage: 9, range: 160, radius: 38, cooldown: 3.5, speed: 240, color: "#ffb84d" },
-      a3: { name: "Burning Text", kind: "dot_zone", damage: 1.5, range: 100, radius: 44, cooldown: 7, duration: 3.5, tickEvery: 0.35, color: "#ff6a3a" },
-      a4: { name: "Three Freeze", kind: "auto_aim", damage: 11, range: 220, radius: 22, cooldown: 8, color: "#5fd1a0" },
+      a2: { name: "Explosive Text", kind: "lobbed", damage: 7, range: 160, radius: 38, cooldown: 3.5, speed: 240, color: "#ffb84d" },
+      a3: { name: "Burning Text", kind: "dot_zone", damage: 1.1, range: 100, radius: 44, cooldown: 7, duration: 3.5, tickEvery: 0.35, color: "#ff6a3a" },
+      a4: { name: "Three Freeze", kind: "auto_aim", damage: 8, range: 220, radius: 22, cooldown: 8, color: "#5fd1a0" },
     },
   },
   ebony_devil: {
@@ -121,8 +121,8 @@ export const STANDS: Record<StandId, Stand> = {
     abilities: {
       m1: { name: "Slice", kind: "melee", damage: 0.3, range: 24, radius: 16, cooldown: 0.32, color: "#cfd3dc" },
       a1: { name: "Doll / Puppet", kind: "puppet_toggle", damage: 0, range: 0, radius: 0, cooldown: 0.35, color: "#b8bcc6" },
-      a2: { name: "Spear Jab", kind: "puppet_spear", damage: 8, range: 190, radius: 8, cooldown: 2.4, speed: 360, color: "#d6d8dd" },
-      a3: { name: "360° Spear Spin", kind: "puppet_spin", damage: 7, range: 0, radius: 58, cooldown: 4.5, color: "#b8bcc6" },
+      a2: { name: "Spear Jab", kind: "puppet_spear", damage: 6, range: 190, radius: 8, cooldown: 2.4, speed: 360, color: "#d6d8dd" },
+      a3: { name: "360° Spear Spin", kind: "puppet_spin", damage: 5, range: 0, radius: 58, cooldown: 4.5, color: "#b8bcc6" },
       a4: { name: "Rage Mode", kind: "rage_mode", damage: 0, range: 0, radius: 0, cooldown: 10, duration: 5, color: "#ff3d3d" },
     },
   },
@@ -133,9 +133,9 @@ export const STANDS: Record<StandId, Stand> = {
     rarityWeight: 2, // rare
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 2.5, range: 22, radius: 16, cooldown: 0.3, color: "#fff0a8" },
-      a1: { name: "Eagle Summon", kind: "chain_projectile", damage: 6, range: 260, radius: 6, cooldown: 3.2, speed: 380, color: "#ffd24a" },
+      a1: { name: "Eagle Summon", kind: "chain_projectile", damage: 5, range: 260, radius: 6, cooldown: 3.2, speed: 380, color: "#ffd24a" },
       a2: { name: "Frog Summon", kind: "frog_summon", damage: 0, range: 0, cooldown: 4.5, color: "#7fc97f" },
-      a3: { name: "Out of Body", kind: "hologram_stun", damage: 7, range: 36, radius: 18, cooldown: 12, stunSeconds: 3.5, color: "#bff5da" },
+      a3: { name: "Out of Body", kind: "hologram_stun", damage: 5, range: 36, radius: 18, cooldown: 12, stunSeconds: 3.5, color: "#bff5da" },
       a4: { name: "Tree of Life", kind: "tree_zone", damage: 0, range: 70, radius: 78, cooldown: 30, duration: 6, color: "#5fd16a" },
     },
   },
@@ -149,7 +149,7 @@ export const STANDS: Record<StandId, Stand> = {
       a1: { name: "Pilot", kind: "pilot_toggle", damage: 0, range: 0, cooldown: 0.4, color: "#cfd6e3" },
       a2: { name: "Mirror Shard", kind: "mirror_shard", damage: 0, range: 0, radius: 80, cooldown: 1.2, duration: 12, color: "#dfe6f0" },
       a3: { name: "Teleport", kind: "shard_teleport", damage: 0, range: 0, cooldown: 6, color: "#dfe6f0" },
-      a4: { name: "Brutal Slash", kind: "brutal_slash", damage: 8, range: 30, radius: 16, cooldown: 9, stunSeconds: 1.5, color: "#9ec0ff" },
+      a4: { name: "Brutal Slash", kind: "brutal_slash", damage: 7, range: 30, radius: 16, cooldown: 9, stunSeconds: 1.5, color: "#9ec0ff" },
     },
   },
 };
@@ -158,7 +158,7 @@ export const STANDS: Record<StandId, Stand> = {
 export const SHIT_ABILITY: Ability = {
   name: "S.H.I.T.",
   kind: "auto_aim",
-  damage: 25,
+  damage: 18,
   range: 280,
   radius: 30,
   cooldown: 12,
