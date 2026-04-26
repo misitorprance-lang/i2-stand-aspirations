@@ -598,8 +598,14 @@ function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
 function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: InputState) {
   const stand = STANDS[w.standId];
   if (stand.id === "none" && key !== "m1") return;
+  // Stand desummoned: no abilities work (M1 = no-stand fallback below at "none")
+  if (stand.id !== "none" && !w.standActive) {
+    w.bannerText = "Resummon stand to attack";
+    w.bannerUntil = w.time + 0.8;
+    return;
+  }
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode"].includes(ab.kind)) return;
+  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone"].includes(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
   if (ab.kind === "rage_mode" && w.rage < 100) {
     w.bannerText = "Rage not ready";
@@ -618,7 +624,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
 
   // Stand aiming: project the stand model toward the cast target/direction
   w.standAimUntil = w.time + 0.4;
-  if (ab.kind === "aoe_target" || ab.kind === "lobbed" || ab.kind === "stun_touch" || ab.kind === "knockback" || ab.kind === "channel_cone" || ab.kind === "pierce" || ab.kind === "projectile") {
+  if (ab.kind === "aoe_target" || ab.kind === "lobbed" || ab.kind === "stun_touch" || ab.kind === "knockback" || ab.kind === "channel_cone" || ab.kind === "pierce" || ab.kind === "projectile" || ab.kind === "auto_aim" || ab.kind === "chain_projectile" || ab.kind === "hologram_stun") {
     w.standAimTarget = { x: w.player.pos.x + dir.x * Math.min(ab.range, 60), y: w.player.pos.y + dir.y * Math.min(ab.range, 60) };
   }
 
