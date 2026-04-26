@@ -346,7 +346,7 @@ const freeSpotOrCenter = freeSpotOrGrid;
 
 function makeNpc(props: Prop[], kind: "friendly" | "enemy", id: number): Entity {
   const pos = freeSpotOrGrid(props, 10);
-  return {
+  const e: Entity = {
     id,
     kind,
     pos,
@@ -360,6 +360,9 @@ function makeNpc(props: Prop[], kind: "friendly" | "enemy", id: number): Entity 
     stunUntil: 0,
     hitFlashUntil: 0,
   };
+  // Belt-and-braces: eject in case the spawn brushed a prop edge.
+  pushOutOfProps(e, props);
+  return e;
 }
 
 export function createWorld(): World {
