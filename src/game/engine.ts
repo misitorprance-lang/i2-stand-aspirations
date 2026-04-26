@@ -743,8 +743,16 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "aoe_target": {
-      const tx = p.x + dir.x * ab.range;
-      const ty = p.y + dir.y * ab.range;
+      // Drop AOE on the actual target if there is one in range, else along facing direction
+      const { target, pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      let tx: number, ty: number;
+      if (target) { tx = target.pos.x; ty = target.pos.y; }
+      else {
+        const dist = Math.hypot(aimPos.x - p.x, aimPos.y - p.y);
+        const clamped = Math.min(ab.range, dist);
+        tx = p.x + dir.x * clamped;
+        ty = p.y + dir.y * clamped;
+      }
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
