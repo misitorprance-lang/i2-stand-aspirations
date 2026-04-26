@@ -1084,19 +1084,32 @@ export function update(w: World, input: InputState, dt: number) {
 
     if (e.kind === "enemy" && e.provoked && pl.alive && dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO) {
       const puppetCloser = w.puppet.active && dist2(e.pos, w.puppet.pos) < dist2(e.pos, pl.pos);
-      const targetPos = puppetCloser ? w.puppet.pos : pl.pos;
+      // Frog interception: if a frog is closer than the player, hit the frog instead
+      const aliveFrogs = w.frogs.filter((f) => f.alive);
+      let frogTarget: Frog | null = null;
+      for (const f of aliveFrogs) {
+        if (dist2(f.pos, e.pos) < dist2(pl.pos, e.pos) && dist2(f.pos, e.pos) < 50 * 50) { frogTarget = f; break; }
+      }
+      const targetPos = frogTarget ? frogTarget.pos : (puppetCloser ? w.puppet.pos : pl.pos);
       const dir = norm({ x: targetPos.x - e.pos.x, y: targetPos.y - e.pos.y });
       tryMove(e, dir.x * ENEMY_SPEED * dt, dir.y * ENEMY_SPEED * dt, w.props);
       e.facing = dir;
       if (dist(e.pos, targetPos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
         e.nextAttackAt = w.time + ENEMY_ATTACK_CD;
-        if (puppetCloser) damagePuppet(w, ENEMY_ATTACK_DMG);
-        else damageEntity(w, pl, ENEMY_ATTACK_DMG, { dir, amount: 40 });
+        const dmg = rand(ENEMY_ATTACK_DMG_MIN, ENEMY_ATTACK_DMG_MAX);
+        if (frogTarget) {
+          // Frog absorbs and reflects 50% back
+          frogTarget.alive = false;
+          spawnParticles(w, frogTarget.pos, "#7fc97f", 14, { gravity: 80, life: 0.6 });
+          play("frog");
+          damageEntity(w, e, dmg * 0.5);
+        } else if (puppetCloser) damagePuppet(w, dmg);
+        else damageEntity(w, pl, dmg, { dir, amount: 40 });
       }
     } else {
       // wander
       if (!e.wanderUntil || w.time >= e.wanderUntil || !e.wanderTarget) {
-        e.wanderTarget = freeSpot(w.props, 10);
+        e.wanderTarget = freeSpotOrCenter(w.props, 10);
         e.wanderUntil = w.time + rand(2, 5);
       }
       const tgt = e.wanderTarget;
