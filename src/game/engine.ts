@@ -633,7 +633,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   }
   w.cdTimers[key] = ab.cooldown;
 
-  const dir = aimDir(w, input, ab);
+  const dir = aimDir(w, input, ab, key);
   const p = w.player.pos;
   const sfx = sfxFor(w, key);
 
@@ -649,12 +649,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   switch (ab.kind) {
     case "melee": {
       const angle = Math.atan2(dir.y, dir.x);
-      const origin = w.standId === "ebony_devil" && w.puppet.active ? w.puppet.pos : p;
+      // Ebony Devil M1: only the puppet swings (does its own bigger damage). Owner barely scratches.
+      const usePuppetOrigin = w.standId === "ebony_devil" && w.puppet.active && key === "m1";
+      const origin = usePuppetOrigin ? w.puppet.pos : p;
       const reach = ab.range + (ab.radius ?? 14);
       // slash arc VFX so misses still feel responsive
       spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.2 });
+      // M1 punches: roll critical per stand table.
+      let dmg = ab.damage;
+      if (key === "m1") dmg = m1DamageRoll(w, usePuppetOrigin);
       // Hit any NPC within an arc in front of the player (cone test).
-      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, ab.damage, key === "m1" && w.time < w.rageUntil ? 45 : undefined);
+      hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, dmg, key === "m1" && w.time < w.rageUntil ? 45 : undefined);
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
