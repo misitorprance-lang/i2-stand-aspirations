@@ -9,10 +9,13 @@ import {
   tryPickupItems,
   useArrow,
   useDisc,
+  toggleStandActive,
+  tryUseDisc,
   type InputState,
 } from "@/game/engine";
 import { STANDS, SHIT_ABILITY } from "@/game/stands";
 import { unlockAudio, isSoundEnabled, setSoundEnabled } from "@/game/sound";
+import { startMusic, applyMusicSetting } from "@/game/music";
 import type { World } from "@/game/engine";
 
 interface UIData {
@@ -147,6 +150,7 @@ export default function Game() {
   const onJoyStart = (e: React.PointerEvent) => {
     e.preventDefault();
     unlockAudio();
+    startMusic();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     joyRef.current.active = true;
     joyRef.current.baseX = e.clientX;
@@ -215,8 +219,15 @@ export default function Game() {
   const onUseDisc = () => {
     if (discsRef.current <= 0 || !worldRef.current) return;
     if (worldRef.current.standId === "none") return;
+    const check = tryUseDisc(worldRef.current);
+    if (!check.ok) return;
     discsRef.current--;
     useDisc(worldRef.current);
+  };
+  const onToggleStand = () => {
+    if (!worldRef.current) return;
+    unlockAudio();
+    toggleStandActive(worldRef.current);
   };
 
   const stand = STANDS[ui.standId as keyof typeof STANDS];
