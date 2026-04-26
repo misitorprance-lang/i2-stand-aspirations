@@ -491,18 +491,19 @@ function pushOutOfProps(e: Entity, props: Prop[]) {
   e.pos.y = Math.max(e.radius, Math.min(MAP_H - e.radius, e.pos.y));
 }
 
-function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff") {
-  const tier = dmg >= 15 ? 22 : dmg >= 8 ? 17 : dmg >= 3 ? 13 : 10;
-  const text = dmg < 1 ? dmg.toFixed(1) : Math.round(dmg).toString();
+function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false) {
+  let tier = dmg >= 15 ? 22 : dmg >= 8 ? 17 : dmg >= 3 ? 13 : 10;
+  if (crit) tier = Math.round(tier * 1.35);
+  const text = (dmg < 1 ? dmg.toFixed(1) : Math.round(dmg).toString()) + (crit ? "!" : "");
   w.damageNumbers.push({
     id: w.nextId++,
     pos: { x: pos.x + rand(-6, 6), y: pos.y - 6 },
     text,
-    color: dmg >= 15 ? "#ffd24a" : dmg >= 8 ? "#ff8a3a" : color,
+    color: crit ? "#ffd24a" : (dmg >= 15 ? "#ffd24a" : dmg >= 8 ? "#ff8a3a" : color),
     size: tier,
-    vy: -28,
+    vy: crit ? -52 : -28,
     bornAt: w.time,
-    expireAt: w.time + 0.9,
+    expireAt: w.time + (crit ? 1.1 : 0.9),
   });
 }
 
