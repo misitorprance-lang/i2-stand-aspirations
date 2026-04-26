@@ -308,7 +308,7 @@ function freeSpotOrCenter(props: Prop[], radius: number): Vec2 {
 }
 
 function makeNpc(props: Prop[], kind: "friendly" | "enemy", id: number): Entity {
-  const pos = freeSpot(props, 10);
+  const pos = freeSpotOrCenter(props, 10);
   return {
     id,
     kind,
@@ -365,6 +365,7 @@ export function createWorld(): World {
     cdTimers: { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 },
     standId: "none",
     shitVariant: false,
+    standActive: true,
     bannerText: null,
     bannerUntil: 0,
     nextId: 1000,
@@ -377,6 +378,11 @@ export function createWorld(): World {
     kills: 0,
     footstepAcc: 0,
     pointerAim: null,
+    frogs: [],
+    trees: [],
+    geBuffUntil: 0,
+    hologramHits: [],
+    m1Held: false,
     puppet: {
       active: false,
       pos: { x: player.pos.x - 14, y: player.pos.y + 10 },
