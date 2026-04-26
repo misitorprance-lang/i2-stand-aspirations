@@ -86,6 +86,8 @@ export interface InputState {
   aim: Vec2 | null;
   sprint: boolean;
   pressed: { m1: boolean; a1: boolean; a2: boolean; a3: boolean; a4: boolean };
+  // True while M1 button is being held — engine auto-repeats M1 each tick the cooldown is ready.
+  m1Held: boolean;
   useArrow: boolean;
   useDisc: boolean;
 }
@@ -97,6 +99,7 @@ export function makeInput(): InputState {
     aim: null,
     sprint: false,
     pressed: { m1: false, a1: false, a2: false, a3: false, a4: false },
+    m1Held: false,
     useArrow: false,
     useDisc: false,
   };
