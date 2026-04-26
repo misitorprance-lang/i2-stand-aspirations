@@ -1,7 +1,7 @@
 // Stand & ability data tables for Stand Test.
 // All ability behavior is data-driven; the engine reads `kind` to decide how to execute.
 
-export type StandId = "none" | "star_platinum" | "rhcp" | "echoes" | "ebony_devil";
+export type StandId = "none" | "star_platinum" | "rhcp" | "echoes" | "ebony_devil" | "gold_experience";
 
 export type AbilityKind =
   | "melee" // short cone in facing dir
@@ -19,7 +19,11 @@ export type AbilityKind =
   | "puppet_toggle"
   | "puppet_spear"
   | "puppet_spin"
-  | "rage_mode";
+  | "rage_mode"
+  | "chain_projectile" // homing piercing shot that chains to nearby targets
+  | "frog_summon"      // summons frog protector(s)
+  | "hologram_stun"    // long stun + hologram visual
+  | "tree_zone";       // protection/heal/buff zone with rooting
 
 export interface Ability {
   name: string;
