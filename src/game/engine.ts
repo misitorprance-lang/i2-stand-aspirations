@@ -1319,6 +1319,41 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       play("brutal");
       break;
     }
+    case "ice_heal": {
+      // Restore HP and drain a chunk of the bar.
+      const heal = 22;
+      w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 35);
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 30, color: ab.color, life: 0.45 });
+      spawnParticles(w, p, ab.color, 18, { speedMin: 30, speedMax: 100, life: 0.6 });
+      spawnDmg(w, p, heal, "#9be7ff");
+      break;
+    }
+    case "ice_stomp": {
+      // Aoe at target with stun + ice burst + chip damage to props.
+      const distToAim = input.aim ? Math.min(ab.range, Math.hypot(input.aim.x, input.aim.y)) : ab.range;
+      const tx = p.x + dir.x * distToAim;
+      const ty = p.y + dir.y * distToAim;
+      for (const e of w.npcs) {
+        if (!e.alive) continue;
+        if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
+          damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - tx, y: e.pos.y - ty }), amount: 60 });
+          e.stunUntil = Math.max(e.stunUntil, w.time + (ab.stunSeconds ?? 1.6));
+          e.slowUntil = w.time + 2;
+        }
+      }
+      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage);
+      spawnVfx(w, { kind: "ice_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
+      spawnVfx(w, { kind: "shockwave", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.4 });
+      spawnParticles(w, { x: tx, y: ty }, ab.color, 22, { shape: "spark", speedMin: 60, speedMax: 200, life: 0.5 });
+      w.shake = Math.max(w.shake, 4);
+      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 18);
+      break;
+    }
+  }
+  // White Album: drain bar on any other ability cast as well.
+  if (w.standId === "white_album" && w.whiteAlbumActive && key !== "m1" && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
+    w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 8);
   }
 }
 
