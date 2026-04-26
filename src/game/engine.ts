@@ -1188,8 +1188,21 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
-  // Projectiles
+  // Projectiles — homing steering for projectiles with a target id
   for (const pr of w.projectiles) {
+    if (pr.homingTargetId !== undefined && pr.speed) {
+      const tgt = w.npcs.find((n) => n.id === pr.homingTargetId && n.alive);
+      if (tgt) {
+        const want = norm({ x: tgt.pos.x - pr.pos.x, y: tgt.pos.y - pr.pos.y });
+        const cur = norm(pr.vel);
+        const k = pr.homingStrength ?? 0.1;
+        const nx = cur.x * (1 - k) + want.x * k;
+        const ny = cur.y * (1 - k) + want.y * k;
+        const nm = Math.hypot(nx, ny) || 1;
+        pr.vel.x = (nx / nm) * pr.speed;
+        pr.vel.y = (ny / nm) * pr.speed;
+      }
+    }
     pr.pos.x += pr.vel.x * dt;
     pr.pos.y += pr.vel.y * dt;
   }
