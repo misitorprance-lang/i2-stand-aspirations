@@ -800,9 +800,11 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       return;
     }
   }
-  // M1 range gate: don't swing into empty air. Origin is puppet pos for piloted Ebony Devil.
+  // M1 range gate: don't swing into empty air. Origin is puppet/hangedman pos when summoned.
   if (key === "m1" && ab.kind === "melee" && !input.aim) {
-    const origin = (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos : w.player.pos;
+    let origin = w.player.pos;
+    if (w.standId === "ebony_devil" && w.puppet.active) origin = w.puppet.pos;
+    else if (w.standId === "hanged_man" && w.hangedManActive) origin = w.hangedMan.pos;
     const reach = ab.range + (ab.radius ?? 14);
     const t = nearestAnyNpc(w, origin, reach + 12);
     if (!t) return; // silent — feels better than a banner spam on hold
@@ -833,9 +835,10 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   switch (ab.kind) {
     case "melee": {
       const angle = Math.atan2(dir.y, dir.x);
-      // Ebony Devil M1: only the puppet swings (does its own bigger damage). Owner barely scratches.
+      // Ebony Devil M1: only the puppet swings. Hanged Man M1: swings from the stand body.
       const usePuppetOrigin = w.standId === "ebony_devil" && w.puppet.active && key === "m1";
-      const origin = usePuppetOrigin ? w.puppet.pos : p;
+      const useHangedOrigin = w.standId === "hanged_man" && w.hangedManActive && key === "m1";
+      const origin = usePuppetOrigin ? w.puppet.pos : useHangedOrigin ? w.hangedMan.pos : p;
       const reach = ab.range + (ab.radius ?? 14);
       // slash arc VFX so misses still feel responsive
       spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.2 });
