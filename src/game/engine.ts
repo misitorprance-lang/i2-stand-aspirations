@@ -2239,8 +2239,7 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
       break;
     }
   }
-  }
-  tag(21, 32, true); // rocks
+}
 
 
 // ---- public toggles for UI ----
