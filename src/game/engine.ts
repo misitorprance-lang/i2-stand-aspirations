@@ -462,6 +462,13 @@ export function createWorld(): World {
   };
 }
 
+// A prop is solid only if it has HP left (or it isn't destructible).
+function propSolid(p: Prop): boolean {
+  if (p.destructible === false) return true;
+  if (p.destructible && (p.hp ?? 0) <= 0) return false;
+  return true;
+}
+
 // movement with collision
 function tryMove(e: Entity, dx: number, dy: number, props: Prop[]) {
   // X axis
@@ -469,14 +476,14 @@ function tryMove(e: Entity, dx: number, dy: number, props: Prop[]) {
   if (nx - e.radius < 0) nx = e.radius;
   if (nx + e.radius > MAP_W) nx = MAP_W - e.radius;
   let blocked = false;
-  for (const p of props) if (circleRectOverlap(nx, e.pos.y, e.radius, p.rect)) { blocked = true; break; }
+  for (const p of props) if (propSolid(p) && circleRectOverlap(nx, e.pos.y, e.radius, p.rect)) { blocked = true; break; }
   if (!blocked) e.pos.x = nx;
 
   let ny = e.pos.y + dy;
   if (ny - e.radius < 0) ny = e.radius;
   if (ny + e.radius > MAP_H) ny = MAP_H - e.radius;
   blocked = false;
-  for (const p of props) if (circleRectOverlap(e.pos.x, ny, e.radius, p.rect)) { blocked = true; break; }
+  for (const p of props) if (propSolid(p) && circleRectOverlap(e.pos.x, ny, e.radius, p.rect)) { blocked = true; break; }
   if (!blocked) e.pos.y = ny;
 }
 
