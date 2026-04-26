@@ -10,8 +10,10 @@ import type {
   Crater,
   DamageNumber,
   Entity,
+  Frog,
   ItemPickup,
   Particle,
+  ProtectionTree,
   PuppetState,
   Projectile,
   Prop,
@@ -26,29 +28,33 @@ import { play, type SfxKey } from "./sound";
 // ---------- constants ----------
 export const VW = 360;
 export const VH = 640;
-export const MAP_W = 900;
-export const MAP_H = 1400;
-export const CAMERA_ZOOM = 1.35;
+export const MAP_W = 1350;
+export const MAP_H = 2100;
+export const CAMERA_ZOOM = 1.7;
 
 const PLAYER_SPEED = 110;
 const PLAYER_SPRINT_SPEED = 142;
+const PLAYER_ACCEL = 14; // higher = snappier
 const NPC_SPEED = 55;
 const ENEMY_SPEED = 70;
 const ENEMY_AGGRO = 140;
 const ENEMY_ATTACK_RANGE = 22;
-const ENEMY_ATTACK_DMG = 6;
-const ENEMY_ATTACK_CD = 1.2;
+const ENEMY_ATTACK_DMG_MIN = 2;
+const ENEMY_ATTACK_DMG_MAX = 4;
+const ENEMY_ATTACK_CD = 1.3;
 const PLAYER_MAX_HP = 100;
 const NPC_MAX_HP = 30;
 const ENEMY_MAX_HP = 45;
 const RESPAWN_DELAY = 6;
-const FRIENDLY_COUNT = 5;
-const ENEMY_COUNT = 4;
-const ARROW_INTERVAL = [10, 18] as const;
-const DISC_INTERVAL = [22, 38] as const;
-const MAX_ITEMS_ON_GROUND = 4;
+const FRIENDLY_COUNT = 7;
+const ENEMY_COUNT = 6;
+const ARROW_INTERVAL = [12, 22] as const;
+const DISC_INTERVAL = [28, 46] as const;
+const MAX_ARROWS_ON_GROUND = 2;
+const MAX_DISCS_ON_GROUND = 1;
 const PICKUP_RADIUS = 18;
-const AIM_ASSIST_RANGE = 260;
+const AIM_ASSIST_RANGE = 220;
+const FROG_MAX = 3;
 
 // ---------- helpers ----------
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -115,6 +121,7 @@ interface World {
   cdTimers: { m1: number; a1: number; a2: number; a3: number; a4: number };
   standId: StandId;
   shitVariant: boolean;
+  standActive: boolean; // can be toggled off (desummon)
   bannerText: string | null;
   bannerUntil: number;
   nextId: number;
@@ -130,6 +137,13 @@ interface World {
   puppet: PuppetState;
   rage: number;
   rageUntil: number;
+  // Gold Experience
+  frogs: Frog[];
+  trees: ProtectionTree[];
+  geBuffUntil: number; // damage boost while in tree
+  hologramHits: { entityId: number; expireAt: number; from: Vec2 }[];
+  // M1 hold-to-repeat
+  m1Held: boolean;
 }
 
 function makeProps(): Prop[] {
@@ -137,7 +151,7 @@ function makeProps(): Prop[] {
 
   // Trees (round canopies + brown trunk; collision = trunk + roots area, smaller than canopy)
   const treeSpots: Vec2[] = [];
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < 42; i++) {
     let tries = 0;
     while (tries++ < 20) {
       const x = rand(40, MAP_W - 60);
@@ -168,7 +182,7 @@ function makeProps(): Prop[] {
   }
 
   // Rocks (gray ovals)
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 21; i++) {
     const x = rand(30, MAP_W - 30), y = rand(30, MAP_H - 30);
     const w = rand(18, 30), h = rand(12, 18);
     const r: Rect = { x: x - w / 2, y: y - h / 2, w, h };
@@ -188,7 +202,7 @@ function makeProps(): Prop[] {
   }
 
   // Bushes (small dark green) — non-blocking? Make them blocking small
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 27; i++) {
     const x = rand(20, MAP_W - 20), y = rand(20, MAP_H - 20);
     const r: Rect = { x: x - 9, y: y - 7, w: 18, h: 14 };
     props.push({
@@ -204,11 +218,13 @@ function makeProps(): Prop[] {
     });
   }
 
-  // Houses (a couple) — bigger collision
+  // Houses (5) — bigger collision; placed at varied locations across the bigger map
   const houses: Vec2[] = [
-    { x: 180, y: 250 },
-    { x: 700, y: 900 },
-    { x: 250, y: 1100 },
+    { x: 220, y: 320 },
+    { x: 1050, y: 480 },
+    { x: 380, y: 1500 },
+    { x: 1100, y: 1700 },
+    { x: 700, y: 1100 },
   ];
   for (const h of houses) {
     const r: Rect = { x: h.x - 40, y: h.y - 30, w: 80, h: 60 };
@@ -238,7 +254,7 @@ function makeProps(): Prop[] {
   }
 
   // Fence segments
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 9; i++) {
     const x = rand(50, MAP_W - 100);
     const y = rand(50, MAP_H - 50);
     const w = rand(60, 120);
@@ -259,19 +275,40 @@ function makeProps(): Prop[] {
   return props;
 }
 
-function freeSpot(props: Prop[], radius: number): Vec2 {
-  for (let i = 0; i < 100; i++) {
-    const x = rand(30, MAP_W - 30);
-    const y = rand(30, MAP_H - 30);
+// Strict spawn: never inside a prop, never inside an existing crater, never on player.
+function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?: number; craters?: Crater[] }): Vec2 | null {
+  const padding = 6;
+  for (let i = 0; i < 80; i++) {
+    const x = rand(40, MAP_W - 40);
+    const y = rand(40, MAP_H - 40);
     let ok = true;
-    for (const p of props) if (circleRectOverlap(x, y, radius + 4, p.rect)) { ok = false; break; }
-    if (ok) return { x, y };
+    for (const p of props) {
+      if (circleRectOverlap(x, y, radius + padding, p.rect)) { ok = false; break; }
+    }
+    if (!ok) continue;
+    if (opts?.craters) {
+      for (const c of opts.craters) {
+        const dx = x - c.pos.x, dy = y - c.pos.y;
+        if (dx * dx + dy * dy < (c.radius + radius) ** 2) { ok = false; break; }
+      }
+    }
+    if (!ok) continue;
+    if (opts?.avoid) {
+      const dx = x - opts.avoid.x, dy = y - opts.avoid.y;
+      if (dx * dx + dy * dy < (opts.avoidR ?? 24) ** 2) continue;
+    }
+    return { x, y };
   }
-  return { x: MAP_W / 2, y: MAP_H / 2 };
+  return null;
+}
+
+// Fallback when caller MUST have a spot (npc creation at world init)
+function freeSpotOrCenter(props: Prop[], radius: number): Vec2 {
+  return freeSpot(props, radius) ?? { x: MAP_W / 2, y: MAP_H / 2 };
 }
 
 function makeNpc(props: Prop[], kind: "friendly" | "enemy", id: number): Entity {
-  const pos = freeSpot(props, 10);
+  const pos = freeSpotOrCenter(props, 10);
   return {
     id,
     kind,
@@ -328,6 +365,7 @@ export function createWorld(): World {
     cdTimers: { m1: 0, a1: 0, a2: 0, a3: 0, a4: 0 },
     standId: "none",
     shitVariant: false,
+    standActive: true,
     bannerText: null,
     bannerUntil: 0,
     nextId: 1000,
@@ -340,6 +378,11 @@ export function createWorld(): World {
     kills: 0,
     footstepAcc: 0,
     pointerAim: null,
+    frogs: [],
+    trees: [],
+    geBuffUntil: 0,
+    hologramHits: [],
+    m1Held: false,
     puppet: {
       active: false,
       pos: { x: player.pos.x - 14, y: player.pos.y + 10 },
@@ -472,11 +515,26 @@ function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, preferEne
 }
 
 function aimDir(w: World, input: InputState, ab?: Ability): Vec2 {
+  // Manual aim wins
   if (input.aim) return norm(input.aim);
-  if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
-  const target = nearestTarget(w, w.player.pos, ab?.range ? Math.max(ab.range + 70, AIM_ASSIST_RANGE * 0.65) : AIM_ASSIST_RANGE * 0.65);
+  // Target-locked aim: use the ability's range (with fallback) so long-range moves still find targets
+  const range = ab?.range && ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : AIM_ASSIST_RANGE;
+  const target = nearestTarget(w, w.player.pos, range);
   if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+  // Fall back to joystick / facing
+  if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
   return w.player.facing;
+}
+
+// Returns the actual point we want to aim at (an entity if found, else a point along dir)
+function resolveTargetPos(w: World, ab: Ability, dir: Vec2, origin: Vec2): { target: Entity | null; pos: Vec2 } {
+  const range = ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : Math.max(ab.range + 60, 80);
+  const target = nearestTarget(w, origin, range);
+  if (target) return { target, pos: { ...target.pos } };
+  return {
+    target: null,
+    pos: { x: origin.x + dir.x * Math.max(40, ab.range), y: origin.y + dir.y * Math.max(40, ab.range) },
+  };
 }
 
 function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: number, damage: number, knockbackAmount?: number) {
@@ -527,14 +585,27 @@ function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
     if (key === "a3") return "spin";
     return "rage";
   }
+  if (sid === "gold_experience") {
+    if (key === "m1") return "punch";
+    if (key === "a1") return "eagle";
+    if (key === "a2") return "frog";
+    if (key === "a3") return "hologram";
+    return "tree";
+  }
   return "punch";
 }
 
 function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: InputState) {
   const stand = STANDS[w.standId];
   if (stand.id === "none" && key !== "m1") return;
+  // Stand desummoned: no abilities work (M1 = no-stand fallback below at "none")
+  if (stand.id !== "none" && !w.standActive) {
+    w.bannerText = "Resummon stand to attack";
+    w.bannerUntil = w.time + 0.8;
+    return;
+  }
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode"].includes(ab.kind)) return;
+  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone"].includes(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
   if (ab.kind === "rage_mode" && w.rage < 100) {
     w.bannerText = "Rage not ready";
@@ -553,7 +624,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
 
   // Stand aiming: project the stand model toward the cast target/direction
   w.standAimUntil = w.time + 0.4;
-  if (ab.kind === "aoe_target" || ab.kind === "lobbed" || ab.kind === "stun_touch" || ab.kind === "knockback" || ab.kind === "channel_cone" || ab.kind === "pierce" || ab.kind === "projectile") {
+  if (ab.kind === "aoe_target" || ab.kind === "lobbed" || ab.kind === "stun_touch" || ab.kind === "knockback" || ab.kind === "channel_cone" || ab.kind === "pierce" || ab.kind === "projectile" || ab.kind === "auto_aim" || ab.kind === "chain_projectile" || ab.kind === "hologram_stun") {
     w.standAimTarget = { x: w.player.pos.x + dir.x * Math.min(ab.range, 60), y: w.player.pos.y + dir.y * Math.min(ab.range, 60) };
   }
 
@@ -607,10 +678,12 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "projectile": {
+      const { target } = resolveTargetPos(w, ab, dir, p);
+      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
       w.projectiles.push({
         id: w.nextId++,
         pos: { x: p.x, y: p.y },
-        vel: { x: dir.x * ab.speed!, y: dir.y * ab.speed! },
+        vel: { x: shootDir.x * ab.speed!, y: shootDir.y * ab.speed! },
         radius: ab.radius || 6,
         damage: ab.damage,
         color: ab.color,
@@ -618,17 +691,25 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         pierce: false,
         hitSet: new Set(),
         expireAt: w.time + ab.range / ab.speed!,
+        homingTargetId: target?.id,
+        homingStrength: 0.12,
+        speed: ab.speed,
+        applyElectro: w.standId === "rhcp" ? 0.7 : undefined,
       });
+      if (target) w.standAimTarget = { ...target.pos };
       // muzzle flash
-      spawnParticles(w, { x: p.x + dir.x * 10, y: p.y + dir.y * 10 }, ab.color, 6, { speedMin: 40, speedMax: 120, life: 0.2 });
+      spawnParticles(w, { x: p.x + shootDir.x * 10, y: p.y + shootDir.y * 10 }, ab.color, 6, { speedMin: 40, speedMax: 120, life: 0.2 });
       break;
     }
     case "lobbed": {
-      const travelTime = ab.range / ab.speed!;
+      const { target, pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const lobDir = target ? norm({ x: aimPos.x - p.x, y: aimPos.y - p.y }) : dir;
+      const dist = target ? Math.hypot(aimPos.x - p.x, aimPos.y - p.y) : ab.range;
+      const travelTime = Math.min(ab.range, dist) / ab.speed!;
       w.projectiles.push({
         id: w.nextId++,
         pos: { x: p.x, y: p.y },
-        vel: { x: dir.x * ab.speed!, y: dir.y * ab.speed! },
+        vel: { x: lobDir.x * ab.speed!, y: lobDir.y * ab.speed! },
         radius: 5,
         damage: 0,
         color: ab.color,
@@ -662,8 +743,16 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "aoe_target": {
-      const tx = p.x + dir.x * ab.range;
-      const ty = p.y + dir.y * ab.range;
+      // Drop AOE on the actual target if there is one in range, else along facing direction
+      const { target, pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      let tx: number, ty: number;
+      if (target) { tx = target.pos.x; ty = target.pos.y; }
+      else {
+        const dist = Math.hypot(aimPos.x - p.x, aimPos.y - p.y);
+        const clamped = Math.min(ab.range, dist);
+        tx = p.x + dir.x * clamped;
+        ty = p.y + dir.y * clamped;
+      }
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
@@ -806,7 +895,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "auto_aim": {
-      const target = nearestTarget(w, p, ab.range);
+      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
       if (target) {
         w.standAimTarget = { ...target.pos };
         w.standAimUntil = w.time + 0.5;
@@ -825,12 +914,94 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       }
       break;
     }
+    case "chain_projectile": {
+      const { target } = resolveTargetPos(w, ab, dir, p);
+      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      w.projectiles.push({
+        id: w.nextId++,
+        pos: { x: p.x, y: p.y },
+        vel: { x: shootDir.x * ab.speed!, y: shootDir.y * ab.speed! },
+        radius: ab.radius || 6,
+        damage: ab.damage,
+        color: ab.color,
+        ownerKind: "player",
+        pierce: true,
+        hitSet: new Set(),
+        expireAt: w.time + ab.range / ab.speed!,
+        homingTargetId: target?.id,
+        homingStrength: 0.18,
+        speed: ab.speed,
+        chainsLeft: 4,
+        chainRange: 90,
+        chainColor: ab.color,
+      });
+      if (target) w.standAimTarget = { ...target.pos };
+      spawnParticles(w, p, ab.color, 8, { speedMin: 40, speedMax: 160, life: 0.3 });
+      break;
+    }
+    case "frog_summon": {
+      if (w.frogs.filter((f) => f.alive).length >= FROG_MAX) {
+        w.bannerText = "Max 3 frogs out";
+        w.bannerUntil = w.time + 0.9;
+        w.cdTimers[key] = 0.5;
+        break;
+      }
+      w.frogs.push({
+        id: w.nextId++,
+        pos: { x: p.x - dir.x * 12 + rand(-6, 6), y: p.y - dir.y * 12 + rand(-6, 6) },
+        bobPhase: Math.random() * Math.PI * 2,
+        alive: true,
+      });
+      spawnParticles(w, p, ab.color, 8, { speedMin: 30, speedMax: 80, life: 0.4, gravity: 80 });
+      break;
+    }
+    case "hologram_stun": {
+      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
+      if (!target) {
+        w.bannerText = "No target";
+        w.bannerUntil = w.time + 0.7;
+        w.cdTimers[key] = 1.5;
+        spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 22, color: ab.color, life: 0.25 });
+        break;
+      }
+      w.standAimTarget = { ...target.pos };
+      w.standAimUntil = w.time + 0.6;
+      damageEntity(w, target, ab.damage);
+      const stunDur = ab.stunSeconds ?? 3.5;
+      target.stunUntil = Math.max(target.stunUntil, w.time + stunDur);
+      target.hologramUntil = w.time + stunDur;
+      // hologram appears behind target (opposite of player->target)
+      const back = norm({ x: target.pos.x - p.x, y: target.pos.y - p.y });
+      target.hologramOrigin = { x: target.pos.x + back.x * 18, y: target.pos.y + back.y * 18 };
+      spawnVfx(w, { kind: "hologram_burst", pos: { ...target.pos }, color: ab.color, life: 0.5 });
+      spawnVfx(w, { kind: "beam", pos: { ...p }, to: { ...target.pos }, color: ab.color, life: 0.3 });
+      spawnParticles(w, target.pos, ab.color, 16, { speedMin: 50, speedMax: 140, life: 0.6 });
+      w.shake = Math.max(w.shake, 5);
+      break;
+    }
+    case "tree_zone": {
+      const tx = p.x + dir.x * Math.min(ab.range, 60);
+      const ty = p.y + dir.y * Math.min(ab.range, 60);
+      w.trees.push({
+        pos: { x: tx, y: ty },
+        radius: ab.radius!,
+        bornAt: w.time,
+        expireAt: w.time + (ab.duration ?? 6),
+        rooted: new Map(),
+      });
+      spawnVfx(w, { kind: "tree_aura", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: ab.duration! });
+      spawnParticles(w, { x: tx, y: ty }, ab.color, 18, { speedMin: 40, speedMax: 120, life: 0.6 });
+      break;
+    }
   }
 }
 
 function trySpawnItem(w: World, kind: "arrow" | "disc") {
-  if (w.items.length >= MAX_ITEMS_ON_GROUND) return;
-  const pos = freeSpot(w.props, 10);
+  const cap = kind === "arrow" ? MAX_ARROWS_ON_GROUND : MAX_DISCS_ON_GROUND;
+  const existing = w.items.filter((it) => it.kind === kind).length;
+  if (existing >= cap) return;
+  const pos = freeSpot(w.props, 10, { avoid: w.player.pos, avoidR: 28, craters: w.craters });
+  if (!pos) return;
   w.items.push({ id: w.nextId++, kind, pos, bornAt: w.time });
 }
 
@@ -890,12 +1061,16 @@ export function update(w: World, input: InputState, dt: number) {
   for (const e of w.npcs) {
     if (!e.alive) {
       if (e.respawnAt && w.time >= e.respawnAt) {
-        // respawn at random spot
-        const spot = freeSpot(w.props, 10);
-        e.pos = spot;
-        e.hp = e.maxHp;
-        e.alive = true;
-        e.provoked = false;
+        // respawn at strict free spot
+        const spot = freeSpot(w.props, 10, { avoid: w.player.pos, avoidR: 80, craters: w.craters });
+        if (spot) {
+          e.pos = spot;
+          e.hp = e.maxHp;
+          e.alive = true;
+          e.provoked = false;
+        } else {
+          e.respawnAt = w.time + 1; // try again soon
+        }
       }
       continue;
     }
@@ -913,19 +1088,32 @@ export function update(w: World, input: InputState, dt: number) {
 
     if (e.kind === "enemy" && e.provoked && pl.alive && dist2(e.pos, pl.pos) < ENEMY_AGGRO * ENEMY_AGGRO) {
       const puppetCloser = w.puppet.active && dist2(e.pos, w.puppet.pos) < dist2(e.pos, pl.pos);
-      const targetPos = puppetCloser ? w.puppet.pos : pl.pos;
+      // Frog interception: if a frog is closer than the player, hit the frog instead
+      const aliveFrogs = w.frogs.filter((f) => f.alive);
+      let frogTarget: Frog | null = null;
+      for (const f of aliveFrogs) {
+        if (dist2(f.pos, e.pos) < dist2(pl.pos, e.pos) && dist2(f.pos, e.pos) < 50 * 50) { frogTarget = f; break; }
+      }
+      const targetPos = frogTarget ? frogTarget.pos : (puppetCloser ? w.puppet.pos : pl.pos);
       const dir = norm({ x: targetPos.x - e.pos.x, y: targetPos.y - e.pos.y });
       tryMove(e, dir.x * ENEMY_SPEED * dt, dir.y * ENEMY_SPEED * dt, w.props);
       e.facing = dir;
       if (dist(e.pos, targetPos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
         e.nextAttackAt = w.time + ENEMY_ATTACK_CD;
-        if (puppetCloser) damagePuppet(w, ENEMY_ATTACK_DMG);
-        else damageEntity(w, pl, ENEMY_ATTACK_DMG, { dir, amount: 40 });
+        const dmg = rand(ENEMY_ATTACK_DMG_MIN, ENEMY_ATTACK_DMG_MAX);
+        if (frogTarget) {
+          // Frog absorbs and reflects 50% back
+          frogTarget.alive = false;
+          spawnParticles(w, frogTarget.pos, "#7fc97f", 14, { gravity: 80, life: 0.6 });
+          play("frog");
+          damageEntity(w, e, dmg * 0.5);
+        } else if (puppetCloser) damagePuppet(w, dmg);
+        else damageEntity(w, pl, dmg, { dir, amount: 40 });
       }
     } else {
       // wander
       if (!e.wanderUntil || w.time >= e.wanderUntil || !e.wanderTarget) {
-        e.wanderTarget = freeSpot(w.props, 10);
+        e.wanderTarget = freeSpotOrCenter(w.props, 10);
         e.wanderUntil = w.time + rand(2, 5);
       }
       const tgt = e.wanderTarget;
@@ -1000,8 +1188,21 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
-  // Projectiles
+  // Projectiles — homing steering for projectiles with a target id
   for (const pr of w.projectiles) {
+    if (pr.homingTargetId !== undefined && pr.speed) {
+      const tgt = w.npcs.find((n) => n.id === pr.homingTargetId && n.alive);
+      if (tgt) {
+        const want = norm({ x: tgt.pos.x - pr.pos.x, y: tgt.pos.y - pr.pos.y });
+        const cur = norm(pr.vel);
+        const k = pr.homingStrength ?? 0.1;
+        const nx = cur.x * (1 - k) + want.x * k;
+        const ny = cur.y * (1 - k) + want.y * k;
+        const nm = Math.hypot(nx, ny) || 1;
+        pr.vel.x = (nx / nm) * pr.speed;
+        pr.vel.y = (ny / nm) * pr.speed;
+      }
+    }
     pr.pos.x += pr.vel.x * dt;
     pr.pos.y += pr.vel.y * dt;
   }
@@ -1237,17 +1438,17 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   for (const it of w.items) {
     const bob = Math.sin((w.time - it.bornAt) * 4) * 2;
     const cx = it.pos.x, cy = it.pos.y + bob;
+    const SC = 0.7; // smaller items
     // soft drop shadow
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath(); ctx.ellipse(it.pos.x, it.pos.y + 6, 6, 2, 0, 0, Math.PI * 2); ctx.fill();
     if (it.kind === "arrow") {
       ctx.save();
       ctx.translate(cx, cy);
+      ctx.scale(SC, SC);
       ctx.rotate(-Math.PI / 4);
-      // shaft
       ctx.fillStyle = "#3a2418";
       ctx.fillRect(-8, -1, 13, 2);
-      // arrowhead
       ctx.fillStyle = "#caa14a";
       ctx.beginPath();
       ctx.moveTo(5, -5); ctx.lineTo(10, 0); ctx.lineTo(5, 5); ctx.closePath();
@@ -1256,40 +1457,33 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
       ctx.beginPath();
       ctx.moveTo(6, -2); ctx.lineTo(9, 0); ctx.lineTo(6, 2); ctx.closePath();
       ctx.fill();
-      // fletching
       ctx.fillStyle = "#caa14a";
       ctx.fillRect(-10, -3, 3, 6);
       ctx.fillStyle = "#5a3a1c";
       ctx.fillRect(-10, -1, 3, 2);
       ctx.restore();
     } else {
-      // DISC — chrome metallic vinyl with hollow center and "DISC" label
-      // outer ring (chrome gradient feel via stacked arcs)
-      const grd = ctx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, 8);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(SC, SC);
+      const grd = ctx.createRadialGradient(-2, -2, 1, 0, 0, 8);
       grd.addColorStop(0, "#f5f5f8");
       grd.addColorStop(0.55, "#a8acb4");
       grd.addColorStop(1, "#5e636c");
       ctx.fillStyle = grd;
-      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
-      // grooves
+      ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.5)";
       ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.stroke();
       ctx.strokeStyle = "rgba(40,40,46,0.5)";
-      ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.stroke();
-      // hollow center (transparent → show grass): draw same color as ground tile beneath approx
+      ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = "#3e8a3a";
-      ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.fill();
-      // tiny chrome bevel
-      ctx.strokeStyle = "rgba(0,0,0,0.6)";
-      ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.stroke();
-      // "DISC" label
-      ctx.save();
+      ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#1a1a1f";
       ctx.font = "bold 4px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("DISC", cx, cy - 5);
+      ctx.fillText("DISC", 0, -5);
       ctx.restore();
     }
   }
@@ -1851,3 +2045,24 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
   }
 }
 
+
+// ---- public toggles for UI ----
+export function toggleStandActive(w: World): boolean {
+  if (w.standId === "none") return w.standActive;
+  w.standActive = !w.standActive;
+  w.bannerText = w.standActive ? "Stand summoned" : "Stand desummoned";
+  w.bannerUntil = w.time + 1.0;
+  if (w.standActive) play("toggleOn");
+  else { play("toggleOff"); w.channel = null; }
+  return w.standActive;
+}
+
+export function tryUseDisc(w: World): { ok: boolean; reason?: string } {
+  if (w.standId === "none") return { ok: false, reason: "No stand to discard" };
+  if (w.standId === "ebony_devil" && w.puppet.active) {
+    w.bannerText = "Desummon puppet first (tap 1)";
+    w.bannerUntil = w.time + 1.4;
+    return { ok: false, reason: "puppet" };
+  }
+  return { ok: true };
+}

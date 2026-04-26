@@ -28,6 +28,25 @@ export interface Entity {
   nextAttackAt?: number;
   // hostile only retaliates after being damaged
   provoked?: boolean;
+  // status effects
+  electroUntil?: number;
+  hologramUntil?: number;
+  hologramOrigin?: Vec2;
+}
+
+export interface Frog {
+  id: number;
+  pos: Vec2;
+  bobPhase: number;
+  alive: boolean;
+}
+
+export interface ProtectionTree {
+  pos: Vec2;
+  radius: number;
+  expireAt: number;
+  bornAt: number;
+  rooted: Map<number, number>; // entityId -> stun-applied-until
 }
 
 export interface Prop {
@@ -51,6 +70,16 @@ export interface Projectile {
   detonateRadius?: number;
   detonateColor?: string;
   detonateCrater?: boolean;
+  // homing toward this target (gentle steering)
+  homingTargetId?: number;
+  homingStrength?: number; // 0..1 each tick
+  speed?: number;
+  // chain lightning style: on hit, jump to next nearest within range
+  chainsLeft?: number;
+  chainRange?: number;
+  chainColor?: string;
+  // applies electrocute status on hit
+  applyElectro?: number;
 }
 
 export interface Zone {
@@ -126,7 +155,10 @@ export type VfxKind =
   | "stab_line"      // forward streak
   | "beam"           // straight beam between points
   | "explosion_ring" // big blast
-  | "crater_smoke";  // smoke after explosion
+  | "crater_smoke"   // smoke after explosion
+  | "tree_aura"      // protection tree dome
+  | "hologram_burst" // out-of-body hologram pop
+  | "chain_arc";     // chain-lightning hop
 
 export interface Vfx {
   kind: VfxKind;
