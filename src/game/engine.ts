@@ -1250,7 +1250,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     }
     case "mirror_shard": {
       // Drop a chrome shard at the stand's position (or player). Creates a combat dome.
-      const origin = w.pilotActive ? w.hangedMan.pos : w.player.pos;
+      const origin = w.hangedManActive ? w.hangedMan.pos : w.player.pos;
       w.shards.push({
         id: w.nextId++,
         pos: { x: origin.x, y: origin.y },
@@ -1281,7 +1281,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     case "brutal_slash": {
       // Big slash: heavy damage, bleed, stun, slow.
       const angle = Math.atan2(dir.y, dir.x);
-      const origin = w.pilotActive ? w.hangedMan.pos : p;
+      const origin = w.hangedManActive ? w.hangedMan.pos : p;
       const reach = ab.range + (ab.radius ?? 16);
       spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.32 });
       for (const e of w.npcs) {
@@ -2724,7 +2724,7 @@ export function teleportToShard(w: World, shardId: number) {
   w.shardPickerOpen = false;
   if (!s) return;
   // flash at origin and destination
-  const origin = w.pilotActive ? w.hangedMan.pos : w.player.pos;
+  const origin = w.hangedManActive ? w.hangedMan.pos : w.player.pos;
   spawnVfx(w, { kind: "shard_flash", pos: { x: origin.x, y: origin.y }, radius: 24, color: "#dfe6f0", life: 0.4 });
   if (w.pilotActive) {
     w.hangedMan.pos = { x: s.pos.x, y: s.pos.y };
