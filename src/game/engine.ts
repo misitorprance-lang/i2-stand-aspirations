@@ -1736,7 +1736,25 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   type Drawable = { y: number; draw: () => void };
   const drawables: Drawable[] = [];
   for (const p of w.props) {
-    drawables.push({ y: p.rect.y + p.rect.h, draw: () => p.draw(ctx, p.rect) });
+    if (!propSolid(p)) continue;
+    drawables.push({ y: p.rect.y + p.rect.h, draw: () => {
+      p.draw(ctx, p.rect);
+      // damage cracks overlay when below 50% hp
+      if (p.maxHp && p.hp !== undefined && p.hp < p.maxHp * 0.5) {
+        ctx.strokeStyle = "rgba(0,0,0,0.45)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(p.rect.x + 2, p.rect.y + p.rect.h * 0.3);
+        ctx.lineTo(p.rect.x + p.rect.w - 4, p.rect.y + p.rect.h * 0.65);
+        ctx.moveTo(p.rect.x + p.rect.w * 0.6, p.rect.y + 2);
+        ctx.lineTo(p.rect.x + p.rect.w * 0.3, p.rect.y + p.rect.h - 2);
+        ctx.stroke();
+      }
+      if (p.hitFlashUntil && w.time < p.hitFlashUntil) {
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        ctx.fillRect(p.rect.x, p.rect.y, p.rect.w, p.rect.h);
+      }
+    }});
   }
   // player
   const pl = w.player;
