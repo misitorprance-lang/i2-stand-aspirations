@@ -211,6 +211,8 @@ function makeProps(): Prop[] {
     });
   }
   tag(treeSpots.length, 18, true); // trees
+
+  // Rocks (gray ovals)
   for (let i = 0; i < 21; i++) {
     const x = rand(30, MAP_W - 30), y = rand(30, MAP_H - 30);
     const w = rand(18, 30), h = rand(12, 18);
