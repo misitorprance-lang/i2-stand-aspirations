@@ -1445,11 +1445,10 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     if (it.kind === "arrow") {
       ctx.save();
       ctx.translate(cx, cy);
+      ctx.scale(SC, SC);
       ctx.rotate(-Math.PI / 4);
-      // shaft
       ctx.fillStyle = "#3a2418";
       ctx.fillRect(-8, -1, 13, 2);
-      // arrowhead
       ctx.fillStyle = "#caa14a";
       ctx.beginPath();
       ctx.moveTo(5, -5); ctx.lineTo(10, 0); ctx.lineTo(5, 5); ctx.closePath();
@@ -1458,40 +1457,33 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
       ctx.beginPath();
       ctx.moveTo(6, -2); ctx.lineTo(9, 0); ctx.lineTo(6, 2); ctx.closePath();
       ctx.fill();
-      // fletching
       ctx.fillStyle = "#caa14a";
       ctx.fillRect(-10, -3, 3, 6);
       ctx.fillStyle = "#5a3a1c";
       ctx.fillRect(-10, -1, 3, 2);
       ctx.restore();
     } else {
-      // DISC — chrome metallic vinyl with hollow center and "DISC" label
-      // outer ring (chrome gradient feel via stacked arcs)
-      const grd = ctx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, 8);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(SC, SC);
+      const grd = ctx.createRadialGradient(-2, -2, 1, 0, 0, 8);
       grd.addColorStop(0, "#f5f5f8");
       grd.addColorStop(0.55, "#a8acb4");
       grd.addColorStop(1, "#5e636c");
       ctx.fillStyle = grd;
-      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
-      // grooves
+      ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.5)";
       ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.stroke();
       ctx.strokeStyle = "rgba(40,40,46,0.5)";
-      ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.stroke();
-      // hollow center (transparent → show grass): draw same color as ground tile beneath approx
+      ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = "#3e8a3a";
-      ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.fill();
-      // tiny chrome bevel
-      ctx.strokeStyle = "rgba(0,0,0,0.6)";
-      ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.stroke();
-      // "DISC" label
-      ctx.save();
+      ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#1a1a1f";
       ctx.font = "bold 4px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("DISC", cx, cy - 5);
+      ctx.fillText("DISC", 0, -5);
       ctx.restore();
     }
   }
