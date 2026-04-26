@@ -87,10 +87,20 @@ export const SFX = {
   hurt:         () => { tone(300, 0.12, "sawtooth", 0.35, 120); noise(0.08, 0.2, 600); },
   footstep:     () => { noise(0.04, 0.06, 350, "lowpass"); },
   standSummon:  () => { tone(220, 0.25, "triangle", 0.3, 660); tone(440, 0.2, "sine", 0.2, 880); },
+  standDismiss: () => { tone(660, 0.15, "triangle", 0.25, 220); tone(330, 0.18, "sine", 0.18, 110); },
   puppet:       () => { tone(260, 0.12, "triangle", 0.25, 520); tone(130, 0.18, "sawtooth", 0.18, 90); },
   spear:        () => { tone(760, 0.12, "sawtooth", 0.28, 320); noise(0.07, 0.12, 1800, "highpass"); },
   spin:         () => { tone(440, 0.22, "triangle", 0.28, 880); noise(0.16, 0.12, 1200); },
   rage:         () => { tone(90, 0.45, "sawtooth", 0.45, 45); tone(180, 0.25, "square", 0.25, 260); },
+  eagle:        () => { tone(1400, 0.1, "triangle", 0.3, 2200); tone(900, 0.08, "triangle", 0.2, 1500); },
+  chain:        () => { tone(1800, 0.05, "square", 0.2, 2400); },
+  frog:         () => { tone(180, 0.06, "square", 0.25, 320); tone(140, 0.1, "triangle", 0.2, 90); },
+  hologram:     () => { tone(520, 0.3, "sine", 0.3, 880); tone(330, 0.35, "triangle", 0.2, 220); },
+  tree:         () => { tone(110, 0.45, "sine", 0.4, 220); tone(330, 0.3, "triangle", 0.25, 660); },
+  bleed:        () => { noise(0.08, 0.12, 500, "lowpass"); },
+  electrocute:  () => { tone(2400, 0.04, "square", 0.18, 3200); },
+  toggleOn:     () => { tone(440, 0.08, "triangle", 0.25, 880); tone(660, 0.08, "triangle", 0.25, 1320); },
+  toggleOff:    () => { tone(660, 0.08, "triangle", 0.25, 440); tone(330, 0.1, "triangle", 0.2, 165); },
 };
 
 export type SfxKey = keyof typeof SFX;
