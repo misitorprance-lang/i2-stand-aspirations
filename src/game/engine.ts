@@ -916,6 +916,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - p.x, y: e.pos.y - p.y }), amount: 60 });
         }
       }
+      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage);
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: ab.radius!, color: ab.color, life: 0.45 });
       // arcing lightning to nearby targets
       for (const e of w.npcs) {
