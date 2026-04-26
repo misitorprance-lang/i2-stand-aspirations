@@ -2490,6 +2490,39 @@ function drawPuppet(ctx: CanvasRenderingContext2D, w: World) {
   if (p.hp < p.maxHp) drawHpBar(ctx, p.pos.x, p.pos.y - 15, p.hp / p.maxHp);
 }
 
+function drawWhiteAlbum(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  // ice trail tiles (under everything)
+  for (const tile of w.icePath) {
+    const a = Math.max(0, 1 - (w.time - tile.bornAt) / 4);
+    ctx.fillStyle = `rgba(190,235,255,${0.35 * a})`;
+    ctx.beginPath(); ctx.arc(tile.pos.x, tile.pos.y, 8, 0, Math.PI * 2); ctx.fill();
+  }
+  // soft white aura
+  ctx.fillStyle = `rgba(232,234,255,${0.25 + Math.sin(w.time * 6) * 0.05})`;
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, 14, 0, Math.PI * 2); ctx.fill();
+  // body — white w/ purple piping
+  ctx.fillStyle = "#f3f4ff";
+  ctx.fillRect(pos.x - 5, pos.y - 2, 10, 12);
+  ctx.fillStyle = "#7c5cff";
+  ctx.fillRect(pos.x - 5, pos.y + 1, 10, 2);
+  // head
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(pos.x - 4, pos.y - 11, 8, 9);
+  // visor (greenish-yellow)
+  ctx.fillStyle = "#c8e64a";
+  ctx.fillRect(pos.x - 3, pos.y - 8, 6, 2);
+  // ice skates
+  ctx.fillStyle = "#bfe9ff";
+  ctx.beginPath(); ctx.moveTo(pos.x - 5, pos.y + 11); ctx.lineTo(pos.x - 1, pos.y + 13); ctx.lineTo(pos.x - 5, pos.y + 13); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(pos.x + 5, pos.y + 11); ctx.lineTo(pos.x + 1, pos.y + 13); ctx.lineTo(pos.x + 5, pos.y + 13); ctx.closePath(); ctx.fill();
+  if (punching) {
+    ctx.strokeStyle = "rgba(190,235,255,0.85)";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
 function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
   const h = w.hangedMan;
   const attacking = w.time < h.attackUntil;
