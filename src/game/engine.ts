@@ -1960,9 +1960,9 @@ function drawRhcp(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
 }
 
 function drawEchoes(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
-  // Echoes form depends on how many enemies the player has hit/killed (act progression).
-  // Act 1: small with tail. Act 2: bigger humanoid. Act 3: white with green accents.
-  const act = w.shitVariant ? 3 : (w.kills >= 6 ? 3 : w.kills >= 2 ? 2 : 1);
+  // Echoes form is driven by which ability the player last used.
+  // a1 -> Act 1, a2/a3 -> Act 2, a4 (or S.H.I.T.) -> Act 3.
+  const act = w.shitVariant ? 3 : w.echoesAct;
   const punching = w.time < w.standPunchUntil;
   if (act === 1) {
     // small egg-like creature with tail
