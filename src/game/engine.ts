@@ -668,19 +668,25 @@ function nearestAnyNpc(w: World, from: Vec2, range = AIM_ASSIST_RANGE): Entity |
 function aimDir(w: World, input: InputState, ab?: Ability, key?: "m1" | "a1" | "a2" | "a3" | "a4"): Vec2 {
   // Manual aim wins
   if (input.aim) return norm(input.aim);
-  // M1: lock onto closest NPC of any kind. For Ebony Devil w/ active puppet, aim from puppet's pos.
+  // Resolve the body that's actually attacking — for Ebony Devil/Hanged Man with their stand summoned,
+  // the puppet/Hanged Man is the one swinging, so they should aim from THEIR position.
+  const body =
+    (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos :
+    (w.standId === "hanged_man" && w.hangedManActive) ? w.hangedMan.pos :
+    w.player.pos;
   if (key === "m1") {
-    const origin = (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos : w.player.pos;
-    const t = nearestAnyNpc(w, origin, AIM_ASSIST_RANGE);
-    if (t) return norm({ x: t.pos.x - origin.x, y: t.pos.y - origin.y });
+    const t = nearestAnyNpc(w, body, AIM_ASSIST_RANGE);
+    if (t) return norm({ x: t.pos.x - body.x, y: t.pos.y - body.y });
   } else {
-    // Target-locked aim: use the ability's range (with fallback) so long-range moves still find targets
     const range = ab?.range && ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : AIM_ASSIST_RANGE;
-    const target = nearestTarget(w, w.player.pos, range);
-    if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+    const target = nearestTarget(w, body, range);
+    if (target) return norm({ x: target.pos.x - body.x, y: target.pos.y - body.y });
   }
   // Fall back to joystick / facing
   if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
+  // Use the stand body's facing if it has one
+  if (w.standId === "ebony_devil" && w.puppet.active) return w.puppet.facing;
+  if (w.standId === "hanged_man" && w.hangedManActive) return w.hangedMan.facing;
   return w.player.facing;
 }
 
