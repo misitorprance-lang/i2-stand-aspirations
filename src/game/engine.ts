@@ -1093,9 +1093,27 @@ export function update(w: World, input: InputState, dt: number) {
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
       pl.facing = { x: nx, y: ny };
       w.footstepAcc += dt * Math.min(1, len);
-      if (w.footstepAcc >= 0.32) { w.footstepAcc = 0; play("footstep"); }
+      if (w.footstepAcc >= 0.32) {
+        w.footstepAcc = 0;
+        play("footstep");
+        // walking dust puff (brown, gravity)
+        const back = { x: -nx, y: -ny };
+        spawnParticles(w, { x: pl.pos.x + back.x * 4, y: pl.pos.y + 6 + back.y * 2 }, "#a1814a", input.sprint ? 5 : 3, {
+          shape: "square", gravity: 60, speedMin: 8, speedMax: input.sprint ? 60 : 35, life: 0.45,
+        });
+      }
     } else {
       w.footstepAcc = 0.32; // ready to step on next move
+    }
+    // Player regen — slow out-of-combat heal (faster while standing in tree zone, handled later).
+    const recentlyHurt = w.time - pl.hitFlashUntil < 4.0;
+    if (!recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
+
+    // Bleed particles when below half HP
+    if (pl.hp < pl.maxHp * 0.5 && Math.random() < dt * 5) {
+      spawnParticles(w, { x: pl.pos.x + rand(-3, 3), y: pl.pos.y - 2 }, "#b21717", 1, {
+        shape: "circle", gravity: 120, speedMin: 8, speedMax: 24, life: 0.5,
+      });
     }
   } else {
     if (pl.respawnAt && w.time >= pl.respawnAt) {
@@ -1103,6 +1121,11 @@ export function update(w: World, input: InputState, dt: number) {
       pl.hp = pl.maxHp;
       pl.pos = { x: MAP_W / 2, y: MAP_H / 2 };
     }
+  }
+
+  // M1 hold-to-repeat
+  if (pl.alive && w.m1Held && w.cdTimers.m1 <= 0 && (w.standId === "none" || w.standActive)) {
+    castAbility(w, "m1", input);
   }
 
   if (input.aim) w.pointerAim = norm(input.aim);
