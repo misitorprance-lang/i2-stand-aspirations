@@ -218,11 +218,13 @@ function makeProps(): Prop[] {
     });
   }
 
-  // Houses (a couple) — bigger collision
+  // Houses (5) — bigger collision; placed at varied locations across the bigger map
   const houses: Vec2[] = [
-    { x: 180, y: 250 },
-    { x: 700, y: 900 },
-    { x: 250, y: 1100 },
+    { x: 220, y: 320 },
+    { x: 1050, y: 480 },
+    { x: 380, y: 1500 },
+    { x: 1100, y: 1700 },
+    { x: 700, y: 1100 },
   ];
   for (const h of houses) {
     const r: Rect = { x: h.x - 40, y: h.y - 30, w: 80, h: 60 };
@@ -252,7 +254,7 @@ function makeProps(): Prop[] {
   }
 
   // Fence segments
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 9; i++) {
     const x = rand(50, MAP_W - 100);
     const y = rand(50, MAP_H - 50);
     const w = rand(60, 120);
@@ -273,15 +275,36 @@ function makeProps(): Prop[] {
   return props;
 }
 
-function freeSpot(props: Prop[], radius: number): Vec2 {
-  for (let i = 0; i < 100; i++) {
-    const x = rand(30, MAP_W - 30);
-    const y = rand(30, MAP_H - 30);
+// Strict spawn: never inside a prop, never inside an existing crater, never on player.
+function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?: number; craters?: Crater[] }): Vec2 | null {
+  const padding = 6;
+  for (let i = 0; i < 80; i++) {
+    const x = rand(40, MAP_W - 40);
+    const y = rand(40, MAP_H - 40);
     let ok = true;
-    for (const p of props) if (circleRectOverlap(x, y, radius + 4, p.rect)) { ok = false; break; }
-    if (ok) return { x, y };
+    for (const p of props) {
+      if (circleRectOverlap(x, y, radius + padding, p.rect)) { ok = false; break; }
+    }
+    if (!ok) continue;
+    if (opts?.craters) {
+      for (const c of opts.craters) {
+        const dx = x - c.pos.x, dy = y - c.pos.y;
+        if (dx * dx + dy * dy < (c.radius + radius) ** 2) { ok = false; break; }
+      }
+    }
+    if (!ok) continue;
+    if (opts?.avoid) {
+      const dx = x - opts.avoid.x, dy = y - opts.avoid.y;
+      if (dx * dx + dy * dy < (opts.avoidR ?? 24) ** 2) continue;
+    }
+    return { x, y };
   }
-  return { x: MAP_W / 2, y: MAP_H / 2 };
+  return null;
+}
+
+// Fallback when caller MUST have a spot (npc creation at world init)
+function freeSpotOrCenter(props: Prop[], radius: number): Vec2 {
+  return freeSpot(props, radius) ?? { x: MAP_W / 2, y: MAP_H / 2 };
 }
 
 function makeNpc(props: Prop[], kind: "friendly" | "enemy", id: number): Entity {
