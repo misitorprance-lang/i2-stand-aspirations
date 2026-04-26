@@ -2226,16 +2226,34 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   }
   // body
   const flash = w.time < pl.hitFlashUntil;
-  ctx.fillStyle = flash ? "#ffffff" : "#caa14a";
-  ctx.fillRect(pl.pos.x - 6, pl.pos.y - 2, 12, 10);
-  // head
-  ctx.fillStyle = flash ? "#ffffff" : pl.color;
-  ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
-  // eyes (face direction)
-  const fx = pl.facing.x, fy = pl.facing.y;
-  ctx.fillStyle = "#222";
-  ctx.fillRect(pl.pos.x - 3 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
-  ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+  if (wearingWhiteAlbum) {
+    // Suit body — same silhouette as the player but reskinned white w/ purple trim.
+    ctx.fillStyle = flash ? "#ffffff" : "#f3f4ff";
+    ctx.fillRect(pl.pos.x - 6, pl.pos.y - 2, 12, 10);
+    ctx.fillStyle = flash ? "#ffffff" : "#7c5cff";
+    ctx.fillRect(pl.pos.x - 6, pl.pos.y + 1, 12, 2);
+    // head / helmet
+    ctx.fillStyle = flash ? "#ffffff" : "#ffffff";
+    ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
+    // greenish-yellow visor strip
+    ctx.fillStyle = "#c8e64a";
+    ctx.fillRect(pl.pos.x - 4, pl.pos.y - 7, 8, 2);
+    // ice skate triangles under feet
+    ctx.fillStyle = "#bfe9ff";
+    ctx.beginPath(); ctx.moveTo(pl.pos.x - 6, pl.pos.y + 9); ctx.lineTo(pl.pos.x - 1, pl.pos.y + 12); ctx.lineTo(pl.pos.x - 6, pl.pos.y + 12); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(pl.pos.x + 6, pl.pos.y + 9); ctx.lineTo(pl.pos.x + 1, pl.pos.y + 12); ctx.lineTo(pl.pos.x + 6, pl.pos.y + 12); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle = flash ? "#ffffff" : "#caa14a";
+    ctx.fillRect(pl.pos.x - 6, pl.pos.y - 2, 12, 10);
+    // head
+    ctx.fillStyle = flash ? "#ffffff" : pl.color;
+    ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
+    // eyes (face direction)
+    const fx = pl.facing.x, fy = pl.facing.y;
+    ctx.fillStyle = "#222";
+    ctx.fillRect(pl.pos.x - 3 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+    ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+  }
   // hp bar (only if damaged)
   if (pl.hp < pl.maxHp) drawHpBar(ctx, pl.pos.x, pl.pos.y - 16, pl.hp / pl.maxHp);
   if (standVisible && standInFront) drawStand(ctx, w, standPos);
