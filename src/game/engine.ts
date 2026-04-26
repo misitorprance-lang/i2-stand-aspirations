@@ -2236,6 +2236,7 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   else if (id === "echoes") drawEchoes(ctx, w, pos);
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
   else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
+  else if (id === "white_album") drawWhiteAlbum(ctx, w, pos);
 }
 
 function drawGoldExperience(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
