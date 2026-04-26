@@ -160,6 +160,7 @@ interface World {
   puppetPiloted: boolean;       // currently piloting Ebony Devil's puppet
   shards: MirrorShard[];
   shardPickerOpen: boolean;
+  hangedMan: { pos: Vec2; facing: Vec2; attackUntil: number };
   // Auto-kick (anti-stuck) cooldown
   kickAt: number;
   // Player-input intent magnitude (used by kick detection)
@@ -293,7 +294,21 @@ function makeProps(): Prop[] {
       },
     });
   }
-  // (prop hp tagging — deferred)
+  // ---- prop tagging: assign destruction HP per category by rect signature ----
+  // Trees: 20×16; Rocks: variable ovals; Bushes: 18×14; Houses: 80×60; Fences: w×6.
+  for (const p of props) {
+    const r = p.rect;
+    let hp = 0;
+    if (r.w === 80 && r.h === 60) hp = 60;            // house
+    else if (r.w === 20 && r.h === 16) hp = 12;       // tree
+    else if (r.w === 18 && r.h === 14) hp = 12;       // bush
+    else if (r.h === 6) hp = 12;                      // fence
+    else hp = 30;                                     // rock
+    p.hp = hp;
+    p.maxHp = hp;
+    p.destructible = true;
+    p.original = { rect: { ...r }, hp };
+  }
 
   return props;
 }
@@ -307,7 +322,7 @@ function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?:
     const y = rand(40, MAP_H - 40);
     let ok = true;
     for (const p of props) {
-      if (circleRectOverlap(x, y, radius + padding, p.rect)) { ok = false; break; }
+      if (propSolid(p) && circleRectOverlap(x, y, radius + padding, p.rect)) { ok = false; break; }
     }
     if (!ok) continue;
     if (opts?.craters) {
@@ -335,7 +350,7 @@ function freeSpotOrGrid(props: Prop[], radius: number): Vec2 {
   for (let y = 40; y < MAP_H - 40; y += step) {
     for (let x = 40; x < MAP_W - 40; x += step) {
       let ok = true;
-      for (const p of props) if (circleRectOverlap(x, y, radius + 6, p.rect)) { ok = false; break; }
+      for (const p of props) if (propSolid(p) && circleRectOverlap(x, y, radius + 6, p.rect)) { ok = false; break; }
       if (ok) return { x, y };
     }
   }
@@ -443,9 +458,17 @@ export function createWorld(): World {
     puppetPiloted: false,
     shards: [],
     shardPickerOpen: false,
+    hangedMan: { pos: { ...player.pos }, facing: { x: 0, y: 1 }, attackUntil: 0 },
     kickAt: 0,
     lastJoyMag: 0,
   };
+}
+
+// A prop is solid only if it has HP left (or it isn't destructible).
+function propSolid(p: Prop): boolean {
+  if (p.destructible === false) return true;
+  if (p.destructible && (p.hp ?? 0) <= 0) return false;
+  return true;
 }
 
 // movement with collision
@@ -455,14 +478,14 @@ function tryMove(e: Entity, dx: number, dy: number, props: Prop[]) {
   if (nx - e.radius < 0) nx = e.radius;
   if (nx + e.radius > MAP_W) nx = MAP_W - e.radius;
   let blocked = false;
-  for (const p of props) if (circleRectOverlap(nx, e.pos.y, e.radius, p.rect)) { blocked = true; break; }
+  for (const p of props) if (propSolid(p) && circleRectOverlap(nx, e.pos.y, e.radius, p.rect)) { blocked = true; break; }
   if (!blocked) e.pos.x = nx;
 
   let ny = e.pos.y + dy;
   if (ny - e.radius < 0) ny = e.radius;
   if (ny + e.radius > MAP_H) ny = MAP_H - e.radius;
   blocked = false;
-  for (const p of props) if (circleRectOverlap(e.pos.x, ny, e.radius, p.rect)) { blocked = true; break; }
+  for (const p of props) if (propSolid(p) && circleRectOverlap(e.pos.x, ny, e.radius, p.rect)) { blocked = true; break; }
   if (!blocked) e.pos.y = ny;
 }
 
@@ -472,7 +495,7 @@ function pushOutOfProps(e: Entity, props: Prop[]) {
   for (let iter = 0; iter < 4; iter++) {
     let moved = false;
     for (const p of props) {
-      if (!circleRectOverlap(e.pos.x, e.pos.y, e.radius, p.rect)) continue;
+      if (!propSolid(p) || !circleRectOverlap(e.pos.x, e.pos.y, e.radius, p.rect)) continue;
       // find nearest exit direction
       const r = p.rect;
       const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
@@ -801,6 +824,8 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       hitConeFrom(w, origin, dir, ab.range, ab.radius ?? 14, dmg, key === "m1" && w.time < w.rageUntil ? 45 : undefined, crit);
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
+      // Melee chops at props in front of you (heavy stands break things faster).
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 14) + 4, dmg);
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
       // trigger stand-punch animation
       w.standPunchUntil = w.time + 0.25;
@@ -893,6 +918,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - p.x, y: e.pos.y - p.y }), amount: 60 });
         }
       }
+      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage);
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: ab.radius!, color: ab.color, life: 0.45 });
       // arcing lightning to nearby targets
       for (const e of w.npcs) {
@@ -921,6 +947,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage);
         }
       }
+      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage);
       spawnVfx(w, { kind: "explosion_ring", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
       spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius! * 0.8, color: ab.color, life: 0.55 });
       if (ab.crater) {
@@ -1177,40 +1204,82 @@ function trySpawnItem(w: World, kind: "arrow" | "disc") {
 export function update(w: World, input: InputState, dt: number) {
   w.time += dt;
 
+  // Time Stop gating — Star Platinum's "The World" freezes everything except the player and their stand.
+  const timeStopped = w.time < w.timeStopUntil;
+  if (timeStopped && w.timeStopStartedAt === 0) w.timeStopStartedAt = w.time;
+  if (!timeStopped && w.timeStopStartedAt > 0) {
+    // Just resumed — apply pending damage in one burst.
+    if (w.pendingPlayerDamage.length > 0) {
+      let total = 0;
+      for (const d of w.pendingPlayerDamage) total += d.amount;
+      damageEntity(w, w.player, total);
+      w.shake = Math.max(w.shake, 8);
+      play("timeResume");
+      w.bannerText = "Time resumes";
+      w.bannerUntil = w.time + 1.0;
+    } else {
+      play("timeResume");
+    }
+    w.pendingPlayerDamage = [];
+    w.timeStopStartedAt = 0;
+  }
+
   // Cooldowns
   for (const k of ["m1", "a1", "a2", "a3", "a4"] as const) {
     if (w.cdTimers[k] > 0) w.cdTimers[k] = Math.max(0, w.cdTimers[k] - dt);
   }
+
+  // Pilot mode: joystick drives the puppet (Ebony Devil) or Hanged Man instead of the player.
+  // The player stops moving while piloting; HP is shared.
+  const piloting = (w.puppetPiloted && w.puppet.active) || w.pilotActive;
 
   // Player movement
   const pl = w.player;
   if (pl.alive) {
     const j = input.joy;
     const len = Math.hypot(j.x, j.y);
-    if (len > 0.05) {
+    w.lastJoyMag = len;
+    if (!piloting && len > 0.05) {
       const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
       const baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
       const speed = baseSpeed * Math.min(1, len);
+      const before = { x: pl.pos.x, y: pl.pos.y };
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
       pl.facing = { x: nx, y: ny };
+      // Auto-kick: if we asked to move but barely budged AND a prop sits in our path, push us out hard.
+      const moved = Math.hypot(pl.pos.x - before.x, pl.pos.y - before.y);
+      if (moved < 0.4 * Math.max(0.5, speed * dt) && w.time - w.kickAt > 0.4) {
+        for (const p of w.props) {
+          if (!propSolid(p)) continue;
+          if (circleRectOverlap(pl.pos.x + nx * (pl.radius + 1), pl.pos.y + ny * (pl.radius + 1), pl.radius, p.rect)) {
+            pushOutOfProps(pl, w.props);
+            pl.pos.x -= nx * 6; pl.pos.y -= ny * 6;
+            pushOutOfProps(pl, w.props);
+            spawnParticles(w, { x: pl.pos.x, y: pl.pos.y + 6 }, "#a1814a", 4, {
+              shape: "square", gravity: 80, speedMin: 20, speedMax: 60, life: 0.4,
+            });
+            play("footstep");
+            w.kickAt = w.time;
+            break;
+          }
+        }
+      }
       w.footstepAcc += dt * Math.min(1, len);
       if (w.footstepAcc >= 0.32) {
         w.footstepAcc = 0;
         play("footstep");
-        // walking dust puff (brown, gravity)
         const back = { x: -nx, y: -ny };
         spawnParticles(w, { x: pl.pos.x + back.x * 4, y: pl.pos.y + 6 + back.y * 2 }, "#a1814a", input.sprint ? 5 : 3, {
           shape: "square", gravity: 60, speedMin: 8, speedMax: input.sprint ? 60 : 35, life: 0.45,
         });
       }
     } else {
-      w.footstepAcc = 0.32; // ready to step on next move
+      w.footstepAcc = 0.32;
     }
-    // Player regen — slow out-of-combat heal (faster while standing in tree zone, handled later).
+    // Player regen — disabled while piloting (HP shared with puppet/Hanged Man).
     const recentlyHurt = w.time - pl.hitFlashUntil < 4.0;
-    if (!recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
+    if (!piloting && !recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
 
-    // Bleed particles when below half HP
     if (pl.hp < pl.maxHp * 0.5 && Math.random() < dt * 5) {
       spawnParticles(w, { x: pl.pos.x + rand(-3, 3), y: pl.pos.y - 2 }, "#b21717", 1, {
         shape: "circle", gravity: 120, speedMin: 8, speedMax: 24, life: 0.5,
@@ -1221,10 +1290,14 @@ export function update(w: World, input: InputState, dt: number) {
       pl.alive = true;
       pl.hp = pl.maxHp;
       pl.pos = { x: MAP_W / 2, y: MAP_H / 2 };
+      pushOutOfProps(pl, w.props);
+      // dropping pilot states on death
+      w.pilotActive = false;
+      w.puppetPiloted = false;
     }
   }
 
-  // M1 hold-to-repeat (input-driven)
+  // M1 hold-to-repeat (input-driven). Allowed during time stop because player still acts.
   w.m1Held = input.m1Held;
   if (pl.alive && w.m1Held && w.cdTimers.m1 <= 0 && (w.standId === "none" || w.standActive)) {
     castAbility(w, "m1", input);
@@ -1232,15 +1305,45 @@ export function update(w: World, input: InputState, dt: number) {
 
   if (input.aim) w.pointerAim = norm(input.aim);
 
+  // Puppet movement: piloted = joystick, otherwise tail behind player.
   if (w.puppet.active) {
-    if (w.puppet.hp <= 0) w.puppet.active = false;
-    const desired = w.time < w.puppet.attackUntil
-      ? { x: pl.pos.x + w.puppet.facing.x * 28, y: pl.pos.y + w.puppet.facing.y * 24 }
-      : { x: pl.pos.x - pl.facing.x * 28, y: pl.pos.y - pl.facing.y * 22 + 4 };
-    w.puppet.pos.x += (desired.x - w.puppet.pos.x) * Math.min(1, dt * 9);
-    w.puppet.pos.y += (desired.y - w.puppet.pos.y) * Math.min(1, dt * 9);
+    if (w.puppet.hp <= 0) { w.puppet.active = false; w.puppetPiloted = false; }
+    if (w.puppetPiloted) {
+      const j = input.joy;
+      const len = Math.hypot(j.x, j.y);
+      if (len > 0.05) {
+        const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
+        const sp = PLAYER_SPEED * Math.min(1, len);
+        const e: Entity = { ...pl, pos: w.puppet.pos, radius: 9 };
+        tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
+        w.puppet.pos.x = e.pos.x; w.puppet.pos.y = e.pos.y;
+        w.puppet.facing = { x: nx, y: ny };
+      }
+    } else {
+      const desired = w.time < w.puppet.attackUntil
+        ? { x: pl.pos.x + w.puppet.facing.x * 28, y: pl.pos.y + w.puppet.facing.y * 24 }
+        : { x: pl.pos.x - pl.facing.x * 28, y: pl.pos.y - pl.facing.y * 22 + 4 };
+      w.puppet.pos.x += (desired.x - w.puppet.pos.x) * Math.min(1, dt * 9);
+      w.puppet.pos.y += (desired.y - w.puppet.pos.y) * Math.min(1, dt * 9);
+    }
     w.puppet.pos.x = Math.max(10, Math.min(MAP_W - 10, w.puppet.pos.x));
     w.puppet.pos.y = Math.max(10, Math.min(MAP_H - 10, w.puppet.pos.y));
+  }
+
+  // Hanged Man pilot movement.
+  if (w.standId === "hanged_man" && w.pilotActive) {
+    const j = input.joy;
+    const len = Math.hypot(j.x, j.y);
+    if (len > 0.05) {
+      const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
+      const sp = PLAYER_SPEED * Math.min(1, len);
+      const e: Entity = { ...pl, pos: w.hangedMan.pos, radius: 9 };
+      tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
+      w.hangedMan.pos.x = e.pos.x; w.hangedMan.pos.y = e.pos.y;
+      w.hangedMan.facing = { x: nx, y: ny };
+    }
+    w.hangedMan.pos.x = Math.max(10, Math.min(MAP_W - 10, w.hangedMan.pos.x));
+    w.hangedMan.pos.y = Math.max(10, Math.min(MAP_H - 10, w.hangedMan.pos.y));
   }
 
   // Item use buttons
@@ -1250,8 +1353,8 @@ export function update(w: World, input: InputState, dt: number) {
   }
   if (input.useDisc) input.useDisc = false;
 
-  // NPC AI
-  for (const e of w.npcs) {
+  // NPC AI — fully frozen during Time Stop.
+  if (!timeStopped) for (const e of w.npcs) {
     if (!e.alive) {
       if (e.respawnAt && w.time >= e.respawnAt) {
         // respawn at strict free spot
@@ -1415,6 +1518,7 @@ export function update(w: World, input: InputState, dt: number) {
           damageEntity(w, e, 9);
         }
       }
+      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14);
       w.zones.push({
         id: w.nextId++,
         pos: { ...pr.pos },
@@ -1440,7 +1544,7 @@ export function update(w: World, input: InputState, dt: number) {
     if (pr.pos.x < 0 || pr.pos.x > MAP_W || pr.pos.y < 0 || pr.pos.y > MAP_H) { pr.expireAt = 0; continue; }
     // hit props?
     for (const p of w.props) {
-      if (circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
+      if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
     }
     if (pr.expireAt === 0) continue;
     // hit npcs
@@ -1710,7 +1814,25 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   type Drawable = { y: number; draw: () => void };
   const drawables: Drawable[] = [];
   for (const p of w.props) {
-    drawables.push({ y: p.rect.y + p.rect.h, draw: () => p.draw(ctx, p.rect) });
+    if (!propSolid(p)) continue;
+    drawables.push({ y: p.rect.y + p.rect.h, draw: () => {
+      p.draw(ctx, p.rect);
+      // damage cracks overlay when below 50% hp
+      if (p.maxHp && p.hp !== undefined && p.hp < p.maxHp * 0.5) {
+        ctx.strokeStyle = "rgba(0,0,0,0.45)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(p.rect.x + 2, p.rect.y + p.rect.h * 0.3);
+        ctx.lineTo(p.rect.x + p.rect.w - 4, p.rect.y + p.rect.h * 0.65);
+        ctx.moveTo(p.rect.x + p.rect.w * 0.6, p.rect.y + 2);
+        ctx.lineTo(p.rect.x + p.rect.w * 0.3, p.rect.y + p.rect.h - 2);
+        ctx.stroke();
+      }
+      if (p.hitFlashUntil && w.time < p.hitFlashUntil) {
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        ctx.fillRect(p.rect.x, p.rect.y, p.rect.w, p.rect.h);
+      }
+    }});
   }
   // player
   const pl = w.player;
@@ -2320,6 +2442,36 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
   }
 }
 
+const PROP_RESPAWN_DELAY = 30;
+function damageProp(w: World, p: Prop, dmg: number) {
+  if (p.destructible !== true) return;
+  if ((p.hp ?? 0) <= 0) return;
+  p.hp = (p.hp ?? 0) - dmg;
+  p.hitFlashUntil = w.time + 0.12;
+  // wood/stone chip particles
+  spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#a07050", 4, {
+    shape: "square", gravity: 80, speedMin: 30, speedMax: 100, life: 0.4,
+  });
+  if (p.hp <= 0) {
+    p.hp = 0;
+    p.destroyedAt = w.time;
+    p.respawnAt = w.time + PROP_RESPAWN_DELAY;
+    spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#7a5a3a", 22, {
+      shape: "square", gravity: 110, speedMin: 60, speedMax: 200, life: 0.7,
+    });
+    spawnVfx(w, { kind: "shockwave", pos: { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, radius: Math.max(p.rect.w, p.rect.h) * 0.6, color: "#caa472", life: 0.4 });
+    w.shake = Math.max(w.shake, 4);
+    play("propBreak");
+  }
+}
+
+// Damage every solid prop that overlaps the AOE circle.
+function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number) {
+  for (const p of w.props) {
+    if (!propSolid(p)) continue;
+    if (circleRectOverlap(x, y, radius, p.rect)) damageProp(w, p, dmg);
+  }
+}
 
 // ---- public toggles for UI ----
 export function toggleStandActive(w: World): boolean {
