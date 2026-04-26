@@ -386,6 +386,7 @@ export function createWorld(): World {
     stunUntil: 0,
     hitFlashUntil: 0,
   };
+  pushOutOfProps(player, props);
 
   return {
     time: 0,
