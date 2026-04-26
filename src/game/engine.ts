@@ -515,11 +515,26 @@ function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, preferEne
 }
 
 function aimDir(w: World, input: InputState, ab?: Ability): Vec2 {
+  // Manual aim wins
   if (input.aim) return norm(input.aim);
-  if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
-  const target = nearestTarget(w, w.player.pos, ab?.range ? Math.max(ab.range + 70, AIM_ASSIST_RANGE * 0.65) : AIM_ASSIST_RANGE * 0.65);
+  // Target-locked aim: use the ability's range (with fallback) so long-range moves still find targets
+  const range = ab?.range && ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : AIM_ASSIST_RANGE;
+  const target = nearestTarget(w, w.player.pos, range);
   if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+  // Fall back to joystick / facing
+  if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
   return w.player.facing;
+}
+
+// Returns the actual point we want to aim at (an entity if found, else a point along dir)
+function resolveTargetPos(w: World, ab: Ability, dir: Vec2, origin: Vec2): { target: Entity | null; pos: Vec2 } {
+  const range = ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : Math.max(ab.range + 60, 80);
+  const target = nearestTarget(w, origin, range);
+  if (target) return { target, pos: { ...target.pos } };
+  return {
+    target: null,
+    pos: { x: origin.x + dir.x * Math.max(40, ab.range), y: origin.y + dir.y * Math.max(40, ab.range) },
+  };
 }
 
 function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: number, damage: number, knockbackAmount?: number) {
