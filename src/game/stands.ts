@@ -154,6 +154,19 @@ export const STANDS: Record<StandId, Stand> = {
       a4: { name: "Brutal Slash", kind: "brutal_slash", damage: 7, range: 30, radius: 16, cooldown: 9, stunSeconds: 1.5, color: "#9ec0ff" },
     },
   },
+  white_album: {
+    id: "white_album",
+    name: "White Album",
+    color: "#e8eaff",
+    rarityWeight: 3,
+    abilities: {
+      m1: { name: "Frost Punch", kind: "melee", damage: 1.4, range: 22, radius: 14, cooldown: 0.32, color: "#dfe6ff" },
+      a1: { name: "Freeze Punch", kind: "melee", damage: 5, range: 24, radius: 16, cooldown: 3, stunSeconds: 1.2, color: "#a8e8ff" },
+      a2: { name: "Ice Stomp", kind: "ice_stomp", damage: 6, range: 130, radius: 56, cooldown: 6, stunSeconds: 1.6, color: "#bff5ff" },
+      a3: { name: "Ice Heal", kind: "ice_heal", damage: 0, range: 0, radius: 0, cooldown: 8, color: "#dfe6ff" },
+      a4: { name: "Frost Expanse", kind: "dot_zone", damage: 1.5, range: 90, radius: 110, cooldown: 16, duration: 5, tickEvery: 0.5, color: "#9be7ff" },
+    },
+  },
 };
 
 // S.H.I.T. — rare upgraded variant of Echoes' a4
@@ -168,7 +181,7 @@ export const SHIT_ABILITY: Ability = {
   color: "#222",
 };
 
-const ROLLABLE: StandId[] = ["star_platinum", "rhcp", "echoes", "ebony_devil", "gold_experience", "hanged_man"];
+const ROLLABLE: StandId[] = ["star_platinum", "rhcp", "echoes", "ebony_devil", "gold_experience", "hanged_man", "white_album"];
 
 export function rollStand(): { id: StandId; shitVariant: boolean } {
   const total = ROLLABLE.reduce((s, id) => s + STANDS[id].rarityWeight, 0);
