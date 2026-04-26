@@ -1189,6 +1189,89 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnParticles(w, { x: tx, y: ty }, ab.color, 18, { speedMin: 40, speedMax: 120, life: 0.6 });
       break;
     }
+    case "time_stop": {
+      // Star Platinum's "The World" — freeze NPCs for `duration` seconds.
+      const dur = ab.duration ?? 5;
+      w.timeStopUntil = w.time + dur;
+      w.timeStopStartedAt = w.time;
+      w.pendingPlayerDamage = [];
+      spawnVfx(w, { kind: "time_clock", pos: { x: w.player.pos.x, y: w.player.pos.y - 30 }, radius: 60, color: ab.color, life: 1.4 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 220, color: ab.color, life: 0.8 });
+      w.bannerText = "ZA WARUDO!";
+      w.bannerUntil = w.time + 1.6;
+      play("timeStop");
+      break;
+    }
+    case "pilot_toggle": {
+      // Hanged Man: toggle piloting the stand directly. Player stops moving while piloted.
+      w.pilotActive = !w.pilotActive;
+      w.hangedManFormed = true;
+      if (w.pilotActive) {
+        // spawn the stand near the player on first engage
+        w.hangedMan.pos = { x: w.player.pos.x + 18, y: w.player.pos.y };
+        pushOutOfProps({ ...w.player, pos: w.hangedMan.pos, radius: 9 } as Entity, w.props);
+      }
+      w.bannerText = w.pilotActive ? "Piloting Hanged Man" : "Released";
+      w.bannerUntil = w.time + 0.8;
+      play("pilot");
+      break;
+    }
+    case "mirror_shard": {
+      // Drop a chrome shard at the stand's position (or player). Creates a combat dome.
+      const origin = w.pilotActive ? w.hangedMan.pos : w.player.pos;
+      w.shards.push({
+        id: w.nextId++,
+        pos: { x: origin.x, y: origin.y },
+        radius: ab.radius ?? 80,
+        bornAt: w.time,
+        expireAt: w.time + (ab.duration ?? 12),
+      });
+      spawnVfx(w, { kind: "mirror_dome", pos: { x: origin.x, y: origin.y }, radius: ab.radius ?? 80, color: ab.color, life: 0.6 });
+      spawnVfx(w, { kind: "shard_flash", pos: { x: origin.x, y: origin.y }, radius: 20, color: ab.color, life: 0.4 });
+      play("shard");
+      break;
+    }
+    case "shard_teleport": {
+      // Open a picker so the user can choose which shard to teleport to.
+      const live = w.shards.filter((s) => w.time < s.expireAt);
+      if (live.length === 0) {
+        w.bannerText = "No shards placed";
+        w.bannerUntil = w.time + 0.8;
+        // refund cooldown so the user isn't penalized for an empty picker
+        w.cdTimers[key] = 0;
+        return;
+      }
+      w.shardPickerOpen = true;
+      // refund cooldown until they actually pick one (set in teleportToShard)
+      w.cdTimers[key] = 0;
+      break;
+    }
+    case "brutal_slash": {
+      // Big slash: heavy damage, bleed, stun, slow.
+      const angle = Math.atan2(dir.y, dir.x);
+      const origin = w.pilotActive ? w.hangedMan.pos : p;
+      const reach = ab.range + (ab.radius ?? 16);
+      spawnVfx(w, { kind: "slash_arc", pos: { x: origin.x, y: origin.y }, angle, radius: reach, color: ab.color, life: 0.32 });
+      for (const e of w.npcs) {
+        if (!e.alive) continue;
+        const dx = e.pos.x - origin.x, dy = e.pos.y - origin.y;
+        const d = Math.hypot(dx, dy);
+        if (d > reach + e.radius) continue;
+        const dot = d <= e.radius + 8 ? 1 : (dx * dir.x + dy * dir.y) / (d || 1);
+        if (dot > 0.1) {
+          damageEntity(w, e, ab.damage, { dir, amount: 80 });
+          e.stunUntil = Math.max(e.stunUntil, w.time + (ab.stunSeconds ?? 1.5));
+          e.bleedUntil = w.time + 4;
+          e.bleedNextTickAt = w.time + 0.5;
+          e.slowUntil = w.time + 3;
+        }
+      }
+      const tx = origin.x + dir.x * ab.range;
+      const ty = origin.y + dir.y * ab.range;
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage);
+      play("brutal");
+      break;
+    }
   }
 }
 
