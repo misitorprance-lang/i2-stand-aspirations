@@ -167,6 +167,12 @@ interface World {
   kickAt: number;
   // Player-input intent magnitude (used by kick detection)
   lastJoyMag: number;
+  // White Album
+  whiteAlbumActive: boolean;
+  whiteAlbumBar: number;          // 0..100
+  whiteAlbumToggleAt: number;     // earliest time a toggle is allowed
+  whiteAlbumLockUntil: number;    // forced-off lockout when bar empty
+  icePath: { pos: Vec2; expireAt: number; bornAt: number }[];
 }
 
 function makeProps(): Prop[] {
@@ -465,6 +471,11 @@ export function createWorld(): World {
     hangedMan: { pos: { ...player.pos }, facing: { x: 0, y: 1 }, attackUntil: 0 },
     kickAt: 0,
     lastJoyMag: 0,
+    whiteAlbumActive: true,
+    whiteAlbumBar: 100,
+    whiteAlbumToggleAt: 0,
+    whiteAlbumLockUntil: 0,
+    icePath: [],
   };
 }
 
