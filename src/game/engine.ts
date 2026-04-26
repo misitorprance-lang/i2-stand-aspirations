@@ -1214,15 +1214,21 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "pilot_toggle": {
-      // Hanged Man: toggle piloting the stand directly. Player stops moving while piloted.
-      w.pilotActive = !w.pilotActive;
+      // Hanged Man: toggle the stand on/off. While active, it's a separate body that gets piloted
+      // and any incoming damage to it is shared 1:1 with the player.
+      const turningOn = !w.hangedManActive;
+      w.hangedManActive = turningOn;
+      w.pilotActive = turningOn;
       w.hangedManFormed = true;
-      if (w.pilotActive) {
+      if (turningOn) {
         // spawn the stand near the player on first engage
         w.hangedMan.pos = { x: w.player.pos.x + 18, y: w.player.pos.y };
         pushOutOfProps({ ...w.player, pos: w.hangedMan.pos, radius: 9 } as Entity, w.props);
+      } else {
+        // dropping the stand also closes the picker
+        w.shardPickerOpen = false;
       }
-      w.bannerText = w.pilotActive ? "Piloting Hanged Man" : "Released";
+      w.bannerText = turningOn ? "Hanged Man summoned" : "Hanged Man released";
       w.bannerUntil = w.time + 0.8;
       play("pilot");
       break;
