@@ -2341,6 +2341,36 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
   }
 }
 
+const PROP_RESPAWN_DELAY = 30;
+function damageProp(w: World, p: Prop, dmg: number) {
+  if (p.destructible !== true) return;
+  if ((p.hp ?? 0) <= 0) return;
+  p.hp = (p.hp ?? 0) - dmg;
+  p.hitFlashUntil = w.time + 0.12;
+  // wood/stone chip particles
+  spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#a07050", 4, {
+    shape: "square", gravity: 80, speedMin: 30, speedMax: 100, life: 0.4,
+  });
+  if (p.hp <= 0) {
+    p.hp = 0;
+    p.destroyedAt = w.time;
+    p.respawnAt = w.time + PROP_RESPAWN_DELAY;
+    spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#7a5a3a", 22, {
+      shape: "square", gravity: 110, speedMin: 60, speedMax: 200, life: 0.7,
+    });
+    spawnVfx(w, { kind: "shockwave", pos: { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, radius: Math.max(p.rect.w, p.rect.h) * 0.6, color: "#caa472", life: 0.4 });
+    w.shake = Math.max(w.shake, 4);
+    play("propBreak");
+  }
+}
+
+// Damage every solid prop that overlaps the AOE circle.
+function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number) {
+  for (const p of w.props) {
+    if (!propSolid(p)) continue;
+    if (circleRectOverlap(x, y, radius, p.rect)) damageProp(w, p, dmg);
+  }
+}
 
 // ---- public toggles for UI ----
 export function toggleStandActive(w: World): boolean {
