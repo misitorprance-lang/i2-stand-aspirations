@@ -283,8 +283,9 @@ function makeProps(): Prop[] {
       },
     });
   }
+  tag(5, 60, true); // houses
 
-  // Fence segments
+
   for (let i = 0; i < 9; i++) {
     const x = rand(50, MAP_W - 100);
     const y = rand(50, MAP_H - 50);
@@ -302,6 +303,7 @@ function makeProps(): Prop[] {
       },
     });
   }
+  tag(9, 14, true); // fences
 
   return props;
 }
@@ -2237,7 +2239,8 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
       break;
     }
   }
-}
+  }
+  tag(21, 32, true); // rocks
 
 
 // ---- public toggles for UI ----
