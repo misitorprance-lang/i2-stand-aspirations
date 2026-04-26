@@ -895,7 +895,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "auto_aim": {
-      const target = nearestTarget(w, p, ab.range);
+      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
       if (target) {
         w.standAimTarget = { ...target.pos };
         w.standAimUntil = w.time + 0.5;
@@ -914,12 +914,94 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       }
       break;
     }
+    case "chain_projectile": {
+      const { target } = resolveTargetPos(w, ab, dir, p);
+      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      w.projectiles.push({
+        id: w.nextId++,
+        pos: { x: p.x, y: p.y },
+        vel: { x: shootDir.x * ab.speed!, y: shootDir.y * ab.speed! },
+        radius: ab.radius || 6,
+        damage: ab.damage,
+        color: ab.color,
+        ownerKind: "player",
+        pierce: true,
+        hitSet: new Set(),
+        expireAt: w.time + ab.range / ab.speed!,
+        homingTargetId: target?.id,
+        homingStrength: 0.18,
+        speed: ab.speed,
+        chainsLeft: 4,
+        chainRange: 90,
+        chainColor: ab.color,
+      });
+      if (target) w.standAimTarget = { ...target.pos };
+      spawnParticles(w, p, ab.color, 8, { speedMin: 40, speedMax: 160, life: 0.3 });
+      break;
+    }
+    case "frog_summon": {
+      if (w.frogs.filter((f) => f.alive).length >= FROG_MAX) {
+        w.bannerText = "Max 3 frogs out";
+        w.bannerUntil = w.time + 0.9;
+        w.cdTimers[key] = 0.5;
+        break;
+      }
+      w.frogs.push({
+        id: w.nextId++,
+        pos: { x: p.x - dir.x * 12 + rand(-6, 6), y: p.y - dir.y * 12 + rand(-6, 6) },
+        bobPhase: Math.random() * Math.PI * 2,
+        alive: true,
+      });
+      spawnParticles(w, p, ab.color, 8, { speedMin: 30, speedMax: 80, life: 0.4, gravity: 80 });
+      break;
+    }
+    case "hologram_stun": {
+      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
+      if (!target) {
+        w.bannerText = "No target";
+        w.bannerUntil = w.time + 0.7;
+        w.cdTimers[key] = 1.5;
+        spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 22, color: ab.color, life: 0.25 });
+        break;
+      }
+      w.standAimTarget = { ...target.pos };
+      w.standAimUntil = w.time + 0.6;
+      damageEntity(w, target, ab.damage);
+      const stunDur = ab.stunSeconds ?? 3.5;
+      target.stunUntil = Math.max(target.stunUntil, w.time + stunDur);
+      target.hologramUntil = w.time + stunDur;
+      // hologram appears behind target (opposite of player->target)
+      const back = norm({ x: target.pos.x - p.x, y: target.pos.y - p.y });
+      target.hologramOrigin = { x: target.pos.x + back.x * 18, y: target.pos.y + back.y * 18 };
+      spawnVfx(w, { kind: "hologram_burst", pos: { ...target.pos }, color: ab.color, life: 0.5 });
+      spawnVfx(w, { kind: "beam", pos: { ...p }, to: { ...target.pos }, color: ab.color, life: 0.3 });
+      spawnParticles(w, target.pos, ab.color, 16, { speedMin: 50, speedMax: 140, life: 0.6 });
+      w.shake = Math.max(w.shake, 5);
+      break;
+    }
+    case "tree_zone": {
+      const tx = p.x + dir.x * Math.min(ab.range, 60);
+      const ty = p.y + dir.y * Math.min(ab.range, 60);
+      w.trees.push({
+        pos: { x: tx, y: ty },
+        radius: ab.radius!,
+        bornAt: w.time,
+        expireAt: w.time + (ab.duration ?? 6),
+        rooted: new Map(),
+      });
+      spawnVfx(w, { kind: "tree_aura", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: ab.duration! });
+      spawnParticles(w, { x: tx, y: ty }, ab.color, 18, { speedMin: 40, speedMax: 120, life: 0.6 });
+      break;
+    }
   }
 }
 
 function trySpawnItem(w: World, kind: "arrow" | "disc") {
-  if (w.items.length >= MAX_ITEMS_ON_GROUND) return;
-  const pos = freeSpot(w.props, 10);
+  const cap = kind === "arrow" ? MAX_ARROWS_ON_GROUND : MAX_DISCS_ON_GROUND;
+  const existing = w.items.filter((it) => it.kind === kind).length;
+  if (existing >= cap) return;
+  const pos = freeSpot(w.props, 10, { avoid: w.player.pos, avoidR: 28, craters: w.craters });
+  if (!pos) return;
   w.items.push({ id: w.nextId++, kind, pos, bornAt: w.time });
 }
 
