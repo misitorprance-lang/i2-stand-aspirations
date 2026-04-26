@@ -56,7 +56,7 @@ const MAX_DISCS_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
 const FROG_MAX = 3;
-const STAND_TETHER = 220; // max distance puppet/hangedman can be from player before snap-back
+const STAND_TETHER = 360; // max distance puppet/hangedman can be from player before snap-back
 
 // ---------- helpers ----------
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -174,6 +174,18 @@ interface World {
   whiteAlbumToggleAt: number;     // earliest time a toggle is allowed
   whiteAlbumLockUntil: number;    // forced-off lockout when bar empty
   icePath: { pos: Vec2; expireAt: number; bornAt: number }[];
+  // Boingo (tutorial-ish friendly NPC; no HP, scared AI, holds a purple book)
+  boingo: {
+    pos: Vec2;
+    vel: Vec2;
+    radius: number;
+    facing: Vec2;
+    wanderTarget: Vec2 | null;
+    wanderUntil: number;
+    bobPhase: number;
+    pageFlipAt: number;
+    pageIndex: number;
+  };
 }
 
 function makeProps(): Prop[] {
@@ -477,6 +489,17 @@ export function createWorld(): World {
     whiteAlbumToggleAt: 0,
     whiteAlbumLockUntil: 0,
     icePath: [],
+    boingo: {
+      pos: freeSpot(props, 9, { avoid: player.pos, avoidR: 120 }) ?? { x: player.pos.x + 120, y: player.pos.y + 80 },
+      vel: { x: 0, y: 0 },
+      radius: 9,
+      facing: { x: 0, y: 1 },
+      wanderTarget: null,
+      wanderUntil: 0,
+      bobPhase: Math.random() * Math.PI * 2,
+      pageFlipAt: 0,
+      pageIndex: 0,
+    },
   };
 }
 
@@ -1708,9 +1731,79 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
+  // Boingo update — scared NPC AI: wanders idly, flees from anything threatening (player, puppet, hanged man, hostile NPCs)
+  if (!timeStopped) {
+    const b = w.boingo;
+    // page-flip timer (purely visual)
+    if (w.time >= b.pageFlipAt) {
+      b.pageIndex = (b.pageIndex + 1) % 4;
+      b.pageFlipAt = w.time + rand(2.2, 4.8);
+    }
+    const FLEE_R = 70;
+    let fleeX = 0, fleeY = 0, threats = 0;
+    const consider = (pos: Vec2) => {
+      const dx = b.pos.x - pos.x;
+      const dy = b.pos.y - pos.y;
+      const d2v = dx * dx + dy * dy;
+      if (d2v > 0 && d2v < FLEE_R * FLEE_R) {
+        const d = Math.sqrt(d2v);
+        fleeX += dx / d;
+        fleeY += dy / d;
+        threats++;
+      }
+    };
+    if (pl.alive) consider(pl.pos);
+    if (w.puppet.active) consider(w.puppet.pos);
+    if (w.hangedManActive) consider(w.hangedMan.pos);
+    for (const e of w.npcs) if (e.alive && e.kind === "enemy") consider(e.pos);
+
+    if (threats > 0) {
+      const dir = norm({ x: fleeX, y: fleeY });
+      tryMove(b as unknown as Entity, dir.x * (NPC_SPEED * 1.15) * dt, dir.y * (NPC_SPEED * 1.15) * dt, w.props);
+      b.facing = dir;
+      // a fled-from Boingo doesn't keep his old wander goal
+      b.wanderTarget = null;
+      b.wanderUntil = w.time + 0.5;
+    } else {
+      if (!b.wanderTarget || w.time >= b.wanderUntil) {
+        b.wanderTarget = freeSpotOrCenter(w.props, 10);
+        b.wanderUntil = w.time + rand(2.5, 5);
+      }
+      const tgt = b.wanderTarget;
+      const d = dist(b.pos, tgt);
+      if (d > 4) {
+        const dir = norm({ x: tgt.x - b.pos.x, y: tgt.y - b.pos.y });
+        tryMove(b as unknown as Entity, dir.x * (NPC_SPEED * 0.6) * dt, dir.y * (NPC_SPEED * 0.6) * dt, w.props);
+        b.facing = dir;
+      }
+    }
+
+    // Soft-collide Boingo against the player + every alive NPC + puppet + hanged man.
+    const collideWith = (px: number, py: number, pr: number, heavyOther: boolean) => {
+      const dx = b.pos.x - px;
+      const dy = b.pos.y - py;
+      const minD = b.radius + pr;
+      const d2v = dx * dx + dy * dy;
+      if (d2v > 0 && d2v < minD * minD) {
+        const d = Math.sqrt(d2v);
+        const overlap = minD - d;
+        const nx = dx / d, ny = dy / d;
+        // Boingo is "lighter" than the player/stand bodies — he gets pushed more
+        const boingoShare = heavyOther ? 0.85 : 0.5;
+        b.pos.x += nx * overlap * boingoShare;
+        b.pos.y += ny * overlap * boingoShare;
+      }
+    };
+    if (pl.alive) collideWith(pl.pos.x, pl.pos.y, pl.radius, true);
+    if (w.puppet.active) collideWith(w.puppet.pos.x, w.puppet.pos.y, 8, true);
+    if (w.hangedManActive) collideWith(w.hangedMan.pos.x, w.hangedMan.pos.y, 9, true);
+    for (const e of w.npcs) if (e.alive) collideWith(e.pos.x, e.pos.y, e.radius, false);
+  }
+
   // Eject any entity overlapping a prop (knockback/spawn glitches push them inside houses).
   if (pl.alive) pushOutOfProps(pl, w.props);
   for (const e of w.npcs) if (e.alive) pushOutOfProps(e, w.props);
+  pushOutOfProps(w.boingo as unknown as Entity, w.props);
 
   // Sweep expired Hanged Man mirror shards.
   if (w.shards.length) w.shards = w.shards.filter((s) => w.time < s.expireAt);
@@ -2186,6 +2279,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
+  drawables.push({ y: w.boingo.pos.y, draw: () => drawBoingo(ctx, w) });
   // Trees (drawn as ground-anchored zones — sort by their root Y)
   for (const t of w.trees) {
     drawables.push({ y: t.pos.y - 4, draw: () => drawProtectionTree(ctx, w, t) });
@@ -2624,15 +2718,49 @@ function drawPuppet(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillStyle = "#1b1714";
   ctx.fillRect(p.pos.x - 3, p.pos.y - 6, 2, 2);
   ctx.fillRect(p.pos.x + 1, p.pos.y - 6, 2, 2);
+  // ----- proper spear -----
   ctx.save();
   ctx.translate(p.pos.x, p.pos.y + 1);
   if (attacking) ctx.rotate(spin);
   else ctx.rotate(Math.atan2(p.facing.y, p.facing.x));
-  ctx.strokeStyle = "#d6d8dd";
+  // long wooden shaft (dark brown) with binding wraps
+  ctx.strokeStyle = "#5a3a22";
   ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(18, 0); ctx.stroke();
-  ctx.fillStyle = "#f2f3f5";
-  ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(16, -4); ctx.lineTo(16, 4); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(20, 0); ctx.stroke();
+  // shaft binding (leather wraps)
+  ctx.strokeStyle = "#2a1a0e";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    const x = 2 + i * 5;
+    ctx.beginPath(); ctx.moveTo(x, -1); ctx.lineTo(x, 1); ctx.stroke();
+  }
+  // butt cap
+  ctx.fillStyle = "#3a2614";
+  ctx.fillRect(-4, -1, 2, 3);
+  // metal collar at base of head
+  ctx.fillStyle = "#9aa0aa";
+  ctx.fillRect(19, -2, 2, 4);
+  // spearhead — narrow pointed leaf shape
+  ctx.fillStyle = "#e8ecf2";
+  ctx.strokeStyle = "#3a4252";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(21, -3);
+  ctx.lineTo(29, 0);
+  ctx.lineTo(21, 3);
+  ctx.lineTo(23, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // side fins (the small wings near the base of the head)
+  ctx.fillStyle = "#c8ccd4";
+  ctx.beginPath();
+  ctx.moveTo(21, -3); ctx.lineTo(19, -5); ctx.lineTo(22, -2); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(21, 3); ctx.lineTo(19, 5); ctx.lineTo(22, 2); ctx.closePath(); ctx.fill();
+  // central blood-groove highlight
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillRect(23, 0, 4, 1);
   ctx.restore();
   if (p.hp < p.maxHp) drawHpBar(ctx, p.pos.x, p.pos.y - 15, p.hp / p.maxHp);
 }
@@ -2741,6 +2869,105 @@ function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
   ctx.restore();
   // shared HP indicator (matches player hp)
   if (w.player.hp < w.player.maxHp) drawHpBar(ctx, h.pos.x, h.pos.y - 17, w.player.hp / w.player.maxHp);
+}
+
+function drawBoingo(ctx: CanvasRenderingContext2D, w: World) {
+  const b = w.boingo;
+  const bob = Math.sin(w.time * 3 + b.bobPhase) * 0.8;
+  const x = b.pos.x;
+  const y = b.pos.y + bob;
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(b.pos.x, b.pos.y + 9, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+  // small kid body — bright yellow shirt
+  ctx.fillStyle = "#f5d24a";
+  ctx.fillRect(x - 5, y - 1, 10, 11);
+  // brown shorts
+  ctx.fillStyle = "#5a3a22";
+  ctx.fillRect(x - 5, y + 7, 10, 3);
+  // legs
+  ctx.fillStyle = "#3a2614";
+  ctx.fillRect(x - 4, y + 10, 3, 2);
+  ctx.fillRect(x + 1, y + 10, 3, 2);
+  // head — pale skin tone
+  ctx.fillStyle = "#f3d9b1";
+  ctx.fillRect(x - 4, y - 11, 8, 9);
+  // dark messy hair cap on top
+  ctx.fillStyle = "#1a1410";
+  ctx.fillRect(x - 4, y - 11, 8, 3);
+  ctx.fillRect(x - 5, y - 10, 1, 2);
+  ctx.fillRect(x + 4, y - 10, 1, 2);
+  // wide nervous eyes (look the way he's facing)
+  const ex = Math.max(-1, Math.min(1, b.facing.x));
+  const ey = Math.max(-1, Math.min(1, b.facing.y));
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(x - 3, y - 7, 2, 2);
+  ctx.fillRect(x + 1, y - 7, 2, 2);
+  ctx.fillStyle = "#0a0d14";
+  ctx.fillRect(x - 3 + Math.round(ex * 0.5), y - 7 + Math.round(ey * 0.5), 1, 1);
+  ctx.fillRect(x + 1 + Math.round(ex * 0.5), y - 7 + Math.round(ey * 0.5), 1, 1);
+  // tiny worried mouth
+  ctx.fillStyle = "#5a2a1a";
+  ctx.fillRect(x - 1, y - 3, 2, 1);
+
+  // ----- purple book held in front -----
+  ctx.save();
+  // book sits slightly in front of his torso
+  const bx = x;
+  const by = y + 4;
+  // back cover
+  ctx.fillStyle = "#3a1a5a";
+  ctx.fillRect(bx - 6, by - 3, 12, 7);
+  // spine highlight
+  ctx.fillStyle = "#5a2c8a";
+  ctx.fillRect(bx - 6, by - 3, 12, 1);
+  // open pages — pale lavender
+  ctx.fillStyle = "#e7dcff";
+  ctx.fillRect(bx - 5, by - 2, 11, 5);
+  // page split
+  ctx.fillStyle = "#3a1a5a";
+  ctx.fillRect(bx, by - 2, 1, 5);
+  // strange unidentifiable glyphs (vary with pageIndex so it looks alive)
+  ctx.fillStyle = "#3a1a5a";
+  const pi = b.pageIndex;
+  // left page glyphs
+  if (pi === 0) {
+    ctx.fillRect(bx - 4, by - 1, 1, 1); ctx.fillRect(bx - 2, by - 1, 2, 1);
+    ctx.fillRect(bx - 4, by + 1, 3, 1); ctx.fillRect(bx - 4, by + 2, 1, 1);
+  } else if (pi === 1) {
+    ctx.fillRect(bx - 4, by - 1, 3, 1); ctx.fillRect(bx - 3, by + 1, 1, 2);
+    ctx.fillRect(bx - 1, by + 2, 1, 1);
+  } else if (pi === 2) {
+    ctx.fillRect(bx - 4, by, 1, 2); ctx.fillRect(bx - 3, by - 1, 2, 1);
+    ctx.fillRect(bx - 2, by + 2, 2, 1);
+  } else {
+    ctx.fillRect(bx - 4, by - 1, 1, 3); ctx.fillRect(bx - 3, by + 2, 2, 1);
+    ctx.fillRect(bx - 1, by - 1, 1, 1);
+  }
+  // right page glyphs (mirrored-ish)
+  if (pi === 0) {
+    ctx.fillRect(bx + 2, by - 1, 2, 1); ctx.fillRect(bx + 4, by + 1, 1, 2);
+    ctx.fillRect(bx + 1, by + 2, 1, 1);
+  } else if (pi === 1) {
+    ctx.fillRect(bx + 1, by - 1, 3, 1); ctx.fillRect(bx + 4, by, 1, 2);
+    ctx.fillRect(bx + 2, by + 2, 2, 1);
+  } else if (pi === 2) {
+    ctx.fillRect(bx + 4, by - 1, 1, 1); ctx.fillRect(bx + 2, by, 2, 1);
+    ctx.fillRect(bx + 1, by + 2, 3, 1);
+  } else {
+    ctx.fillRect(bx + 4, by - 1, 1, 3); ctx.fillRect(bx + 2, by + 1, 1, 1);
+    ctx.fillRect(bx + 3, by + 2, 1, 1);
+  }
+  // faint mystic shimmer above the book
+  const shimmer = (Math.sin(w.time * 4 + b.bobPhase) + 1) * 0.5;
+  ctx.fillStyle = `rgba(186,140,255,${0.18 + shimmer * 0.18})`;
+  ctx.fillRect(bx - 4, by - 5, 8, 1);
+  ctx.restore();
+
+  // little hands gripping the book sides
+  ctx.fillStyle = "#f3d9b1";
+  ctx.fillRect(x - 7, y + 3, 2, 2);
+  ctx.fillRect(x + 5, y + 3, 2, 2);
 }
 
 function drawFrog(ctx: CanvasRenderingContext2D, w: World, f: Frog) {
