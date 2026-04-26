@@ -1975,6 +1975,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     if (e.alive) drawables.push({ y: e.pos.y, draw: () => drawNpc(ctx, w, e) });
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
+  if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
