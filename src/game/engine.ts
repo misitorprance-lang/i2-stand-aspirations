@@ -585,6 +585,13 @@ function sfxFor(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): SfxKey {
     if (key === "a3") return "spin";
     return "rage";
   }
+  if (sid === "gold_experience") {
+    if (key === "m1") return "punch";
+    if (key === "a1") return "eagle";
+    if (key === "a2") return "frog";
+    if (key === "a3") return "hologram";
+    return "tree";
+  }
   return "punch";
 }
 
