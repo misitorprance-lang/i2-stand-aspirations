@@ -578,6 +578,8 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   if (!e.alive) return;
   // Rage Mode now only multiplies damage that originates from the puppet itself.
   if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil && opts?.fromPuppet) dmg *= 1.55;
+  // White Album suit armor: -1 damage to player while suit is active.
+  if (e.kind === "player" && w.standId === "white_album" && w.whiteAlbumActive) dmg = Math.max(0.1, dmg - 1);
   e.hp -= dmg;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg, "#fff", crit);
