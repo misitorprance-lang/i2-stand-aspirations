@@ -121,6 +121,7 @@ interface World {
   cdTimers: { m1: number; a1: number; a2: number; a3: number; a4: number };
   standId: StandId;
   shitVariant: boolean;
+  standActive: boolean; // can be toggled off (desummon)
   bannerText: string | null;
   bannerUntil: number;
   nextId: number;
@@ -136,6 +137,13 @@ interface World {
   puppet: PuppetState;
   rage: number;
   rageUntil: number;
+  // Gold Experience
+  frogs: Frog[];
+  trees: ProtectionTree[];
+  geBuffUntil: number; // damage boost while in tree
+  hologramHits: { entityId: number; expireAt: number; from: Vec2 }[];
+  // M1 hold-to-repeat
+  m1Held: boolean;
 }
 
 function makeProps(): Prop[] {
