@@ -1440,6 +1440,7 @@ export function update(w: World, input: InputState, dt: number) {
           damageEntity(w, e, 9);
         }
       }
+      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14);
       w.zones.push({
         id: w.nextId++,
         pos: { ...pr.pos },
