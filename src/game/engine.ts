@@ -210,7 +210,7 @@ function makeProps(): Prop[] {
       },
     });
   }
-  tag(treeSpots.length, 18, true); // trees
+  // (prop hp tagging — deferred to next round)
 
   // Rocks (gray ovals)
   for (let i = 0; i < 21; i++) {
