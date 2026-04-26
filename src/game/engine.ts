@@ -2793,3 +2793,58 @@ export function teleportToShard(w: World, shardId: number) {
 export function closeShardPicker(w: World) {
   w.shardPickerOpen = false;
 }
+
+// ---------- Save / Load ----------
+export interface SaveData {
+  v: number;
+  standId: StandId;
+  shitVariant: boolean;
+  arrows: number;
+  discs: number;
+  kills: number;
+  hp: number;
+  maxHp: number;
+  px: number;
+  py: number;
+  echoesAct: number;
+  whiteAlbumActive?: boolean;
+  whiteAlbumBar?: number;
+  boingoTalkedTo?: boolean;
+}
+
+export function exportSave(w: World, arrows: number, discs: number): SaveData {
+  return {
+    v: 1,
+    standId: w.standId,
+    shitVariant: w.shitVariant,
+    arrows,
+    discs,
+    kills: w.kills,
+    hp: w.player.hp,
+    maxHp: w.player.maxHp,
+    px: w.player.pos.x,
+    py: w.player.pos.y,
+    echoesAct: w.echoesAct,
+    whiteAlbumActive: (w as any).whiteAlbumActive ?? true,
+    whiteAlbumBar: (w as any).whiteAlbumBar ?? 100,
+    boingoTalkedTo: (w as any).boingoTalkedTo ?? false,
+  };
+}
+
+export function applySave(w: World, s: SaveData): { arrows: number; discs: number } {
+  resetStandRuntime(w);
+  w.standId = s.standId;
+  w.shitVariant = !!s.shitVariant;
+  w.kills = s.kills | 0;
+  w.player.hp = Math.max(1, Math.min(s.maxHp || w.player.maxHp, s.hp));
+  w.player.maxHp = s.maxHp || w.player.maxHp;
+  w.player.pos = { x: s.px, y: s.py };
+  pushOutOfProps(w.player, w.props);
+  w.echoesAct = (s.echoesAct as 1 | 2 | 3) || 1;
+  if ((w as any).whiteAlbumActive !== undefined) (w as any).whiteAlbumActive = s.whiteAlbumActive ?? true;
+  if ((w as any).whiteAlbumBar !== undefined) (w as any).whiteAlbumBar = s.whiteAlbumBar ?? 100;
+  if ((w as any).boingoTalkedTo !== undefined) (w as any).boingoTalkedTo = !!s.boingoTalkedTo;
+  w.bannerText = "Game loaded";
+  w.bannerUntil = w.time + 1.6;
+  return { arrows: s.arrows | 0, discs: s.discs | 0 };
+}
