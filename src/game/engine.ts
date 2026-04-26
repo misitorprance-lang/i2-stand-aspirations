@@ -602,6 +602,7 @@ function damagePuppet(w: World, dmg: number) {
     w.puppet.active = false;
     w.puppet.hp = w.puppet.maxHp;
     spawnVfx(w, { kind: "crater_smoke", pos: { ...w.puppet.pos }, radius: 20, color: "#585d66", life: 0.7 });
+  }
 }
 
 // Hanged Man takes hits but its HP is shared with the player — route damage straight to player.
@@ -612,6 +613,7 @@ function damageHangedMan(w: World, dmg: number, dir: Vec2) {
   damageEntity(w, w.player, dmg, { dir, amount: 30 });
 }
 
+function getAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): Ability {
   const stand = STANDS[w.standId];
   const a = stand.abilities[key];
   if (w.standId === "echoes" && key === "a4" && w.shitVariant) return SHIT_ABILITY;
