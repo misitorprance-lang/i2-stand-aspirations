@@ -156,6 +156,7 @@ interface World {
   pendingPlayerDamage: { amount: number; dir: Vec2 }[];
   // Hanged Man
   hangedManFormed: boolean;     // false until Pilot has been engaged at least once
+  hangedManActive: boolean;     // visible separate model standing on field
   pilotActive: boolean;         // currently piloting Hanged Man
   puppetPiloted: boolean;       // currently piloting Ebony Devil's puppet
   shards: MirrorShard[];
@@ -454,6 +455,7 @@ export function createWorld(): World {
     timeStopStartedAt: 0,
     pendingPlayerDamage: [],
     hangedManFormed: false,
+    hangedManActive: false,
     pilotActive: false,
     puppetPiloted: false,
     shards: [],
