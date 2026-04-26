@@ -1370,7 +1370,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 24, color: ab.color, life: 0.3 });
       w.shake = Math.max(w.shake, 4);
       w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 22);
-      play("iceCast");
+      play("freezeTouch");
       break;
     }
   }
