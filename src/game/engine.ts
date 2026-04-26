@@ -514,13 +514,31 @@ function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, preferEne
   return target;
 }
 
-function aimDir(w: World, input: InputState, ab?: Ability): Vec2 {
+// "any NPC" target — used for M1 punches which should hit closest NPC regardless of faction.
+function nearestAnyNpc(w: World, from: Vec2, range = AIM_ASSIST_RANGE): Entity | null {
+  let target: Entity | null = null;
+  let best = range * range;
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    const d = dist2(e.pos, from);
+    if (d < best) { best = d; target = e; }
+  }
+  return target;
+}
+
+function aimDir(w: World, input: InputState, ab?: Ability, key?: "m1" | "a1" | "a2" | "a3" | "a4"): Vec2 {
   // Manual aim wins
   if (input.aim) return norm(input.aim);
-  // Target-locked aim: use the ability's range (with fallback) so long-range moves still find targets
-  const range = ab?.range && ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : AIM_ASSIST_RANGE;
-  const target = nearestTarget(w, w.player.pos, range);
-  if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+  // M1: lock onto closest NPC of any kind (so the player can punch friendlies too).
+  if (key === "m1") {
+    const t = nearestAnyNpc(w, w.player.pos, AIM_ASSIST_RANGE);
+    if (t) return norm({ x: t.pos.x - w.player.pos.x, y: t.pos.y - w.player.pos.y });
+  } else {
+    // Target-locked aim: use the ability's range (with fallback) so long-range moves still find targets
+    const range = ab?.range && ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : AIM_ASSIST_RANGE;
+    const target = nearestTarget(w, w.player.pos, range);
+    if (target) return norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+  }
   // Fall back to joystick / facing
   if (input.joyActive && (input.joy.x !== 0 || input.joy.y !== 0)) return norm(input.joy);
   return w.player.facing;
