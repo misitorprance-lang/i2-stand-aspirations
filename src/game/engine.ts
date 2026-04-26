@@ -1888,11 +1888,15 @@ export function update(w: World, input: InputState, dt: number) {
   }
 
 
-  // Camera
+  // Camera — focus on the active stand body (puppet/Hanged Man) when present, else the player.
+  const camFocus =
+    w.standId === "ebony_devil" && w.puppet.active ? w.puppet.pos :
+    w.standId === "hanged_man" && w.hangedManActive ? w.hangedMan.pos :
+    pl.pos;
   const viewW = VW / CAMERA_ZOOM;
   const viewH = VH / CAMERA_ZOOM;
-  const camTargetX = Math.max(viewW / 2, Math.min(MAP_W - viewW / 2, pl.pos.x));
-  const camTargetY = Math.max(viewH / 2, Math.min(MAP_H - viewH / 2, pl.pos.y));
+  const camTargetX = Math.max(viewW / 2, Math.min(MAP_W - viewW / 2, camFocus.x));
+  const camTargetY = Math.max(viewH / 2, Math.min(MAP_H - viewH / 2, camFocus.y));
   w.cam.x += (camTargetX - w.cam.x) * Math.min(1, dt * 6);
   w.cam.y += (camTargetY - w.cam.y) * Math.min(1, dt * 6);
 }
