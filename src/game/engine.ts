@@ -1126,7 +1126,8 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
-  // M1 hold-to-repeat
+  // M1 hold-to-repeat (input-driven)
+  w.m1Held = input.m1Held;
   if (pl.alive && w.m1Held && w.cdTimers.m1 <= 0 && (w.standId === "none" || w.standActive)) {
     castAbility(w, "m1", input);
   }
