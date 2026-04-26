@@ -287,7 +287,7 @@ export default function Game() {
               <span>DISC {ui.discs}</span>
             </button>
             <button
-              onClick={() => { const n = !soundOn; setSoundOn(n); setSoundEnabled(n); }}
+              onClick={() => { const n = !soundOn; setSoundOn(n); setSoundEnabled(n); applyMusicSetting(n); }}
               className="bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-xs"
               title="Toggle sound"
             >
@@ -411,6 +411,15 @@ export default function Game() {
           <AbilityBtn label="4" name={abilities.a4.name} damage={abilities.a4.damage} color={abilities.a4.color} cdFrac={cdFrac("a4")} disabled={ui.standId === "none" || abilities.a4.name === "-" || (ui.standId === "ebony_devil" && ui.rage < 100 && !ui.rageActive)} onPress={press("a4")} />
         </div>
         <AbilityBtn label="M1" name={abilities.m1.name} damage={abilities.m1.damage} color={abilities.m1.color} cdFrac={cdFrac("m1")} big onPress={press("m1")} />
+        {ui.standId !== "none" && (
+          <button
+            onClick={onToggleStand}
+            className="bg-black/70 border border-white/40 rounded px-2 py-1 text-white text-[10px] pointer-events-auto"
+            style={{ touchAction: "none" }}
+          >
+            Stand: ON/OFF
+          </button>
+        )}
       </div>
     </div>
   );
