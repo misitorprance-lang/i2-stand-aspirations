@@ -352,7 +352,7 @@ export function createWorld(): World {
   const player: Entity = {
     id: 0,
     kind: "player",
-    pos: { x: MAP_W / 2, y: MAP_H / 2 },
+    pos: freeSpotOrGrid(props, 10),
     vel: { x: 0, y: 0 },
     radius: 9,
     hp: PLAYER_MAX_HP,
