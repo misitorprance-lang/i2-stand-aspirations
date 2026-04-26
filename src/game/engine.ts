@@ -1755,7 +1755,19 @@ export function update(w: World, input: InputState, dt: number) {
   }
 
   // Banner timeout
+  // Mirror current bannerText into the stacked banners queue (so multiple notifs can show at once).
+  if (w.bannerText) {
+    const last = w.banners[w.banners.length - 1];
+    if (!last || last.text !== w.bannerText || last.expireAt < w.time) {
+      w.banners.push({ id: w.nextId++, text: w.bannerText, color: null, expireAt: w.bannerUntil });
+    } else {
+      // refresh expiry if same text re-asserted
+      last.expireAt = Math.max(last.expireAt, w.bannerUntil);
+    }
+  }
   if (w.bannerText && w.time >= w.bannerUntil) w.bannerText = null;
+  // Sweep expired stacked banners.
+  if (w.banners.length) w.banners = w.banners.filter((b) => w.time < b.expireAt);
 
   // Shake decays
   w.shake *= 0.85;
