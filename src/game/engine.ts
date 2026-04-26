@@ -2045,3 +2045,24 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
   }
 }
 
+
+// ---- public toggles for UI ----
+export function toggleStandActive(w: World): boolean {
+  if (w.standId === "none") return w.standActive;
+  w.standActive = !w.standActive;
+  w.bannerText = w.standActive ? "Stand summoned" : "Stand desummoned";
+  w.bannerUntil = w.time + 1.0;
+  if (w.standActive) play("toggleOn");
+  else { play("toggleOff"); w.channel = null; }
+  return w.standActive;
+}
+
+export function tryUseDisc(w: World): { ok: boolean; reason?: string } {
+  if (w.standId === "none") return { ok: false, reason: "No stand to discard" };
+  if (w.standId === "ebony_devil" && w.puppet.active) {
+    w.bannerText = "Desummon puppet first (tap 1)";
+    w.bannerUntil = w.time + 1.4;
+    return { ok: false, reason: "puppet" };
+  }
+  return { ok: true };
+}
