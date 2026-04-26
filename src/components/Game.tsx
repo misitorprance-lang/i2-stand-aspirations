@@ -355,6 +355,16 @@ export default function Game() {
             >
               {soundOn ? "🔊" : "🔇"}
             </button>
+            <button
+              onClick={onSave}
+              className="bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-[10px]"
+              title="Save game"
+            >Save</button>
+            <button
+              onClick={onLoad}
+              className="bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-[10px]"
+              title="Load saved game"
+            >Load</button>
           </div>
         </div>
         {/* HP bar */}
