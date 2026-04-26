@@ -118,17 +118,27 @@ export default function Game() {
     const keys = new Set<string>();
     const onDown = (e: KeyboardEvent) => {
       unlockAudio();
+      if (keys.has(e.key.toLowerCase())) return; // ignore key-repeat
       keys.add(e.key.toLowerCase());
       const k = e.key.toLowerCase();
       if (k === "1") inputRef.current.pressed.a1 = true;
       if (k === "2") inputRef.current.pressed.a2 = true;
       if (k === "3") inputRef.current.pressed.a3 = true;
       if (k === "4") inputRef.current.pressed.a4 = true;
-      if (k === " " || k === "f") inputRef.current.pressed.m1 = true;
+      if (k === " " || k === "f") {
+        inputRef.current.pressed.m1 = true;
+        inputRef.current.m1Held = true;
+      }
       inputRef.current.sprint = keys.has("shift");
       updateKeyJoy();
     };
-    const onUp = (e: KeyboardEvent) => { keys.delete(e.key.toLowerCase()); inputRef.current.sprint = keys.has("shift"); updateKeyJoy(); };
+    const onUp = (e: KeyboardEvent) => {
+      keys.delete(e.key.toLowerCase());
+      const k = e.key.toLowerCase();
+      if (k === " " || k === "f") inputRef.current.m1Held = false;
+      inputRef.current.sprint = keys.has("shift");
+      updateKeyJoy();
+    };
     function updateKeyJoy() {
       let x = 0, y = 0;
       if (keys.has("arrowleft") || keys.has("a")) x -= 1;
