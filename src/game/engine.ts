@@ -56,7 +56,7 @@ const MAX_DISCS_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
 const FROG_MAX = 3;
-const STAND_TETHER = 220; // max distance puppet/hangedman can be from player before snap-back
+const STAND_TETHER = 360; // max distance puppet/hangedman can be from player before snap-back
 
 // ---------- helpers ----------
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
