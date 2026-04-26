@@ -43,6 +43,7 @@ interface UIData {
   shards: { id: number; pos: { x: number; y: number } }[];
   whiteAlbumBar: number;
   whiteAlbumActive: boolean;
+  boingoNearby: boolean;
 }
 
 export default function Game() {
