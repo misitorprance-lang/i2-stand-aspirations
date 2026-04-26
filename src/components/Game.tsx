@@ -400,6 +400,22 @@ export default function Game() {
             />
           </div>
         )}
+        {ui.standId === "white_album" && (
+          <div className="flex items-center gap-1 self-start">
+            <div className="bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-32">
+              <div
+                className="h-full transition-[width]"
+                style={{
+                  width: `${ui.whiteAlbumBar}%`,
+                  background: ui.whiteAlbumActive ? "#bff5ff" : "#5b6a8c",
+                }}
+              />
+            </div>
+            <span className="text-[9px] text-white/80 font-bold">
+              {ui.whiteAlbumActive ? "SUIT" : "COOL"}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Banners — stacked so multiple notifications never overlap */}
