@@ -641,7 +641,7 @@ function resolveTargetPos(w: World, ab: Ability, dir: Vec2, origin: Vec2): { tar
   };
 }
 
-function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: number, damage: number, knockbackAmount?: number) {
+function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: number, damage: number, knockbackAmount?: number, crit = false) {
   const reach = range + radius;
   let hitAny = false;
   for (const e of w.npcs) {
@@ -651,7 +651,7 @@ function hitConeFrom(w: World, origin: Vec2, dir: Vec2, range: number, radius: n
     if (d > reach + e.radius) continue;
     const dot = d <= e.radius + 8 ? 1 : (dx * dir.x + dy * dir.y) / (d || 1);
     if (dot > 0.15) {
-      damageEntity(w, e, damage, knockbackAmount ? { dir, amount: knockbackAmount } : undefined);
+      damageEntity(w, e, damage, knockbackAmount ? { dir, amount: knockbackAmount } : undefined, crit);
       hitAny = true;
     }
   }
