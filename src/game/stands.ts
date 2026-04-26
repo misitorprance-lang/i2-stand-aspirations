@@ -75,7 +75,7 @@ export const STANDS: Record<StandId, Stand> = {
     color: "#7c5cff",
     rarityWeight: 1, // rarest
     abilities: {
-      m1: { name: "Punch", kind: "melee", damage: 4, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
+      m1: { name: "Punch", kind: "melee", damage: 3, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
       a1: { name: "Star Finger", kind: "pierce", damage: 6, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
       a2: { name: "Ranged Smash", kind: "projectile", damage: 8, range: 220, radius: 8, cooldown: 2.0, speed: 320, color: "#b8a6ff" },
       a3: { name: "Ora Ora Rush", kind: "channel_cone", damage: 1.2, range: 30, radius: 22, cooldown: 6, duration: 2.0, tickEvery: 0.09, color: "#ffffff" },
@@ -88,7 +88,7 @@ export const STANDS: Record<StandId, Stand> = {
     color: "#ff4444",
     rarityWeight: 6, // most common
     abilities: {
-      m1: { name: "Punch", kind: "melee", damage: 3, range: 20, radius: 14, cooldown: 0.32, color: "#ffd0a8" },
+      m1: { name: "Punch", kind: "melee", damage: 1.4, range: 20, radius: 14, cooldown: 0.32, color: "#ffd0a8" },
       a1: { name: "Electric Shot", kind: "projectile", damage: 5, range: 220, radius: 6, cooldown: 1.2, speed: 380, color: "#fff36b" },
       a2: { name: "Electric Discharge", kind: "aoe_self", damage: 7, range: 0, radius: 70, cooldown: 4, color: "#fff36b" },
       a3: { name: "Ground Bomber", kind: "aoe_target", damage: 12, range: 120, radius: 50, cooldown: 6, crater: true, color: "#ff8a3a" },
@@ -101,7 +101,7 @@ export const STANDS: Record<StandId, Stand> = {
     color: "#5fd1a0",
     rarityWeight: 3,
     abilities: {
-      m1: { name: "Act 3 Punch", kind: "melee", damage: 0.3, range: 18, radius: 12, cooldown: 0.28, color: "#bff5da" },
+      m1: { name: "Act 3 Punch", kind: "melee", damage: 1.5, range: 18, radius: 12, cooldown: 0.28, color: "#bff5da" },
       a1: { name: "Freeze Touch", kind: "stun_touch", damage: 1, range: 22, radius: 16, cooldown: 4, stunSeconds: 1.6, color: "#a8e8ff" },
       a2: { name: "Explosive Text", kind: "lobbed", damage: 9, range: 160, radius: 38, cooldown: 3.5, speed: 240, color: "#ffb84d" },
       a3: { name: "Burning Text", kind: "dot_zone", damage: 1.5, range: 100, radius: 44, cooldown: 7, duration: 3.5, tickEvery: 0.35, color: "#ff6a3a" },
@@ -114,7 +114,7 @@ export const STANDS: Record<StandId, Stand> = {
     color: "#8f949c",
     rarityWeight: 4,
     abilities: {
-      m1: { name: "Slice", kind: "melee", damage: 3.5, range: 24, radius: 16, cooldown: 0.32, color: "#cfd3dc" },
+      m1: { name: "Slice", kind: "melee", damage: 0.3, range: 24, radius: 16, cooldown: 0.32, color: "#cfd3dc" },
       a1: { name: "Doll / Puppet", kind: "puppet_toggle", damage: 0, range: 0, radius: 0, cooldown: 0.35, color: "#b8bcc6" },
       a2: { name: "Spear Jab", kind: "puppet_spear", damage: 8, range: 190, radius: 8, cooldown: 2.4, speed: 360, color: "#d6d8dd" },
       a3: { name: "360° Spear Spin", kind: "puppet_spin", damage: 7, range: 0, radius: 58, cooldown: 4.5, color: "#b8bcc6" },
@@ -127,7 +127,7 @@ export const STANDS: Record<StandId, Stand> = {
     color: "#f5d36b",
     rarityWeight: 2, // rare
     abilities: {
-      m1: { name: "Punch", kind: "melee", damage: 3.5, range: 22, radius: 16, cooldown: 0.3, color: "#fff0a8" },
+      m1: { name: "Punch", kind: "melee", damage: 2.5, range: 22, radius: 16, cooldown: 0.3, color: "#fff0a8" },
       a1: { name: "Eagle Summon", kind: "chain_projectile", damage: 6, range: 260, radius: 6, cooldown: 3.2, speed: 380, color: "#ffd24a" },
       a2: { name: "Frog Summon", kind: "frog_summon", damage: 0, range: 0, cooldown: 4.5, color: "#7fc97f" },
       a3: { name: "Out of Body", kind: "hologram_stun", damage: 7, range: 36, radius: 18, cooldown: 12, stunSeconds: 3.5, color: "#bff5da" },
