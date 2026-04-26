@@ -2576,3 +2576,28 @@ export function tryUseDisc(w: World): { ok: boolean; reason?: string } {
   }
   return { ok: true };
 }
+
+// Hanged Man: teleport the player (or piloted stand) to a chosen mirror shard.
+export function teleportToShard(w: World, shardId: number) {
+  const s = w.shards.find((x) => x.id === shardId && w.time < x.expireAt);
+  w.shardPickerOpen = false;
+  if (!s) return;
+  // flash at origin and destination
+  const origin = w.pilotActive ? w.hangedMan.pos : w.player.pos;
+  spawnVfx(w, { kind: "shard_flash", pos: { x: origin.x, y: origin.y }, radius: 24, color: "#dfe6f0", life: 0.4 });
+  if (w.pilotActive) {
+    w.hangedMan.pos = { x: s.pos.x, y: s.pos.y };
+  } else {
+    w.player.pos = { x: s.pos.x, y: s.pos.y };
+    pushOutOfProps(w.player, w.props);
+  }
+  spawnVfx(w, { kind: "shard_flash", pos: { x: s.pos.x, y: s.pos.y }, radius: 24, color: "#dfe6f0", life: 0.4 });
+  // commit the cooldown now
+  const ab = STANDS[w.standId].abilities.a3;
+  w.cdTimers.a3 = ab.cooldown;
+  play("shard");
+}
+
+export function closeShardPicker(w: World) {
+  w.shardPickerOpen = false;
+}
