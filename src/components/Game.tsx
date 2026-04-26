@@ -267,6 +267,31 @@ export default function Game() {
     toggleStandActive(worldRef.current);
   };
 
+  const SAVE_KEY = "standtest.save.v1";
+  const onSave = () => {
+    if (!worldRef.current) return;
+    const data = exportSave(worldRef.current, arrowsRef.current, discsRef.current);
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch { /* quota */ }
+  };
+  const onLoad = () => {
+    if (!worldRef.current) return;
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      const got = applySave(worldRef.current, data);
+      arrowsRef.current = got.arrows;
+      discsRef.current = got.discs;
+    } catch { /* corrupt */ }
+  };
+
+  // Autosave every 30s
+  useEffect(() => {
+    const id = window.setInterval(() => onSave(), 30000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stand = STANDS[ui.standId as keyof typeof STANDS];
   const a4 = ui.standId === "echoes" && ui.shitVariant ? SHIT_ABILITY : stand.abilities.a4;
   const abilities = {
