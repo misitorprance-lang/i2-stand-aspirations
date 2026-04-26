@@ -575,10 +575,11 @@ function nearestAnyNpc(w: World, from: Vec2, range = AIM_ASSIST_RANGE): Entity |
 function aimDir(w: World, input: InputState, ab?: Ability, key?: "m1" | "a1" | "a2" | "a3" | "a4"): Vec2 {
   // Manual aim wins
   if (input.aim) return norm(input.aim);
-  // M1: lock onto closest NPC of any kind (so the player can punch friendlies too).
+  // M1: lock onto closest NPC of any kind. For Ebony Devil w/ active puppet, aim from puppet's pos.
   if (key === "m1") {
-    const t = nearestAnyNpc(w, w.player.pos, AIM_ASSIST_RANGE);
-    if (t) return norm({ x: t.pos.x - w.player.pos.x, y: t.pos.y - w.player.pos.y });
+    const origin = (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos : w.player.pos;
+    const t = nearestAnyNpc(w, origin, AIM_ASSIST_RANGE);
+    if (t) return norm({ x: t.pos.x - origin.x, y: t.pos.y - origin.y });
   } else {
     // Target-locked aim: use the ability's range (with fallback) so long-range moves still find targets
     const range = ab?.range && ab.range > 30 ? Math.max(ab.range, AIM_ASSIST_RANGE) : AIM_ASSIST_RANGE;
