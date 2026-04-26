@@ -138,4 +138,19 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       a4: moveOf("hanged_man", "a4", "Brutal slash — bleed + stun + slow."),
     },
   },
+  white_album: {
+    id: "white_album",
+    model: {
+      description: "White suit with purple trim and a yellow-green visor; ice skates under feet.",
+      silhouette: ["sleek visored helmet", "white body w/ purple piping", "ice-skate triangle feet"],
+      auraColor: "#e8eaff",
+    },
+    moves: {
+      m1: moveOf("white_album", "m1", "Quick frost punch. 15% crit (2.1 dmg)."),
+      a1: moveOf("white_album", "a1", "Heavy frozen punch with stun."),
+      a2: moveOf("white_album", "a2", "Barrage of ice at target zone, freezes + stuns."),
+      a3: moveOf("white_album", "a3", "Heal the suit; restores player HP."),
+      a4: moveOf("white_album", "a4", "Frost dome that slows and chips all enemies inside."),
+    },
+  },
 };
