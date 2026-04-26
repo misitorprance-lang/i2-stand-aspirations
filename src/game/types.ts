@@ -155,7 +155,10 @@ export type VfxKind =
   | "stab_line"      // forward streak
   | "beam"           // straight beam between points
   | "explosion_ring" // big blast
-  | "crater_smoke";  // smoke after explosion
+  | "crater_smoke"   // smoke after explosion
+  | "tree_aura"      // protection tree dome
+  | "hologram_burst" // out-of-body hologram pop
+  | "chain_arc";     // chain-lightning hop
 
 export interface Vfx {
   kind: VfxKind;
