@@ -1731,9 +1731,79 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
+  // Boingo update — scared NPC AI: wanders idly, flees from anything threatening (player, puppet, hanged man, hostile NPCs)
+  if (!timeStopped) {
+    const b = w.boingo;
+    // page-flip timer (purely visual)
+    if (w.time >= b.pageFlipAt) {
+      b.pageIndex = (b.pageIndex + 1) % 4;
+      b.pageFlipAt = w.time + rand(2.2, 4.8);
+    }
+    const FLEE_R = 70;
+    let fleeX = 0, fleeY = 0, threats = 0;
+    const consider = (pos: Vec2) => {
+      const dx = b.pos.x - pos.x;
+      const dy = b.pos.y - pos.y;
+      const d2v = dx * dx + dy * dy;
+      if (d2v > 0 && d2v < FLEE_R * FLEE_R) {
+        const d = Math.sqrt(d2v);
+        fleeX += dx / d;
+        fleeY += dy / d;
+        threats++;
+      }
+    };
+    if (pl.alive) consider(pl.pos);
+    if (w.puppet.active) consider(w.puppet.pos);
+    if (w.hangedManActive) consider(w.hangedMan.pos);
+    for (const e of w.npcs) if (e.alive && e.kind === "enemy") consider(e.pos);
+
+    if (threats > 0) {
+      const dir = norm({ x: fleeX, y: fleeY });
+      tryMove(b as unknown as Entity, dir.x * (NPC_SPEED * 1.15) * dt, dir.y * (NPC_SPEED * 1.15) * dt, w.props);
+      b.facing = dir;
+      // a fled-from Boingo doesn't keep his old wander goal
+      b.wanderTarget = null;
+      b.wanderUntil = w.time + 0.5;
+    } else {
+      if (!b.wanderTarget || w.time >= b.wanderUntil) {
+        b.wanderTarget = freeSpotOrCenter(w.props, 10);
+        b.wanderUntil = w.time + rand(2.5, 5);
+      }
+      const tgt = b.wanderTarget;
+      const d = dist(b.pos, tgt);
+      if (d > 4) {
+        const dir = norm({ x: tgt.x - b.pos.x, y: tgt.y - b.pos.y });
+        tryMove(b as unknown as Entity, dir.x * (NPC_SPEED * 0.6) * dt, dir.y * (NPC_SPEED * 0.6) * dt, w.props);
+        b.facing = dir;
+      }
+    }
+
+    // Soft-collide Boingo against the player + every alive NPC + puppet + hanged man.
+    const collideWith = (px: number, py: number, pr: number, heavyOther: boolean) => {
+      const dx = b.pos.x - px;
+      const dy = b.pos.y - py;
+      const minD = b.radius + pr;
+      const d2v = dx * dx + dy * dy;
+      if (d2v > 0 && d2v < minD * minD) {
+        const d = Math.sqrt(d2v);
+        const overlap = minD - d;
+        const nx = dx / d, ny = dy / d;
+        // Boingo is "lighter" than the player/stand bodies — he gets pushed more
+        const boingoShare = heavyOther ? 0.85 : 0.5;
+        b.pos.x += nx * overlap * boingoShare;
+        b.pos.y += ny * overlap * boingoShare;
+      }
+    };
+    if (pl.alive) collideWith(pl.pos.x, pl.pos.y, pl.radius, true);
+    if (w.puppet.active) collideWith(w.puppet.pos.x, w.puppet.pos.y, 8, true);
+    if (w.hangedManActive) collideWith(w.hangedMan.pos.x, w.hangedMan.pos.y, 9, true);
+    for (const e of w.npcs) if (e.alive) collideWith(e.pos.x, e.pos.y, e.radius, false);
+  }
+
   // Eject any entity overlapping a prop (knockback/spawn glitches push them inside houses).
   if (pl.alive) pushOutOfProps(pl, w.props);
   for (const e of w.npcs) if (e.alive) pushOutOfProps(e, w.props);
+  pushOutOfProps(w.boingo as unknown as Entity, w.props);
 
   // Sweep expired Hanged Man mirror shards.
   if (w.shards.length) w.shards = w.shards.filter((s) => w.time < s.expireAt);
