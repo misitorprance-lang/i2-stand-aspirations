@@ -18,6 +18,7 @@ import {
   type InputState,
 } from "@/game/engine";
 import { STANDS, SHIT_ABILITY } from "@/game/stands";
+import { STAND_CODEX } from "@/game/codex";
 import { unlockAudio, isSoundEnabled, setSoundEnabled } from "@/game/sound";
 import { startMusic, applyMusicSetting } from "@/game/music";
 import type { World } from "@/game/engine";
