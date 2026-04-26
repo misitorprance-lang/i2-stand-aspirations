@@ -321,7 +321,7 @@ function freeSpot(props: Prop[], radius: number, opts?: { avoid?: Vec2; avoidR?:
     const y = rand(40, MAP_H - 40);
     let ok = true;
     for (const p of props) {
-      if (circleRectOverlap(x, y, radius + padding, p.rect)) { ok = false; break; }
+      if (propSolid(p) && circleRectOverlap(x, y, radius + padding, p.rect)) { ok = false; break; }
     }
     if (!ok) continue;
     if (opts?.craters) {
@@ -349,7 +349,7 @@ function freeSpotOrGrid(props: Prop[], radius: number): Vec2 {
   for (let y = 40; y < MAP_H - 40; y += step) {
     for (let x = 40; x < MAP_W - 40; x += step) {
       let ok = true;
-      for (const p of props) if (circleRectOverlap(x, y, radius + 6, p.rect)) { ok = false; break; }
+      for (const p of props) if (propSolid(p) && circleRectOverlap(x, y, radius + 6, p.rect)) { ok = false; break; }
       if (ok) return { x, y };
     }
   }
@@ -493,7 +493,7 @@ function pushOutOfProps(e: Entity, props: Prop[]) {
   for (let iter = 0; iter < 4; iter++) {
     let moved = false;
     for (const p of props) {
-      if (!circleRectOverlap(e.pos.x, e.pos.y, e.radius, p.rect)) continue;
+      if (!propSolid(p) || !circleRectOverlap(e.pos.x, e.pos.y, e.radius, p.rect)) continue;
       // find nearest exit direction
       const r = p.rect;
       const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
@@ -1461,7 +1461,7 @@ export function update(w: World, input: InputState, dt: number) {
     if (pr.pos.x < 0 || pr.pos.x > MAP_W || pr.pos.y < 0 || pr.pos.y > MAP_H) { pr.expireAt = 0; continue; }
     // hit props?
     for (const p of w.props) {
-      if (circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
+      if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
     }
     if (pr.expireAt === 0) continue;
     // hit npcs
