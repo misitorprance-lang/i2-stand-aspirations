@@ -1420,26 +1420,18 @@ export function update(w: World, input: InputState, dt: number) {
 
   if (input.aim) w.pointerAim = norm(input.aim);
 
-  // Puppet movement: piloted = joystick, otherwise tail behind player.
+  // Puppet movement: while summoned, the player is frozen and the joystick drives the puppet.
   if (w.puppet.active) {
     if (w.puppet.hp <= 0) { w.puppet.active = false; w.puppetPiloted = false; }
-    if (w.puppetPiloted) {
-      const j = input.joy;
-      const len = Math.hypot(j.x, j.y);
-      if (len > 0.05) {
-        const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
-        const sp = PLAYER_SPEED * Math.min(1, len);
-        const e: Entity = { ...pl, pos: w.puppet.pos, radius: 9 };
-        tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
-        w.puppet.pos.x = e.pos.x; w.puppet.pos.y = e.pos.y;
-        w.puppet.facing = { x: nx, y: ny };
-      }
-    } else {
-      const desired = w.time < w.puppet.attackUntil
-        ? { x: pl.pos.x + w.puppet.facing.x * 28, y: pl.pos.y + w.puppet.facing.y * 24 }
-        : { x: pl.pos.x - pl.facing.x * 28, y: pl.pos.y - pl.facing.y * 22 + 4 };
-      w.puppet.pos.x += (desired.x - w.puppet.pos.x) * Math.min(1, dt * 9);
-      w.puppet.pos.y += (desired.y - w.puppet.pos.y) * Math.min(1, dt * 9);
+    const j = input.joy;
+    const len = Math.hypot(j.x, j.y);
+    if (len > 0.05) {
+      const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
+      const sp = PLAYER_SPEED * Math.min(1, len);
+      const e: Entity = { ...pl, pos: w.puppet.pos, radius: 9 };
+      tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
+      w.puppet.pos.x = e.pos.x; w.puppet.pos.y = e.pos.y;
+      w.puppet.facing = { x: nx, y: ny };
     }
     w.puppet.pos.x = Math.max(10, Math.min(MAP_W - 10, w.puppet.pos.x));
     w.puppet.pos.y = Math.max(10, Math.min(MAP_H - 10, w.puppet.pos.y));
