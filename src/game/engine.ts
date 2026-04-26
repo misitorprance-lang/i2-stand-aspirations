@@ -1246,6 +1246,10 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
+  // Eject any entity overlapping a prop (knockback/spawn glitches push them inside houses).
+  if (pl.alive) pushOutOfProps(pl, w.props);
+  for (const e of w.npcs) if (e.alive) pushOutOfProps(e, w.props);
+
   if (pl.alive) {
     if (input.pressed.m1) { input.pressed.m1 = false; castAbility(w, "m1", input); }
     if (input.pressed.a1) { input.pressed.a1 = false; castAbility(w, "a1", input); }
