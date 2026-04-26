@@ -160,6 +160,7 @@ interface World {
   puppetPiloted: boolean;       // currently piloting Ebony Devil's puppet
   shards: MirrorShard[];
   shardPickerOpen: boolean;
+  hangedMan: { pos: Vec2; facing: Vec2; attackUntil: number };
   // Auto-kick (anti-stuck) cooldown
   kickAt: number;
   // Player-input intent magnitude (used by kick detection)
