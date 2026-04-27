@@ -137,7 +137,7 @@ export default function Game() {
           rageActive: w.time < w.rageUntil,
           echoesAct: w.echoesAct,
           timeStopActive: w.time < w.timeStopUntil,
-          pilotActive: w.pilotActive || w.puppetPiloted,
+          pilotActive: w.pilotActive || w.puppetPiloted || w.purpleHazeActive,
           shardPickerOpen: w.shardPickerOpen,
           shards: w.shards.map((s) => ({ id: s.id, pos: { ...s.pos } })),
           whiteAlbumBar: Math.round(w.whiteAlbumBar),
