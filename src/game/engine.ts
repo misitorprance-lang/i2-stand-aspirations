@@ -639,6 +639,14 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   if (!e.alive) return;
   // Rage Mode now only multiplies damage that originates from the puppet itself.
   if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil && opts?.fromPuppet) dmg *= 1.55;
+  // Cleansly Violence (Purple Haze A4): +8% damage to NPCs while active.
+  if (e.kind !== "player" && w.standId === "purple_haze" && w.time < w.cleanslyUntil) dmg *= 1.08;
+  // Gold Experience: Tree of Life buff (+15% damage while standing inside an active tree).
+  if (e.kind !== "player" && w.standId === "gold_experience") {
+    for (const t of w.trees) {
+      if (w.time < t.expireAt && dist2(w.player.pos, t.pos) < t.radius * t.radius) { dmg *= 1.15; break; }
+    }
+  }
   // White Album suit armor: -1 damage to player while suit is active.
   if (e.kind === "player" && w.standId === "white_album" && w.whiteAlbumActive) dmg = Math.max(0.1, dmg - 1);
   e.hp -= dmg;
