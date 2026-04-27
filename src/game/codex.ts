@@ -117,10 +117,10 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
     },
     moves: {
       m1: moveOf("gold_experience", "m1", "Cone melee."),
-      a1: moveOf("gold_experience", "a1", "Eagle homes to nearest enemy; chains up to 4 (50% per hop)."),
-      a2: moveOf("gold_experience", "a2", "Spawns frog protector (max 3); intercepts attack and reflects 50% damage."),
-      a3: moveOf("gold_experience", "a3", "Long single-target stun with hologram exit/return visual."),
-      a4: moveOf("gold_experience", "a4", "Tree of Life zone: roots enemies, heals + boosts player."),
+      a1: moveOf("gold_experience", "a1", "Eagle shoots forward in a straight line, piercing every enemy in its path."),
+      a2: moveOf("gold_experience", "a2", "Frog protectors follow you (max 3); they leap to block hits and reflect 50%."),
+      a3: moveOf("gold_experience", "a3", "Long single-target stun; a hologram of GE shoots out from behind the target."),
+      a4: moveOf("gold_experience", "a4", "Tree of Life zone: roots enemies, heals you, buffs frog/eagle spam. Despawns on expire."),
     },
   },
   hanged_man: {
@@ -131,7 +131,7 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       auraColor: "#cfd6e3",
     },
     moves: {
-      m1: moveOf("hanged_man", "m1", "Saber slash, fixed 1.2 dmg, no crits. Only inside an active mirror dome."),
+      m1: moveOf("hanged_man", "m1", "Saber slash, fixed 1.2 dmg, no crits."),
       a1: moveOf("hanged_man", "a1", "Pilot toggle: control the stand directly; HP shared, regen disabled."),
       a2: moveOf("hanged_man", "a2", "Drop a mirror shard with a combat dome (max 5, 12s)."),
       a3: moveOf("hanged_man", "a3", "Open shard picker; teleport to chosen shard."),
@@ -148,9 +148,25 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
     moves: {
       m1: moveOf("white_album", "m1", "Quick frost punch. 15% crit (2.1 dmg)."),
       a1: moveOf("white_album", "a1", "Heavy frozen punch with stun."),
-      a2: moveOf("white_album", "a2", "Barrage of ice at target zone, freezes + stuns."),
+      a2: moveOf("white_album", "a2", "Ice spikes shoot out and hit only the 2 closest enemies."),
       a3: moveOf("white_album", "a3", "Heal the suit; restores player HP."),
       a4: moveOf("white_album", "a4", "Frost dome that slows and chips all enemies inside."),
     },
   },
+  purple_haze: {
+    id: "purple_haze",
+    model: {
+      description: "Hulking purple-armored stand with bio-capsule fists and a pale, snarling helm.",
+      silhouette: ["spiked purple helm", "broad violet torso", "capsule knuckles on fists"],
+      auraColor: "#a06bff",
+    },
+    moves: {
+      m1: moveOf("purple_haze", "m1", "Standard punch. Every 10 punches, ~0.2% chance to poison the target for 6s."),
+      a1: moveOf("purple_haze", "a1", "Capsule Shot — golden capsule explodes into a poison gas cloud on contact."),
+      a2: moveOf("purple_haze", "a2", "Gas Release — a ring of poison vents from Purple Haze; light self-damage too."),
+      a3: moveOf("purple_haze", "a3", "Pilot — Purple Haze itself becomes the body you control (slower)."),
+      a4: moveOf("purple_haze", "a4", "Cleansly Violence — +8% damage for several seconds, shown by a bar."),
+    },
+  },
 };
+
