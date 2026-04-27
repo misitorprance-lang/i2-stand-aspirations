@@ -87,10 +87,10 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
     },
     moves: {
       m1: moveOf("echoes", "m1", "Tiny melee tick."),
-      a1: moveOf("echoes", "a1", "Touch that stuns target."),
-      a2: moveOf("echoes", "a2", "Lobbed text that explodes on landing."),
-      a3: moveOf("echoes", "a3", "Burning ground zone that ticks damage."),
-      a4: moveOf("echoes", "a4", "Auto-aim crush on nearest enemy. Rare S.H.I.T. variant: 25 dmg + crater."),
+      a1: moveOf("echoes", "a1", "Sent Bleed: red text projectile that infects an NPC with bleed."),
+      a2: moveOf("echoes", "a2", "Explosion: tags YOU; attackers get blown back on hit."),
+      a3: moveOf("echoes", "a3", "Drops a Frost or Burn ground text. Frost slows + chip; Burn faster chip, no stun."),
+      a4: moveOf("echoes", "a4", "Three Freeze: pressures the 3 nearest enemies — chip, heavy slow, can't fight."),
     },
   },
   ebony_devil: {
