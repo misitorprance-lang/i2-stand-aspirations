@@ -111,6 +111,12 @@ export interface Projectile {
   chainColor?: string;
   // applies electrocute status on hit
   applyElectro?: number;
+  // applies bleed status on hit (Echoes Sent Bleed)
+  applyBleed?: { dps: number; durationSeconds: number };
+  // applies poison status on hit (Purple Haze Capsule Shot)
+  applyPoison?: { dps: number; durationSeconds: number };
+  // textual rendering hint (Echoes/Purple Haze projectiles)
+  textGlyph?: string;
 }
 
 export interface Zone {
