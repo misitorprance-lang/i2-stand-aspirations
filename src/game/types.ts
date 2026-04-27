@@ -35,6 +35,14 @@ export interface Entity {
   bleedUntil?: number;
   bleedNextTickAt?: number;
   slowUntil?: number;
+  // Purple Haze poison
+  poisonUntil?: number;
+  poisonNextTickAt?: number;
+  poisonDps?: number;
+  // Echoes Three Freeze pressure (slow + can't act)
+  pressuredUntil?: number;
+  // Echoes rooting visual via Tree of Life
+  rootedUntil?: number;
   // AI anti-stuck
   stuckAcc?: number;
   lastPos?: Vec2;
