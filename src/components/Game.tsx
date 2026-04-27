@@ -397,12 +397,27 @@ export default function Game() {
         >
           {stand.name}{ui.standId === "echoes" && ui.shitVariant ? " (S.H.I.T.)" : ""}
         </div>
+        {/* Piloting chip — under the stand name (per user spec) */}
+        {ui.pilotActive && (
+          <div className="px-2 py-0.5 rounded text-[10px] font-bold self-start"
+               style={{ background: "rgba(0,0,0,0.7)", color: standColor, border: `1px solid ${standColor}` }}>
+            🎮 PILOTING
+          </div>
+        )}
         {ui.standId === "ebony_devil" && (
           <div className="bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-32">
             <div
               className="h-full transition-[width]"
               style={{ width: `${ui.rage}%`, background: ui.rageActive ? "#ff3d3d" : "#d04848" }}
             />
+          </div>
+        )}
+        {ui.standId === "purple_haze" && ui.cleanslyActive && (
+          <div className="flex items-center gap-1 self-start">
+            <div className="bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-32">
+              <div className="h-full transition-[width]" style={{ width: `${ui.cleanslyFrac * 100}%`, background: "#ff6bd1" }} />
+            </div>
+            <span className="text-[9px] text-white/80 font-bold">VIOLENCE</span>
           </div>
         )}
         {ui.standId === "white_album" && (
