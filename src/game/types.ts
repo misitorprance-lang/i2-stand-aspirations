@@ -199,7 +199,11 @@ export type VfxKind =
   | "crit_burst"     // critical hit yellow sparks
   | "time_clock"     // big clock during time stop
   | "shard_flash"    // teleport flash
-  | "mirror_dome";   // dome edge ring
+  | "mirror_dome"    // dome edge ring
+  | "punch_impact"   // small fist contact burst
+  | "slash_hit"      // weapon contact arc
+  | "poison_cloud"   // purple gas puff (Purple Haze)
+  | "ge_hologram";   // Gold Experience hologram silhouette behind a target
 
 export interface Vfx {
   kind: VfxKind;
