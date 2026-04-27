@@ -35,6 +35,14 @@ export interface Entity {
   bleedUntil?: number;
   bleedNextTickAt?: number;
   slowUntil?: number;
+  // Purple Haze poison
+  poisonUntil?: number;
+  poisonNextTickAt?: number;
+  poisonDps?: number;
+  // Echoes Three Freeze pressure (slow + can't act)
+  pressuredUntil?: number;
+  // Echoes rooting visual via Tree of Life
+  rootedUntil?: number;
   // AI anti-stuck
   stuckAcc?: number;
   lastPos?: Vec2;
@@ -103,6 +111,12 @@ export interface Projectile {
   chainColor?: string;
   // applies electrocute status on hit
   applyElectro?: number;
+  // applies bleed status on hit (Echoes Sent Bleed)
+  applyBleed?: { dps: number; durationSeconds: number };
+  // applies poison status on hit (Purple Haze Capsule Shot)
+  applyPoison?: { dps: number; durationSeconds: number };
+  // textual rendering hint (Echoes/Purple Haze projectiles)
+  textGlyph?: string;
 }
 
 export interface Zone {
@@ -185,7 +199,11 @@ export type VfxKind =
   | "crit_burst"     // critical hit yellow sparks
   | "time_clock"     // big clock during time stop
   | "shard_flash"    // teleport flash
-  | "mirror_dome";   // dome edge ring
+  | "mirror_dome"    // dome edge ring
+  | "punch_impact"   // small fist contact burst
+  | "slash_hit"      // weapon contact arc
+  | "poison_cloud"   // purple gas puff (Purple Haze)
+  | "ge_hologram";   // Gold Experience hologram silhouette behind a target
 
 export interface Vfx {
   kind: VfxKind;

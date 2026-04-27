@@ -1,36 +1,57 @@
 // Stand & ability data tables for Stand Test.
 // All ability behavior is data-driven; the engine reads `kind` to decide how to execute.
 
-export type StandId = "none" | "star_platinum" | "rhcp" | "echoes" | "ebony_devil" | "gold_experience" | "hanged_man" | "white_album";
+export type StandId =
+  | "none"
+  | "star_platinum"
+  | "rhcp"
+  | "echoes"
+  | "ebony_devil"
+  | "gold_experience"
+  | "hanged_man"
+  | "white_album"
+  | "purple_haze";
 
 export type AbilityKind =
-  | "melee" // short cone in facing dir
-  | "projectile" // straight-line moving hit
-  | "pierce" // short forward stab, hits multiple
-  | "aoe_self" // ring around the player
-  | "aoe_target" // AOE at point in facing direction (leaves crater optional)
-  | "channel_cone" // multi-tick cone (ora ora)
-  | "knockback" // close-range strong push
-  | "auto_aim" // pick nearest enemy in range, hit it
-  | "stun_touch" // close range, applies stun
-  | "lobbed" // travels then explodes
-  | "dot_zone" // ground zone ticking damage
-  | "tesla" // stationary AOE that ticks for a few seconds
+  | "melee"
+  | "projectile"
+  | "pierce"
+  | "aoe_self"
+  | "aoe_target"
+  | "channel_cone"
+  | "knockback"
+  | "auto_aim"
+  | "stun_touch"
+  | "lobbed"
+  | "dot_zone"
+  | "tesla"
   | "puppet_toggle"
   | "puppet_spear"
   | "puppet_spin"
   | "rage_mode"
-  | "chain_projectile" // homing piercing shot that chains to nearby targets
-  | "frog_summon"      // summons frog protector(s)
-  | "hologram_stun"    // long stun + hologram visual
-  | "tree_zone"        // protection/heal/buff zone with rooting
-  | "time_stop"        // The World — freezes everything but the player
-  | "pilot_toggle"     // Hanged Man pilot / Ebony Devil puppet drive
-  | "mirror_shard"     // drops a chrome shard with a combat dome
-  | "shard_teleport"   // opens a picker, teleports to chosen shard
-  | "brutal_slash"     // big slash w/ bleed + stun + slow
-  | "ice_heal"         // White Album: regen suit
-  | "ice_stomp";       // White Album: ice barrage
+  | "chain_projectile"
+  | "frog_summon"
+  | "hologram_stun"
+  | "tree_zone"
+  | "time_stop"
+  | "pilot_toggle"
+  | "mirror_shard"
+  | "shard_teleport"
+  | "brutal_slash"
+  | "ice_heal"
+  | "ice_stomp"
+  | "ge_eagle_pierce"        // GE A1 — straight piercing eagle that hits many in a line
+  // Echoes rework
+  | "bleed_text"             // Sent Bleed: red text projectile that applies bleed
+  | "explosion_text"         // self-buff that knocks back attackers
+  | "frost_text"             // ground text — slow + small chip
+  | "burn_text"              // ground text — chip damage, no stun, short
+  | "three_freeze_pressure"  // pressure: chip damage + heavy slow + can't fight
+  // Purple Haze
+  | "capsule_shot"           // shoots a gold capsule that explodes into poison gas
+  | "gas_release"            // self-AOE poison cloud (also damages user weakly)
+  | "ph_pilot_toggle"        // Purple Haze pilot (slower)
+  | "cleansly_violence";     // damage boost duration with bar
 
 export interface Ability {
   name: string;
@@ -38,10 +59,10 @@ export interface Ability {
   damage: number;
   range: number;
   radius?: number;
-  cooldown: number; // seconds
-  duration?: number; // for channels / zones / tesla
-  tickEvery?: number; // for channels / zones
-  speed?: number; // projectiles
+  cooldown: number;
+  duration?: number;
+  tickEvery?: number;
+  speed?: number;
   knockback?: number;
   crater?: boolean;
   stunSeconds?: number;
@@ -51,8 +72,8 @@ export interface Ability {
 export interface Stand {
   id: StandId;
   name: string;
-  color: string; // aura color
-  rarityWeight: number; // 0 means not in roll pool
+  color: string;
+  rarityWeight: number;
   abilities: {
     m1: Ability;
     a1: Ability;
@@ -80,7 +101,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "star_platinum",
     name: "Star Platinum",
     color: "#7c5cff",
-    rarityWeight: 4, // Epic
+    rarityWeight: 4,
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 3, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
       a1: { name: "Star Finger", kind: "pierce", damage: 5, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
@@ -93,7 +114,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "rhcp",
     name: "Red Hot Chili Pepper",
     color: "#ff4444",
-    rarityWeight: 15, // Uncommon
+    rarityWeight: 15,
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 1.4, range: 20, radius: 14, cooldown: 0.32, color: "#ffd0a8" },
       a1: { name: "Electric Shot", kind: "projectile", damage: 4, range: 220, radius: 6, cooldown: 1.2, speed: 380, color: "#fff36b" },
@@ -106,20 +127,20 @@ export const STANDS: Record<StandId, Stand> = {
     id: "echoes",
     name: "Echoes",
     color: "#5fd1a0",
-    rarityWeight: 6, // Rare (Echoes)
+    rarityWeight: 6,
     abilities: {
       m1: { name: "Act 3 Punch", kind: "melee", damage: 1.5, range: 18, radius: 12, cooldown: 0.28, color: "#bff5da" },
-      a1: { name: "Freeze Touch", kind: "stun_touch", damage: 1, range: 22, radius: 16, cooldown: 4, stunSeconds: 1.6, color: "#a8e8ff" },
-      a2: { name: "Explosive Text", kind: "lobbed", damage: 7, range: 160, radius: 38, cooldown: 3.5, speed: 240, color: "#ffb84d" },
-      a3: { name: "Burning Text", kind: "dot_zone", damage: 1.1, range: 100, radius: 44, cooldown: 7, duration: 3.5, tickEvery: 0.35, color: "#ff6a3a" },
-      a4: { name: "Three Freeze", kind: "auto_aim", damage: 8, range: 220, radius: 22, cooldown: 8, color: "#5fd1a0" },
+      a1: { name: "Sent Bleed", kind: "bleed_text", damage: 2, range: 220, radius: 7, cooldown: 3.2, speed: 360, duration: 6, color: "#ff4d4d" },
+      a2: { name: "Explosion", kind: "explosion_text", damage: 6, range: 0, radius: 26, cooldown: 7, duration: 6, knockback: 220, color: "#ffb84d" },
+      a3: { name: "Ground Text", kind: "frost_text", damage: 0.8, range: 110, radius: 44, cooldown: 5, duration: 4, tickEvery: 0.45, color: "#a8e8ff" },
+      a4: { name: "Three Freeze", kind: "three_freeze_pressure", damage: 0.9, range: 240, radius: 22, cooldown: 11, duration: 4.5, tickEvery: 0.5, color: "#5fd1a0" },
     },
   },
   ebony_devil: {
     id: "ebony_devil",
     name: "Ebony Devil",
     color: "#8f949c",
-    rarityWeight: 48, // Common (Ebony Devil)
+    rarityWeight: 48,
     abilities: {
       m1: { name: "Slice", kind: "melee", damage: 0.3, range: 24, radius: 16, cooldown: 0.32, color: "#cfd3dc" },
       a1: { name: "Doll / Puppet", kind: "puppet_toggle", damage: 0, range: 0, radius: 0, cooldown: 0.35, color: "#b8bcc6" },
@@ -132,10 +153,10 @@ export const STANDS: Record<StandId, Stand> = {
     id: "gold_experience",
     name: "Gold Experience",
     color: "#f5d36b",
-    rarityWeight: 6, // Rare (GE)
+    rarityWeight: 6,
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 2.5, range: 22, radius: 16, cooldown: 0.3, color: "#fff0a8" },
-      a1: { name: "Eagle Summon", kind: "chain_projectile", damage: 5, range: 260, radius: 6, cooldown: 3.2, speed: 380, color: "#ffd24a" },
+      a1: { name: "Eagle Shot", kind: "ge_eagle_pierce", damage: 4, range: 280, radius: 8, cooldown: 3.0, speed: 360, color: "#ffd24a" },
       a2: { name: "Frog Summon", kind: "frog_summon", damage: 0, range: 0, cooldown: 4.5, color: "#7fc97f" },
       a3: { name: "Out of Body", kind: "hologram_stun", damage: 5, range: 36, radius: 18, cooldown: 12, stunSeconds: 3.5, color: "#bff5da" },
       a4: { name: "Tree of Life", kind: "tree_zone", damage: 0, range: 70, radius: 90, cooldown: 30, duration: 14, color: "#5fd16a" },
@@ -145,7 +166,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "hanged_man",
     name: "Hanged Man",
     color: "#cfd6e3",
-    rarityWeight: 15, // Uncommon (Hanged Man)
+    rarityWeight: 15,
     abilities: {
       m1: { name: "Saber", kind: "melee", damage: 1.2, range: 28, radius: 14, cooldown: 0.34, color: "#cfd6e3" },
       a1: { name: "Pilot", kind: "pilot_toggle", damage: 0, range: 0, cooldown: 0.4, color: "#cfd6e3" },
@@ -158,7 +179,7 @@ export const STANDS: Record<StandId, Stand> = {
     id: "white_album",
     name: "White Album",
     color: "#e8eaff",
-    rarityWeight: 6, // Rare (White Album)
+    rarityWeight: 6,
     abilities: {
       m1: { name: "Frost Punch", kind: "melee", damage: 1.4, range: 22, radius: 14, cooldown: 0.32, color: "#dfe6ff" },
       a1: { name: "Freeze Punch", kind: "melee", damage: 5, range: 24, radius: 16, cooldown: 3, stunSeconds: 1.2, color: "#a8e8ff" },
@@ -167,9 +188,22 @@ export const STANDS: Record<StandId, Stand> = {
       a4: { name: "Frost Expanse", kind: "dot_zone", damage: 1.5, range: 90, radius: 110, cooldown: 16, duration: 5, tickEvery: 0.5, color: "#9be7ff" },
     },
   },
+  purple_haze: {
+    id: "purple_haze",
+    name: "Purple Haze",
+    color: "#a06bff",
+    rarityWeight: 5, // Rare
+    abilities: {
+      m1: { name: "Punch", kind: "melee", damage: 1.5, range: 22, radius: 14, cooldown: 0.32, color: "#c8a8ff" },
+      a1: { name: "Capsule Shot", kind: "capsule_shot", damage: 3, range: 240, radius: 6, cooldown: 2.8, speed: 320, duration: 6, color: "#ffd24a" },
+      a2: { name: "Gas Release", kind: "gas_release", damage: 1.0, range: 0, radius: 80, cooldown: 9, duration: 5, tickEvery: 0.45, color: "#a06bff" },
+      a3: { name: "Pilot", kind: "ph_pilot_toggle", damage: 0, range: 0, cooldown: 0.4, color: "#a06bff" },
+      a4: { name: "Cleansly Violence", kind: "cleansly_violence", damage: 0, range: 0, cooldown: 18, duration: 8, color: "#ff6bd1" },
+    },
+  },
 };
 
-// S.H.I.T. — rare upgraded variant of Echoes' a4
+// Kept for save-format/back-compat. Not selected by current code paths.
 export const SHIT_ABILITY: Ability = {
   name: "S.H.I.T.",
   kind: "auto_aim",
@@ -181,7 +215,16 @@ export const SHIT_ABILITY: Ability = {
   color: "#222",
 };
 
-const ROLLABLE: StandId[] = ["star_platinum", "rhcp", "echoes", "ebony_devil", "gold_experience", "hanged_man", "white_album"];
+const ROLLABLE: StandId[] = [
+  "star_platinum",
+  "rhcp",
+  "echoes",
+  "ebony_devil",
+  "gold_experience",
+  "hanged_man",
+  "white_album",
+  "purple_haze",
+];
 
 export function rollStand(): { id: StandId; shitVariant: boolean } {
   const total = ROLLABLE.reduce((s, id) => s + STANDS[id].rarityWeight, 0);
@@ -189,8 +232,8 @@ export function rollStand(): { id: StandId; shitVariant: boolean } {
   for (const id of ROLLABLE) {
     r -= STANDS[id].rarityWeight;
     if (r <= 0) {
-      const shitVariant = id === "echoes" && Math.random() < 0.15; // 15% on Echoes
-      return { id, shitVariant };
+      // S.H.I.T. variant fully removed.
+      return { id, shitVariant: false };
     }
   }
   return { id: "rhcp", shitVariant: false };
