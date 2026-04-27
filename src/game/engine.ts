@@ -852,7 +852,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     return;
   }
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone", "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop"].includes(ab.kind)) return;
+  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone", "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop", "ph_pilot_toggle", "cleansly_violence", "explosion_text"].includes(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
   // Hanged Man: A2/A3/A4 require the stand to be summoned first.
   if (w.standId === "hanged_man" && key !== "m1" && ab.kind !== "pilot_toggle" && !w.hangedManActive) {
