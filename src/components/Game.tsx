@@ -75,6 +75,8 @@ export default function Game() {
     shards: [],
     whiteAlbumBar: 100,
     whiteAlbumActive: true,
+    cleanslyActive: false,
+    cleanslyFrac: 0,
     boingoNearby: false,
   });
   const [boingoOpen, setBoingoOpen] = useState(false);
