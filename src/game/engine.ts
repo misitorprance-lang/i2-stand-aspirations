@@ -2231,7 +2231,42 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
-  // Damage numbers
+  // Frogs follow the player (gentle homing) so they're useful as bodyguards.
+  for (const f of w.frogs) {
+    if (!f.alive) continue;
+    const dx = w.player.pos.x - f.pos.x, dy = w.player.pos.y - f.pos.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 18) {
+      const sp = 70;
+      f.pos.x += (dx / d) * sp * dt;
+      f.pos.y += (dy / d) * sp * dt;
+    }
+    f.bobPhase += dt * 4;
+  }
+
+  // Purple Haze pilot movement (mirrors Hanged Man pilot behavior, slower).
+  if (w.standId === "purple_haze" && w.purpleHazeActive) {
+    const j = input.joy;
+    const len = Math.hypot(j.x, j.y);
+    if (len > 0.05) {
+      const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
+      const sp = PLAYER_SPEED * 0.75 * Math.min(1, len);
+      const e: Entity = { ...w.player, pos: w.purpleHaze.pos, radius: 9 };
+      tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
+      w.purpleHaze.pos.x = e.pos.x; w.purpleHaze.pos.y = e.pos.y;
+      w.purpleHaze.facing = { x: nx, y: ny };
+    }
+    w.purpleHaze.pos.x = Math.max(10, Math.min(MAP_W - 10, w.purpleHaze.pos.x));
+    w.purpleHaze.pos.y = Math.max(10, Math.min(MAP_H - 10, w.purpleHaze.pos.y));
+    pushOutOfNpcs(w, w.purpleHaze.pos, 9);
+    const dpx = w.purpleHaze.pos.x - w.player.pos.x, dpy = w.purpleHaze.pos.y - w.player.pos.y;
+    const td = Math.hypot(dpx, dpy);
+    if (td > STAND_TETHER) {
+      const k = STAND_TETHER / td;
+      w.purpleHaze.pos.x = w.player.pos.x + dpx * k;
+      w.purpleHaze.pos.y = w.player.pos.y + dpy * k;
+    }
+  }
   for (const dn of w.damageNumbers) dn.pos.y += dn.vy * dt;
   w.damageNumbers = w.damageNumbers.filter((d) => w.time < d.expireAt);
 
