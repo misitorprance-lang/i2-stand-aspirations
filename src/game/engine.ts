@@ -177,6 +177,14 @@ interface World {
   whiteAlbumToggleAt: number;     // earliest time a toggle is allowed
   whiteAlbumLockUntil: number;    // forced-off lockout when bar empty
   icePath: { pos: Vec2; expireAt: number; bornAt: number }[];
+  // Purple Haze pilot mode (a3)
+  purpleHazeActive: boolean;
+  purpleHaze: { pos: Vec2; facing: Vec2; attackUntil: number };
+  // Cleansly Violence (a4) — +8% damage window
+  cleanslyUntil: number;
+  cleanslyDuration: number;
+  // PH M1 punch counter for poison-on-10 chance
+  phPunchCount: number;
   // Boingo (tutorial-ish friendly NPC; no HP, scared AI, holds a purple book)
   boingo: {
     pos: Vec2;
