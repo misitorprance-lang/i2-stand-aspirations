@@ -43,6 +43,8 @@ interface UIData {
   shards: { id: number; pos: { x: number; y: number } }[];
   whiteAlbumBar: number;
   whiteAlbumActive: boolean;
+  cleanslyActive: boolean;
+  cleanslyFrac: number;
   boingoNearby: boolean;
 }
 
