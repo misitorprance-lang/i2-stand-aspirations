@@ -2192,6 +2192,45 @@ export function update(w: World, input: InputState, dt: number) {
   }
   w.zones = w.zones.filter((z) => w.time < z.expireAt);
 
+  // Status DOTs (bleed, poison, pressure) — ticked per-NPC.
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    if (e.bleedUntil && w.time < e.bleedUntil) {
+      if (!e.bleedNextTickAt || w.time >= e.bleedNextTickAt) {
+        damageEntity(w, e, 0.6);
+        spawnParticles(w, e.pos, "#c4202d", 3, { gravity: 60, speedMin: 10, speedMax: 30, life: 0.4 });
+        e.bleedNextTickAt = w.time + 0.5;
+      }
+    }
+    if (e.poisonUntil && w.time < e.poisonUntil) {
+      if (!e.poisonNextTickAt || w.time >= e.poisonNextTickAt) {
+        damageEntity(w, e, e.poisonDps ?? 1.2);
+        spawnParticles(w, e.pos, "#a06bff", 3, { gravity: -10, speedMin: 8, speedMax: 24, life: 0.5 });
+        e.poisonNextTickAt = w.time + 0.5;
+      }
+    }
+    if (e.pressuredUntil && w.time < e.pressuredUntil) {
+      // Slow + can't act: extend stun window briefly so they can't attack.
+      e.stunUntil = Math.max(e.stunUntil, w.time + 0.15);
+    }
+  }
+  // Player poison from Gas Release self-effect.
+  if (w.player.poisonUntil && w.time < w.player.poisonUntil) {
+    if (!w.player.poisonNextTickAt || w.time >= w.player.poisonNextTickAt) {
+      damageEntity(w, w.player, w.player.poisonDps ?? 0.6);
+      w.player.poisonNextTickAt = w.time + 0.6;
+    }
+  }
+  // Tree of Life passive heal — heal player slowly while inside an active tree.
+  if (w.standId === "gold_experience" && w.player.alive) {
+    for (const t of w.trees) {
+      if (w.time < t.expireAt && dist2(w.player.pos, t.pos) < t.radius * t.radius) {
+        w.player.hp = Math.min(w.player.maxHp, w.player.hp + 6 * dt);
+        break;
+      }
+    }
+  }
+
   // Damage numbers
   for (const dn of w.damageNumbers) dn.pos.y += dn.vy * dt;
   w.damageNumbers = w.damageNumbers.filter((d) => w.time < d.expireAt);
