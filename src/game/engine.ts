@@ -500,6 +500,11 @@ export function createWorld(): World {
     whiteAlbumToggleAt: 0,
     whiteAlbumLockUntil: 0,
     icePath: [],
+    purpleHazeActive: false,
+    purpleHaze: { pos: { ...player.pos }, facing: { x: 0, y: 1 }, attackUntil: 0 },
+    cleanslyUntil: 0,
+    cleanslyDuration: 0,
+    phPunchCount: 0,
     boingo: {
       pos: freeSpot(props, 9, { avoid: player.pos, avoidR: 120 }) ?? { x: player.pos.x + 120, y: player.pos.y + 80 },
       vel: { x: 0, y: 0 },
