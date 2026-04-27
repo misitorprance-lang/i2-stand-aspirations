@@ -2361,6 +2361,7 @@ export function update(w: World, input: InputState, dt: number) {
   const camFocus =
     w.standId === "ebony_devil" && w.puppet.active ? w.puppet.pos :
     w.standId === "hanged_man" && w.hangedManActive ? w.hangedMan.pos :
+    w.standId === "purple_haze" && w.purpleHazeActive ? w.purpleHaze.pos :
     pl.pos;
   const viewW = VW / CAMERA_ZOOM;
   const viewH = VH / CAMERA_ZOOM;
