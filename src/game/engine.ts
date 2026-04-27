@@ -3657,6 +3657,49 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
       ctx.stroke();
       break;
     }
+    case "punch_impact": {
+      const r = (v.radius ?? 8) * (0.5 + t * 1.2);
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.85);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r * 0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "slash_hit": {
+      const r = (v.radius ?? 10) * (0.6 + t * 1.0);
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2.5 * inv + 0.5;
+      ctx.beginPath();
+      ctx.arc(v.pos.x, v.pos.y, r, -0.6, 0.6);
+      ctx.stroke();
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.7);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, 2 + inv * 2, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case "poison_cloud": {
+      const r = (v.radius ?? 30);
+      // multiple soft purple puffs that drift
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + time * 0.5;
+        const dx = Math.cos(a) * r * 0.45 * (0.5 + t * 0.5);
+        const dy = Math.sin(a) * r * 0.45 * (0.5 + t * 0.5) - t * 4;
+        ctx.fillStyle = hexToRgba(v.color, inv * 0.45);
+        ctx.beginPath(); ctx.arc(v.pos.x + dx, v.pos.y + dy, r * 0.42, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.18);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case "ge_hologram": {
+      // Faint gold humanoid silhouette behind target.
+      const flick = 0.5 + Math.sin(time * 30) * 0.3;
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.6 * flick);
+      ctx.fillRect(v.pos.x - 5, v.pos.y - 11, 10, 20);
+      ctx.fillStyle = hexToRgba("#ffe89a", inv * 0.4 * flick);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y - 12, 4, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
   }
 }
 
