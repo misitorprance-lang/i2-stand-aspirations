@@ -546,21 +546,13 @@ export default function Game() {
         )}
       </div>
 
-      {/* Pilot / Time Stop status chips */}
-      {(ui.pilotActive || ui.timeStopActive) && (
+      {/* Time Stop chip (Piloting label is now under the stand name in the top-left HUD). */}
+      {ui.timeStopActive && (
         <div className="absolute top-24 left-3 flex flex-col gap-1 z-30 pointer-events-none">
-          {ui.timeStopActive && (
-            <div className="px-2 py-0.5 rounded text-[10px] font-bold"
-                 style={{ background: "rgba(0,0,0,0.7)", color: "#dcd6ff", border: "1px solid #dcd6ff" }}>
-              ⏱ TIME STOPPED
-            </div>
-          )}
-          {ui.pilotActive && (
-            <div className="px-2 py-0.5 rounded text-[10px] font-bold"
-                 style={{ background: "rgba(0,0,0,0.7)", color: "#cfd6e3", border: "1px solid #cfd6e3" }}>
-              🎮 PILOTING
-            </div>
-          )}
+          <div className="px-2 py-0.5 rounded text-[10px] font-bold"
+               style={{ background: "rgba(0,0,0,0.7)", color: "#dcd6ff", border: "1px solid #dcd6ff" }}>
+            ⏱ TIME STOPPED
+          </div>
         </div>
       )}
 
