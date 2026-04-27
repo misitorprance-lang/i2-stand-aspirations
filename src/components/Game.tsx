@@ -43,6 +43,8 @@ interface UIData {
   shards: { id: number; pos: { x: number; y: number } }[];
   whiteAlbumBar: number;
   whiteAlbumActive: boolean;
+  cleanslyActive: boolean;
+  cleanslyFrac: number;
   boingoNearby: boolean;
 }
 
@@ -73,6 +75,8 @@ export default function Game() {
     shards: [],
     whiteAlbumBar: 100,
     whiteAlbumActive: true,
+    cleanslyActive: false,
+    cleanslyFrac: 0,
     boingoNearby: false,
   });
   const [boingoOpen, setBoingoOpen] = useState(false);
@@ -133,11 +137,13 @@ export default function Game() {
           rageActive: w.time < w.rageUntil,
           echoesAct: w.echoesAct,
           timeStopActive: w.time < w.timeStopUntil,
-          pilotActive: w.pilotActive || w.puppetPiloted,
+          pilotActive: w.pilotActive || w.puppetPiloted || w.purpleHazeActive,
           shardPickerOpen: w.shardPickerOpen,
           shards: w.shards.map((s) => ({ id: s.id, pos: { ...s.pos } })),
           whiteAlbumBar: Math.round(w.whiteAlbumBar),
           whiteAlbumActive: w.whiteAlbumActive,
+          cleanslyActive: w.time < w.cleanslyUntil,
+          cleanslyFrac: w.cleanslyDuration > 0 ? Math.max(0, (w.cleanslyUntil - w.time) / w.cleanslyDuration) : 0,
           boingoNearby: Math.hypot(w.player.pos.x - w.boingo.pos.x, w.player.pos.y - w.boingo.pos.y) < 26,
         });
       }
@@ -397,12 +403,27 @@ export default function Game() {
         >
           {stand.name}{ui.standId === "echoes" && ui.shitVariant ? " (S.H.I.T.)" : ""}
         </div>
+        {/* Piloting chip — under the stand name (per user spec) */}
+        {ui.pilotActive && (
+          <div className="px-2 py-0.5 rounded text-[10px] font-bold self-start"
+               style={{ background: "rgba(0,0,0,0.7)", color: standColor, border: `1px solid ${standColor}` }}>
+            🎮 PILOTING
+          </div>
+        )}
         {ui.standId === "ebony_devil" && (
           <div className="bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-32">
             <div
               className="h-full transition-[width]"
               style={{ width: `${ui.rage}%`, background: ui.rageActive ? "#ff3d3d" : "#d04848" }}
             />
+          </div>
+        )}
+        {ui.standId === "purple_haze" && ui.cleanslyActive && (
+          <div className="flex items-center gap-1 self-start">
+            <div className="bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-32">
+              <div className="h-full transition-[width]" style={{ width: `${ui.cleanslyFrac * 100}%`, background: "#ff6bd1" }} />
+            </div>
+            <span className="text-[9px] text-white/80 font-bold">VIOLENCE</span>
           </div>
         )}
         {ui.standId === "white_album" && (
@@ -525,21 +546,13 @@ export default function Game() {
         )}
       </div>
 
-      {/* Pilot / Time Stop status chips */}
-      {(ui.pilotActive || ui.timeStopActive) && (
+      {/* Time Stop chip (Piloting label is now under the stand name in the top-left HUD). */}
+      {ui.timeStopActive && (
         <div className="absolute top-24 left-3 flex flex-col gap-1 z-30 pointer-events-none">
-          {ui.timeStopActive && (
-            <div className="px-2 py-0.5 rounded text-[10px] font-bold"
-                 style={{ background: "rgba(0,0,0,0.7)", color: "#dcd6ff", border: "1px solid #dcd6ff" }}>
-              ⏱ TIME STOPPED
-            </div>
-          )}
-          {ui.pilotActive && (
-            <div className="px-2 py-0.5 rounded text-[10px] font-bold"
-                 style={{ background: "rgba(0,0,0,0.7)", color: "#cfd6e3", border: "1px solid #cfd6e3" }}>
-              🎮 PILOTING
-            </div>
-          )}
+          <div className="px-2 py-0.5 rounded text-[10px] font-bold"
+               style={{ background: "rgba(0,0,0,0.7)", color: "#dcd6ff", border: "1px solid #dcd6ff" }}>
+            ⏱ TIME STOPPED
+          </div>
         </div>
       )}
 

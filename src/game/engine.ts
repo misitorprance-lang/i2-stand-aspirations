@@ -177,6 +177,14 @@ interface World {
   whiteAlbumToggleAt: number;     // earliest time a toggle is allowed
   whiteAlbumLockUntil: number;    // forced-off lockout when bar empty
   icePath: { pos: Vec2; expireAt: number; bornAt: number }[];
+  // Purple Haze pilot mode (a3)
+  purpleHazeActive: boolean;
+  purpleHaze: { pos: Vec2; facing: Vec2; attackUntil: number };
+  // Cleansly Violence (a4) — +8% damage window
+  cleanslyUntil: number;
+  cleanslyDuration: number;
+  // PH M1 punch counter for poison-on-10 chance
+  phPunchCount: number;
   // Boingo (tutorial-ish friendly NPC; no HP, scared AI, holds a purple book)
   boingo: {
     pos: Vec2;
@@ -492,6 +500,11 @@ export function createWorld(): World {
     whiteAlbumToggleAt: 0,
     whiteAlbumLockUntil: 0,
     icePath: [],
+    purpleHazeActive: false,
+    purpleHaze: { pos: { ...player.pos }, facing: { x: 0, y: 1 }, attackUntil: 0 },
+    cleanslyUntil: 0,
+    cleanslyDuration: 0,
+    phPunchCount: 0,
     boingo: {
       pos: freeSpot(props, 9, { avoid: player.pos, avoidR: 120 }) ?? { x: player.pos.x + 120, y: player.pos.y + 80 },
       vel: { x: 0, y: 0 },
@@ -626,6 +639,14 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   if (!e.alive) return;
   // Rage Mode now only multiplies damage that originates from the puppet itself.
   if (e.kind !== "player" && w.standId === "ebony_devil" && w.time < w.rageUntil && opts?.fromPuppet) dmg *= 1.55;
+  // Cleansly Violence (Purple Haze A4): +8% damage to NPCs while active.
+  if (e.kind !== "player" && w.standId === "purple_haze" && w.time < w.cleanslyUntil) dmg *= 1.08;
+  // Gold Experience: Tree of Life buff (+15% damage while standing inside an active tree).
+  if (e.kind !== "player" && w.standId === "gold_experience") {
+    for (const t of w.trees) {
+      if (w.time < t.expireAt && dist2(w.player.pos, t.pos) < t.radius * t.radius) { dmg *= 1.15; break; }
+    }
+  }
   // White Album suit armor: -1 damage to player while suit is active.
   if (e.kind === "player" && w.standId === "white_album" && w.whiteAlbumActive) dmg = Math.max(0.1, dmg - 1);
   e.hp -= dmg;
@@ -839,7 +860,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     return;
   }
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone", "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop"].includes(ab.kind)) return;
+  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone", "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop", "ph_pilot_toggle", "cleansly_violence", "explosion_text"].includes(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
   // Hanged Man: A2/A3/A4 require the stand to be summoned first.
   if (w.standId === "hanged_man" && key !== "m1" && ab.kind !== "pilot_toggle" && !w.hangedManActive) {
@@ -1436,6 +1457,222 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       play("freezeTouch");
       break;
     }
+    // ---- Gold Experience: Eagle Pierce (A1) ----
+    case "ge_eagle_pierce": {
+      const { target } = resolveTargetPos(w, ab, dir, p);
+      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      w.projectiles.push({
+        id: w.nextId++,
+        pos: { x: p.x, y: p.y },
+        vel: { x: shootDir.x * ab.speed!, y: shootDir.y * ab.speed! },
+        radius: ab.radius || 8,
+        damage: ab.damage,
+        color: ab.color,
+        ownerKind: "player",
+        pierce: true,
+        hitSet: new Set(),
+        expireAt: w.time + ab.range / ab.speed!,
+        speed: ab.speed,
+        textGlyph: "🦅",
+      });
+      if (target) w.standAimTarget = { ...target.pos };
+      spawnVfx(w, { kind: "stab_line", pos: { x: p.x, y: p.y }, to: { x: p.x + shootDir.x * 30, y: p.y + shootDir.y * 30 }, radius: 6, color: ab.color, life: 0.25 });
+      spawnParticles(w, { x: p.x + shootDir.x * 10, y: p.y + shootDir.y * 10 }, ab.color, 8, { speedMin: 60, speedMax: 160, life: 0.3 });
+      break;
+    }
+    // ---- Echoes: Sent Bleed (A1) ----
+    case "bleed_text": {
+      const { target } = resolveTargetPos(w, ab, dir, p);
+      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      w.projectiles.push({
+        id: w.nextId++,
+        pos: { x: p.x, y: p.y },
+        vel: { x: shootDir.x * ab.speed!, y: shootDir.y * ab.speed! },
+        radius: ab.radius || 7,
+        damage: ab.damage,
+        color: ab.color,
+        ownerKind: "player",
+        pierce: false,
+        hitSet: new Set(),
+        expireAt: w.time + ab.range / ab.speed!,
+        homingTargetId: target?.id,
+        homingStrength: 0.14,
+        speed: ab.speed,
+        applyBleed: { dps: 1.2, durationSeconds: ab.duration ?? 6 },
+        textGlyph: "BLEED",
+      });
+      if (target) w.standAimTarget = { ...target.pos };
+      spawnParticles(w, p, ab.color, 6, { speedMin: 50, speedMax: 140, life: 0.3 });
+      break;
+    }
+    // ---- Echoes: Explosion text (A2) — self-buff that knocks back attackers when they hit you ----
+    case "explosion_text": {
+      // Set a buff window; melee hits during this window are reflected.
+      w.cleanslyUntil = Math.max(w.cleanslyUntil, 0); // no-op safety
+      // Reuse pressuredUntil pattern: tag the player with explosionUntil via slowUntil? No — use a dedicated time:
+      // We'll piggyback on rageUntil-like via a new field; simplest: push a zone around player that knocks back contact.
+      const dur = ab.duration ?? 6;
+      // Reactive AOE pulse zone (visual + repeated quick knockback).
+      w.zones.push({
+        id: w.nextId++,
+        pos: { ...p },
+        radius: 24,
+        damagePerTick: ab.damage,
+        tickEvery: 0.6,
+        nextTickAt: w.time + 0.6,
+        expireAt: w.time + dur,
+        color: ab.color,
+        ringColor: ab.color,
+      });
+      spawnVfx(w, { kind: "explosion_ring", pos: { ...p }, radius: 32, color: ab.color, life: 0.5 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 36, color: ab.color, life: 0.45 });
+      spawnParticles(w, p, ab.color, 14, { speedMin: 60, speedMax: 180, life: 0.5 });
+      break;
+    }
+    // ---- Echoes: Frost Text (A3) ----
+    case "frost_text": {
+      const { target, pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const distToAim = Math.hypot(aimPos.x - p.x, aimPos.y - p.y);
+      const drop = Math.min(ab.range, distToAim);
+      const tx = target ? target.pos.x : p.x + dir.x * drop;
+      const ty = target ? target.pos.y : p.y + dir.y * drop;
+      w.zones.push({
+        id: w.nextId++,
+        pos: { x: tx, y: ty },
+        radius: ab.radius!,
+        damagePerTick: ab.damage,
+        tickEvery: ab.tickEvery!,
+        nextTickAt: w.time + ab.tickEvery!,
+        expireAt: w.time + ab.duration!,
+        color: ab.color,
+        ringColor: ab.color,
+      });
+      // Apply slow to enemies stepping in via slowUntil tagging in zone tick? simpler: tag now in radius
+      for (const e of w.npcs) {
+        if (!e.alive) continue;
+        if (dist2(e.pos, { x: tx, y: ty }) < (ab.radius! + e.radius) ** 2) {
+          e.slowUntil = Math.max(e.slowUntil ?? 0, w.time + ab.duration!);
+        }
+      }
+      spawnVfx(w, { kind: "ice_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.6 });
+      break;
+    }
+    // ---- Echoes: Burn Text (unused alt) ----
+    case "burn_text": {
+      const { target, pos: aimPos } = resolveTargetPos(w, ab, dir, p);
+      const distToAim = Math.hypot(aimPos.x - p.x, aimPos.y - p.y);
+      const drop = Math.min(ab.range, distToAim);
+      const tx = target ? target.pos.x : p.x + dir.x * drop;
+      const ty = target ? target.pos.y : p.y + dir.y * drop;
+      w.zones.push({
+        id: w.nextId++,
+        pos: { x: tx, y: ty },
+        radius: ab.radius!,
+        damagePerTick: ab.damage,
+        tickEvery: ab.tickEvery!,
+        nextTickAt: w.time + ab.tickEvery!,
+        expireAt: w.time + ab.duration!,
+        color: ab.color,
+        ringColor: ab.color,
+      });
+      spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: ab.duration! });
+      break;
+    }
+    // ---- Echoes: Three Freeze pressure (A4) — pressure 3 nearest enemies ----
+    case "three_freeze_pressure": {
+      const targets = w.npcs
+        .filter((e) => e.alive)
+        .map((e) => ({ e, d: dist2(e.pos, p) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 3);
+      if (targets.length === 0) {
+        spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 24, color: ab.color, life: 0.3 });
+        break;
+      }
+      for (const { e } of targets) {
+        e.pressuredUntil = w.time + (ab.duration ?? 4.5);
+        e.slowUntil = Math.max(e.slowUntil ?? 0, w.time + (ab.duration ?? 4.5));
+        e.bleedUntil = w.time + (ab.duration ?? 4.5);
+        e.bleedNextTickAt = w.time + (ab.tickEvery ?? 0.5);
+        spawnVfx(w, { kind: "beam", pos: { ...p }, to: { ...e.pos }, color: ab.color, life: 0.3 });
+        spawnVfx(w, { kind: "ice_burst", pos: { ...e.pos }, radius: 16, color: ab.color, life: 0.6 });
+      }
+      break;
+    }
+    // ---- Purple Haze: Capsule Shot (A1) ----
+    case "capsule_shot": {
+      const { target } = resolveTargetPos(w, ab, dir, p);
+      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      w.projectiles.push({
+        id: w.nextId++,
+        pos: { x: p.x, y: p.y },
+        vel: { x: shootDir.x * ab.speed!, y: shootDir.y * ab.speed! },
+        radius: ab.radius || 6,
+        damage: ab.damage,
+        color: "#ffd24a",
+        ownerKind: "player",
+        pierce: false,
+        hitSet: new Set(),
+        expireAt: w.time + ab.range / ab.speed!,
+        applyPoison: { dps: 1.4, durationSeconds: ab.duration ?? 6 },
+      });
+      spawnParticles(w, p, "#ffd24a", 8, { speedMin: 50, speedMax: 140, life: 0.3 });
+      break;
+    }
+    // ---- Purple Haze: Gas Release (A2) ----
+    case "gas_release": {
+      const origin = w.purpleHazeActive ? w.purpleHaze.pos : p;
+      // Damage zone (lasts longer than capsule cloud).
+      w.zones.push({
+        id: w.nextId++,
+        pos: { ...origin },
+        radius: ab.radius!,
+        damagePerTick: ab.damage,
+        tickEvery: ab.tickEvery!,
+        nextTickAt: w.time + ab.tickEvery!,
+        expireAt: w.time + ab.duration!,
+        color: ab.color,
+        ringColor: ab.color,
+      });
+      // Tag NPCs in radius with poison so DOT continues even if they walk out.
+      for (const e of w.npcs) {
+        if (!e.alive) continue;
+        if (dist2(e.pos, origin) < (ab.radius! + e.radius) ** 2) {
+          e.poisonUntil = w.time + (ab.duration! + 2);
+          e.poisonNextTickAt = w.time + 0.5;
+          e.poisonDps = 1.6;
+        }
+      }
+      // Light self-damage (player too).
+      damageEntity(w, w.player, 0.5);
+      spawnVfx(w, { kind: "poison_cloud", pos: { ...origin }, radius: ab.radius!, color: ab.color, life: ab.duration! });
+      spawnParticles(w, origin, ab.color, 18, { speedMin: 30, speedMax: 110, life: 0.7 });
+      break;
+    }
+    // ---- Purple Haze: Pilot toggle (A3) ----
+    case "ph_pilot_toggle": {
+      const turningOn = !w.purpleHazeActive;
+      w.purpleHazeActive = turningOn;
+      if (turningOn) {
+        w.purpleHaze.pos = { x: w.player.pos.x + 18, y: w.player.pos.y };
+        pushOutOfProps({ ...w.player, pos: w.purpleHaze.pos, radius: 9 } as Entity, w.props);
+      }
+      w.bannerText = turningOn ? "Piloting Purple Haze" : "Purple Haze released";
+      w.bannerUntil = w.time + 0.9;
+      play("pilot");
+      break;
+    }
+    // ---- Purple Haze: Cleansly Violence (A4) ----
+    case "cleansly_violence": {
+      const dur = ab.duration ?? 8;
+      w.cleanslyUntil = w.time + dur;
+      w.cleanslyDuration = dur;
+      w.bannerText = "Cleansly Violence!";
+      w.bannerUntil = w.time + 1.0;
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 50, color: ab.color, life: 0.5 });
+      spawnParticles(w, p, ab.color, 18, { shape: "ember", speedMin: 60, speedMax: 180, life: 0.6 });
+      break;
+    }
   }
   // White Album: every move drains the suit bar (Ice Heal / Ice Stomp already drained above).
   if (w.standId === "white_album" && w.whiteAlbumActive && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
@@ -1897,6 +2134,30 @@ export function update(w: World, input: InputState, dt: number) {
       if (dist2(e.pos, pr.pos) < (pr.radius + e.radius) ** 2) {
         damageEntity(w, e, pr.damage);
         pr.hitSet.add(e.id);
+        // Apply bleed if projectile carries it (Echoes Sent Bleed).
+        if (pr.applyBleed) {
+          e.bleedUntil = Math.max(e.bleedUntil ?? 0, w.time + pr.applyBleed.durationSeconds);
+          e.bleedNextTickAt = w.time + 0.5;
+        }
+        // Apply poison if projectile carries it (Purple Haze Capsule Shot — explodes into gas).
+        if (pr.applyPoison) {
+          e.poisonUntil = Math.max(e.poisonUntil ?? 0, w.time + pr.applyPoison.durationSeconds);
+          e.poisonNextTickAt = w.time + 0.5;
+          e.poisonDps = pr.applyPoison.dps;
+          // Spawn lingering poison cloud zone at hit point.
+          w.zones.push({
+            id: w.nextId++,
+            pos: { ...pr.pos },
+            radius: 28,
+            damagePerTick: 0.6,
+            tickEvery: 0.5,
+            nextTickAt: w.time + 0.5,
+            expireAt: w.time + pr.applyPoison.durationSeconds,
+            color: "#a06bff",
+            ringColor: "#a06bff",
+          });
+          spawnVfx(w, { kind: "poison_cloud", pos: { ...pr.pos }, radius: 30, color: "#a06bff", life: pr.applyPoison.durationSeconds });
+        }
         if (!pr.pierce) { pr.expireAt = 0; break; }
       }
     }
@@ -1931,7 +2192,81 @@ export function update(w: World, input: InputState, dt: number) {
   }
   w.zones = w.zones.filter((z) => w.time < z.expireAt);
 
-  // Damage numbers
+  // Status DOTs (bleed, poison, pressure) — ticked per-NPC.
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    if (e.bleedUntil && w.time < e.bleedUntil) {
+      if (!e.bleedNextTickAt || w.time >= e.bleedNextTickAt) {
+        damageEntity(w, e, 0.6);
+        spawnParticles(w, e.pos, "#c4202d", 3, { gravity: 60, speedMin: 10, speedMax: 30, life: 0.4 });
+        e.bleedNextTickAt = w.time + 0.5;
+      }
+    }
+    if (e.poisonUntil && w.time < e.poisonUntil) {
+      if (!e.poisonNextTickAt || w.time >= e.poisonNextTickAt) {
+        damageEntity(w, e, e.poisonDps ?? 1.2);
+        spawnParticles(w, e.pos, "#a06bff", 3, { gravity: -10, speedMin: 8, speedMax: 24, life: 0.5 });
+        e.poisonNextTickAt = w.time + 0.5;
+      }
+    }
+    if (e.pressuredUntil && w.time < e.pressuredUntil) {
+      // Slow + can't act: extend stun window briefly so they can't attack.
+      e.stunUntil = Math.max(e.stunUntil, w.time + 0.15);
+    }
+  }
+  // Player poison from Gas Release self-effect.
+  if (w.player.poisonUntil && w.time < w.player.poisonUntil) {
+    if (!w.player.poisonNextTickAt || w.time >= w.player.poisonNextTickAt) {
+      damageEntity(w, w.player, w.player.poisonDps ?? 0.6);
+      w.player.poisonNextTickAt = w.time + 0.6;
+    }
+  }
+  // Tree of Life passive heal — heal player slowly while inside an active tree.
+  if (w.standId === "gold_experience" && w.player.alive) {
+    for (const t of w.trees) {
+      if (w.time < t.expireAt && dist2(w.player.pos, t.pos) < t.radius * t.radius) {
+        w.player.hp = Math.min(w.player.maxHp, w.player.hp + 6 * dt);
+        break;
+      }
+    }
+  }
+
+  // Frogs follow the player (gentle homing) so they're useful as bodyguards.
+  for (const f of w.frogs) {
+    if (!f.alive) continue;
+    const dx = w.player.pos.x - f.pos.x, dy = w.player.pos.y - f.pos.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 18) {
+      const sp = 70;
+      f.pos.x += (dx / d) * sp * dt;
+      f.pos.y += (dy / d) * sp * dt;
+    }
+    f.bobPhase += dt * 4;
+  }
+
+  // Purple Haze pilot movement (mirrors Hanged Man pilot behavior, slower).
+  if (w.standId === "purple_haze" && w.purpleHazeActive) {
+    const j = input.joy;
+    const len = Math.hypot(j.x, j.y);
+    if (len > 0.05) {
+      const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
+      const sp = PLAYER_SPEED * 0.75 * Math.min(1, len);
+      const e: Entity = { ...w.player, pos: w.purpleHaze.pos, radius: 9 };
+      tryMove(e, nx * sp * dt, ny * sp * dt, w.props);
+      w.purpleHaze.pos.x = e.pos.x; w.purpleHaze.pos.y = e.pos.y;
+      w.purpleHaze.facing = { x: nx, y: ny };
+    }
+    w.purpleHaze.pos.x = Math.max(10, Math.min(MAP_W - 10, w.purpleHaze.pos.x));
+    w.purpleHaze.pos.y = Math.max(10, Math.min(MAP_H - 10, w.purpleHaze.pos.y));
+    pushOutOfNpcs(w, w.purpleHaze.pos, 9);
+    const dpx = w.purpleHaze.pos.x - w.player.pos.x, dpy = w.purpleHaze.pos.y - w.player.pos.y;
+    const td = Math.hypot(dpx, dpy);
+    if (td > STAND_TETHER) {
+      const k = STAND_TETHER / td;
+      w.purpleHaze.pos.x = w.player.pos.x + dpx * k;
+      w.purpleHaze.pos.y = w.player.pos.y + dpy * k;
+    }
+  }
   for (const dn of w.damageNumbers) dn.pos.y += dn.vy * dt;
   w.damageNumbers = w.damageNumbers.filter((d) => w.time < d.expireAt);
 
@@ -2026,6 +2361,7 @@ export function update(w: World, input: InputState, dt: number) {
   const camFocus =
     w.standId === "ebony_devil" && w.puppet.active ? w.puppet.pos :
     w.standId === "hanged_man" && w.hangedManActive ? w.hangedMan.pos :
+    w.standId === "purple_haze" && w.purpleHazeActive ? w.purpleHaze.pos :
     pl.pos;
   const viewW = VW / CAMERA_ZOOM;
   const viewH = VH / CAMERA_ZOOM;
@@ -3319,6 +3655,49 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
       ctx.lineTo(mx, my);
       ctx.lineTo(v.to.x, v.to.y);
       ctx.stroke();
+      break;
+    }
+    case "punch_impact": {
+      const r = (v.radius ?? 8) * (0.5 + t * 1.2);
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.85);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r * 0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    case "slash_hit": {
+      const r = (v.radius ?? 10) * (0.6 + t * 1.0);
+      ctx.strokeStyle = hexToRgba(v.color, inv);
+      ctx.lineWidth = 2.5 * inv + 0.5;
+      ctx.beginPath();
+      ctx.arc(v.pos.x, v.pos.y, r, -0.6, 0.6);
+      ctx.stroke();
+      ctx.fillStyle = hexToRgba("#ffffff", inv * 0.7);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, 2 + inv * 2, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case "poison_cloud": {
+      const r = (v.radius ?? 30);
+      // multiple soft purple puffs that drift
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + time * 0.5;
+        const dx = Math.cos(a) * r * 0.45 * (0.5 + t * 0.5);
+        const dy = Math.sin(a) * r * 0.45 * (0.5 + t * 0.5) - t * 4;
+        ctx.fillStyle = hexToRgba(v.color, inv * 0.45);
+        ctx.beginPath(); ctx.arc(v.pos.x + dx, v.pos.y + dy, r * 0.42, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.18);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y, r, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case "ge_hologram": {
+      // Faint gold humanoid silhouette behind target.
+      const flick = 0.5 + Math.sin(time * 30) * 0.3;
+      ctx.fillStyle = hexToRgba(v.color, inv * 0.6 * flick);
+      ctx.fillRect(v.pos.x - 5, v.pos.y - 11, 10, 20);
+      ctx.fillStyle = hexToRgba("#ffe89a", inv * 0.4 * flick);
+      ctx.beginPath(); ctx.arc(v.pos.x, v.pos.y - 12, 4, 0, Math.PI * 2); ctx.fill();
       break;
     }
   }
