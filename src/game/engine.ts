@@ -2134,6 +2134,30 @@ export function update(w: World, input: InputState, dt: number) {
       if (dist2(e.pos, pr.pos) < (pr.radius + e.radius) ** 2) {
         damageEntity(w, e, pr.damage);
         pr.hitSet.add(e.id);
+        // Apply bleed if projectile carries it (Echoes Sent Bleed).
+        if (pr.applyBleed) {
+          e.bleedUntil = Math.max(e.bleedUntil ?? 0, w.time + pr.applyBleed.durationSeconds);
+          e.bleedNextTickAt = w.time + 0.5;
+        }
+        // Apply poison if projectile carries it (Purple Haze Capsule Shot — explodes into gas).
+        if (pr.applyPoison) {
+          e.poisonUntil = Math.max(e.poisonUntil ?? 0, w.time + pr.applyPoison.durationSeconds);
+          e.poisonNextTickAt = w.time + 0.5;
+          e.poisonDps = pr.applyPoison.dps;
+          // Spawn lingering poison cloud zone at hit point.
+          w.zones.push({
+            id: w.nextId++,
+            pos: { ...pr.pos },
+            radius: 28,
+            damagePerTick: 0.6,
+            tickEvery: 0.5,
+            nextTickAt: w.time + 0.5,
+            expireAt: w.time + pr.applyPoison.durationSeconds,
+            color: "#a06bff",
+            ringColor: "#a06bff",
+          });
+          spawnVfx(w, { kind: "poison_cloud", pos: { ...pr.pos }, radius: 30, color: "#a06bff", life: pr.applyPoison.durationSeconds });
+        }
         if (!pr.pierce) { pr.expireAt = 0; break; }
       }
     }
