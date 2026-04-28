@@ -2240,7 +2240,8 @@ export function update(w: World, input: InputState, dt: number) {
       w.player.poisonNextTickAt = w.time + 0.6;
     }
   }
-  // Tree of Life passive heal — heal player slowly while inside an active tree.
+  // Tree of Life: heal player inside an active tree, root enemies inside dome,
+  // and remove expired trees from the world (so the visuals + dome despawn cleanly).
   if (w.standId === "gold_experience" && w.player.alive) {
     for (const t of w.trees) {
       if (w.time < t.expireAt && dist2(w.player.pos, t.pos) < t.radius * t.radius) {
@@ -2249,19 +2250,44 @@ export function update(w: World, input: InputState, dt: number) {
       }
     }
   }
+  // Apply root/slow to NPCs inside any active tree dome (re-applied each tick).
+  for (const t of w.trees) {
+    if (w.time >= t.expireAt) continue;
+    for (const e of w.npcs) {
+      if (!e.alive) continue;
+      if (dist2(e.pos, t.pos) < t.radius * t.radius) {
+        e.rootedUntil = Math.max(e.rootedUntil ?? 0, w.time + 0.4);
+        e.slowUntil = Math.max(e.slowUntil ?? 0, w.time + 0.4);
+        // Occasional root sprout VFX
+        if (!t.rooted.has(e.id) || w.time > (t.rooted.get(e.id) ?? 0)) {
+          spawnParticles(w, e.pos, "#5a3a1c", 3, { gravity: 60, life: 0.5, speedMin: 20, speedMax: 60, shape: "square" });
+          t.rooted.set(e.id, w.time + 0.6);
+        }
+      }
+    }
+  }
+  // Despawn expired trees (fixes the bug where trees never disappeared).
+  if (w.trees.length) w.trees = w.trees.filter((t) => w.time < t.expireAt);
 
-  // Frogs follow the player (gentle homing) so they're useful as bodyguards.
-  for (const f of w.frogs) {
-    if (!f.alive) continue;
-    const dx = w.player.pos.x - f.pos.x, dy = w.player.pos.y - f.pos.y;
+  // Frogs follow the player in stable orbit slots (no jitter / stacking).
+  const aliveFrogsList = w.frogs.filter((f) => f.alive);
+  for (let i = 0; i < aliveFrogsList.length; i++) {
+    const f = aliveFrogsList[i];
+    const slot = (i / Math.max(1, aliveFrogsList.length)) * Math.PI * 2;
+    const orbit = 22;
+    const tx = w.player.pos.x + Math.cos(slot + w.time * 0.6) * orbit;
+    const ty = w.player.pos.y + Math.sin(slot + w.time * 0.6) * orbit;
+    const dx = tx - f.pos.x, dy = ty - f.pos.y;
     const d = Math.hypot(dx, dy);
-    if (d > 18) {
-      const sp = 70;
+    if (d > 1) {
+      const sp = Math.min(d * 6, 140);
       f.pos.x += (dx / d) * sp * dt;
       f.pos.y += (dy / d) * sp * dt;
     }
     f.bobPhase += dt * 4;
   }
+  // Clean dead frogs from list periodically.
+  if (w.frogs.some((f) => !f.alive)) w.frogs = w.frogs.filter((f) => f.alive);
 
   // Purple Haze pilot movement (mirrors Hanged Man pilot behavior, slower).
   if (w.standId === "purple_haze" && w.purpleHazeActive) {
