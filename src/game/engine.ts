@@ -3723,12 +3723,26 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
 }
 
 const PROP_RESPAWN_DELAY = 30;
-function damageProp(w: World, p: Prop, dmg: number) {
+// Routes all prop damage. If `kind` is "house" we require the source to be a house-breaker stand
+// or a strong ability. Otherwise the hit is ignored (the bonk lands but the wall holds).
+function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
   if (p.destructible !== true) return;
   if ((p.hp ?? 0) <= 0) return;
+  if (isHouse(p)) {
+    const sid = source?.standId ?? w.standId;
+    const ak = source?.abilityKind ?? "";
+    const allowed = HOUSE_BREAKERS.has(sid) || HOUSE_STRONG_KINDS.has(ak);
+    if (!allowed) {
+      // Show a tiny "ineffective" puff so the player understands.
+      p.hitFlashUntil = w.time + 0.06;
+      spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#caa472", 2, {
+        shape: "square", gravity: 40, speedMin: 10, speedMax: 30, life: 0.25,
+      });
+      return;
+    }
+  }
   p.hp = (p.hp ?? 0) - dmg;
   p.hitFlashUntil = w.time + 0.12;
-  // wood/stone chip particles
   spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#a07050", 4, {
     shape: "square", gravity: 80, speedMin: 30, speedMax: 100, life: 0.4,
   });
@@ -3745,11 +3759,10 @@ function damageProp(w: World, p: Prop, dmg: number) {
   }
 }
 
-// Damage every solid prop that overlaps the AOE circle.
-function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number) {
+function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
   for (const p of w.props) {
     if (!propSolid(p)) continue;
-    if (circleRectOverlap(x, y, radius, p.rect)) damageProp(w, p, dmg);
+    if (circleRectOverlap(x, y, radius, p.rect)) damageProp(w, p, dmg, source);
   }
 }
 
