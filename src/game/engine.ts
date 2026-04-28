@@ -214,9 +214,9 @@ interface World {
 function makeProps(): Prop[] {
   const props: Prop[] = [];
 
-  // Trees (round canopies + brown trunk; collision = trunk + roots area, smaller than canopy)
+  // Trees — denser for the larger map.
   const treeSpots: Vec2[] = [];
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < 90; i++) {
     let tries = 0;
     while (tries++ < 20) {
       const x = rand(40, MAP_W - 60);
@@ -230,7 +230,6 @@ function makeProps(): Prop[] {
     props.push({
       rect: r,
       draw: (ctx, rr) => {
-        // canopy
         ctx.fillStyle = "#1f5d2a";
         ctx.beginPath();
         ctx.arc(rr.x + rr.w / 2, rr.y - 8, 22, 0, Math.PI * 2);
@@ -239,16 +238,14 @@ function makeProps(): Prop[] {
         ctx.beginPath();
         ctx.arc(rr.x + rr.w / 2 - 4, rr.y - 12, 14, 0, Math.PI * 2);
         ctx.fill();
-        // trunk
         ctx.fillStyle = "#5a3a1c";
         ctx.fillRect(rr.x + rr.w / 2 - 4, rr.y, 8, rr.h);
       },
     });
   }
-  // (prop hp tagging — deferred to next round)
 
-  // Rocks (gray ovals)
-  for (let i = 0; i < 21; i++) {
+  // Rocks
+  for (let i = 0; i < 45; i++) {
     const x = rand(30, MAP_W - 30), y = rand(30, MAP_H - 30);
     const w = rand(18, 30), h = rand(12, 18);
     const r: Rect = { x: x - w / 2, y: y - h / 2, w, h };
@@ -267,8 +264,8 @@ function makeProps(): Prop[] {
     });
   }
 
-  // Bushes (small dark green) — non-blocking? Make them blocking small
-  for (let i = 0; i < 27; i++) {
+  // Bushes
+  for (let i = 0; i < 60; i++) {
     const x = rand(20, MAP_W - 20), y = rand(20, MAP_H - 20);
     const r: Rect = { x: x - 9, y: y - 7, w: 18, h: 14 };
     props.push({
@@ -284,45 +281,45 @@ function makeProps(): Prop[] {
     });
   }
 
-  // Houses (5) — bigger collision; placed at varied locations across the bigger map
+  // Houses (10) — bigger collision (110×84) spread across the bigger map.
   const houses: Vec2[] = [
-    { x: 220, y: 320 },
-    { x: 1050, y: 480 },
-    { x: 380, y: 1500 },
-    { x: 1100, y: 1700 },
-    { x: 700, y: 1100 },
+    { x: 280, y: 360 },
+    { x: 1380, y: 540 },
+    { x: 2200, y: 380 },
+    { x: 460, y: 1700 },
+    { x: 1500, y: 1950 },
+    { x: 2350, y: 1700 },
+    { x: 820, y: 1250 },
+    { x: 1900, y: 2700 },
+    { x: 380, y: 3100 },
+    { x: 2200, y: 3300 },
   ];
   for (const h of houses) {
-    const r: Rect = { x: h.x - 40, y: h.y - 30, w: 80, h: 60 };
+    const r: Rect = { x: h.x - 55, y: h.y - 42, w: 110, h: 84 };
     props.push({
       rect: r,
       draw: (ctx, rr) => {
-        // body
         ctx.fillStyle = "#caa472";
-        ctx.fillRect(rr.x, rr.y + 10, rr.w, rr.h - 10);
-        // roof
+        ctx.fillRect(rr.x, rr.y + 14, rr.w, rr.h - 14);
         ctx.fillStyle = "#7a3a2a";
         ctx.beginPath();
-        ctx.moveTo(rr.x - 4, rr.y + 14);
-        ctx.lineTo(rr.x + rr.w / 2, rr.y - 12);
-        ctx.lineTo(rr.x + rr.w + 4, rr.y + 14);
+        ctx.moveTo(rr.x - 6, rr.y + 18);
+        ctx.lineTo(rr.x + rr.w / 2, rr.y - 16);
+        ctx.lineTo(rr.x + rr.w + 6, rr.y + 18);
         ctx.closePath();
         ctx.fill();
-        // door
         ctx.fillStyle = "#3a2418";
-        ctx.fillRect(rr.x + rr.w / 2 - 7, rr.y + rr.h - 18, 14, 18);
-        // window
+        ctx.fillRect(rr.x + rr.w / 2 - 9, rr.y + rr.h - 26, 18, 26);
         ctx.fillStyle = "#9bd9ff";
-        ctx.fillRect(rr.x + 8, rr.y + 20, 12, 10);
-        ctx.fillRect(rr.x + rr.w - 20, rr.y + 20, 12, 10);
+        ctx.fillRect(rr.x + 12, rr.y + 28, 16, 14);
+        ctx.fillRect(rr.x + rr.w - 28, rr.y + 28, 16, 14);
       },
     });
   }
-  // (prop hp tagging — deferred)
 
-
-  for (let i = 0; i < 9; i++) {
-    const x = rand(50, MAP_W - 100);
+  // Fences
+  for (let i = 0; i < 22; i++) {
+    const x = rand(50, MAP_W - 140);
     const y = rand(50, MAP_H - 50);
     const w = rand(60, 120);
     const r: Rect = { x, y, w, h: 6 };
@@ -338,12 +335,12 @@ function makeProps(): Prop[] {
       },
     });
   }
-  // ---- prop tagging: assign destruction HP per category by rect signature ----
-  // Trees: 20×16; Rocks: variable ovals; Bushes: 18×14; Houses: 80×60; Fences: w×6.
+
+  // Prop tagging — assign HP. Houses are now 110×84.
   for (const p of props) {
     const r = p.rect;
     let hp = 0;
-    if (r.w === 80 && r.h === 60) hp = 60;            // house
+    if (r.w === 110 && r.h === 84) hp = 80;           // house
     else if (r.w === 20 && r.h === 16) hp = 12;       // tree
     else if (r.w === 18 && r.h === 14) hp = 12;       // bush
     else if (r.h === 6) hp = 12;                      // fence
@@ -355,6 +352,11 @@ function makeProps(): Prop[] {
   }
 
   return props;
+}
+
+// True if a prop is a "house" (the only props basic punches cannot break).
+function isHouse(p: Prop): boolean {
+  return p.rect.w === 110 && p.rect.h === 84;
 }
 
 // Strict spawn: never inside a prop, never inside an existing crater, never on player.
