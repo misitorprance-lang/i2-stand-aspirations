@@ -964,7 +964,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
       // Melee chops at props in front of you (heavy stands break things faster).
-      damagePropsInRadius(w, tx, ty, (ab.radius ?? 14) + 4, dmg);
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 14) + 4, dmg, { abilityKind: ab.kind, standId: w.standId });
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
       // trigger stand-punch animation
       w.standPunchUntil = w.time + 0.25;
