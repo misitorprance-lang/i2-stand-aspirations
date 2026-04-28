@@ -1,108 +1,121 @@
-# Plan: Detached Stand Bodies, Balance, Boingo, Save/Load, White Album
+I’ll implement this as one gameplay pass across `engine.ts`, `types.ts`, `stands.ts`, `codex.ts`, and `Game.tsx`.
 
-## Part 1 — Hanged Man & Puppet as separate "player" entities
+## Plan
 
-### Hanged Man requires summon
-- Add `hangedManActive` flag in `World`. `m1` (Saber) is the only ability allowed when inactive.
-- A1 "Pilot" toggles `hangedManActive` AND `pilotActive` together: first press summons + starts piloting; second press desummons. While inactive, A2/A3/A4 show banner "Summon Hanged Man first" and do nothing.
-- A2 (Mirror Shard), A3 (Teleport), A4 (Brutal Slash) all require `hangedManActive` and now originate from `w.hangedMan.pos` instead of player.
-- M1 Saber: when `hangedManActive`, swing originates from the Hanged Man entity (matches Ebony Devil M1 pattern).
+### 1. Gold Experience fixes
+- Rework Ability 1 projectile rendering so it is visibly an eagle instead of a generic orb/emoji:
+  - Draw a small golden bird body, wings, beak, tail, and wing-flap frames while it flies forward.
+  - Keep it piercing so it can hit more than 3 enemies.
+- Fix Ability 2 frogs:
+  - Make frogs follow in stable offset slots around the player instead of stacking/jittering.
+  - When an NPC attack reaches the player, a frog leaps onto the player/attack point, disappears, and reflects 50% of that incoming damage to the attacker.
+- Fix Ability 3 hologram/afterimage:
+  - Add a real Gold Experience afterimage behind/through the target, not only a burst effect.
+  - Render the target’s out-of-body afterimage state clearly while stunned.
+- Fix Ability 4 Tree of Life:
+  - Remove expired tree objects from `w.trees`, not just the VFX.
+  - Make tree + dome disappear exactly when the duration ends.
+  - Root/grab enemies inside the dome by applying `rootedUntil`/short stun/slow and root visuals.
+  - Clear tree effects when switching stands or using a DISC.
 
-### Visible model + collision
-- Add `drawHangedMan(ctx, w, pos)` renderer: tall slim humanoid in grey/blue, saber, cloak. Called from main draw list when `hangedManActive`, sorted by `y` like `drawPuppet`.
-- Add `drawPuppet` body refresh so the puppet reads as a separate "player-like" doll.
-- Both already have `pos` and `radius` — pass through `pushOutOfProps` and `tryMove` paths each tick so they collide with props.
+### 2. Stand summon + cleanup behavior
+- Change arrow usage so the new stand is equipped but not automatically summoned:
+  - `standActive = false` after using an Arrow or Blue Pebble.
+  - The player must tap `Stand: ON/OFF` to summon.
+  - On summon, show colored floating text with the stand name near the player for a few seconds.
+- Add a centralized `resetStandRuntime` cleanup so stand switching/discarding removes old map effects:
+  - GE frogs/trees/holograms.
+  - Echoes text zones/status leftovers where appropriate.
+  - Purple Haze poison clouds/projectiles/pilot/violence state.
+  - Hanged Man shards/pilot state.
+  - White Album trail/suit runtime where needed.
 
-### Hostile NPCs target the active stand
-- In NPC AI block (the `targetPos` selection around `puppetCloser`), extend logic:
-  - If `w.hangedManActive`, also consider `w.hangedMan.pos` as a candidate. Pick whichever (player / puppet / hanged man) is closest.
-  - When NPC reaches attack range of the puppet → call existing `damagePuppet`. When it reaches the hanged man → new `damageHangedMan(w, dmg)` that routes the damage to the player (HP shared).
-- Player movement freeze: existing `piloting` flag already disables player joystick movement. Confirm it covers both stands; player still cannot move while either is active.
+### 3. Boingo + Tonth UI rework
+- Replace the current long Boingo modal with a paged book UI named `Tonth`:
+  - Page 1: current player stand, in-game visual design, special model notes like Ebony Devil’s puppet, stats, rarity, and abilities.
+  - Page 2: stand rarity table ordered from most common to rarest.
+- Freeze Boingo at his last position while the player is inside his UI.
+- On first talk:
+  - Award `Tonth Copy`.
+  - Boingo despawns/disappears permanently for that run/save.
+  - Show a single item notification: `Got Tonth Copy`.
+- Add `Tonth Copy` to inventory; using it opens the same Tonth book without Boingo speech.
 
-### Ebony Devil Rage Mode → puppet-only
-- A4 `rage_mode`: require `w.puppet.active`; otherwise banner "Summon Puppet first".
-- Damage multiplier (`* 1.55`) currently applied to all player damage during `rageUntil` — gate it so it only multiplies damage whose origin is the puppet (M1 puppetSwing, `puppet_spear`, `puppet_spin`). Player's own M1 / other abilities are unaffected.
-- Visual rage ring drawn around puppet instead of player while rage is active and puppet is summoned.
+### 4. Inventory system and item pickups
+- Remove the top-bar Arrow/DISC counters/buttons.
+- Add an inventory button/panel that contains:
+  - Stand Arrow count and Use button.
+  - DISC count and Use button.
+  - Tonth Copy Use button if owned.
+  - Requiem Arrow count/entry, marked unusable for now.
+  - Blue Pebble count and Use button.
+- Update save/load to persist the new inventory counts and Boingo/Tonth state.
+- Keep item pickup collision, but route pickups into inventory instead of separate `arrowsRef` / `discsRef` counters.
 
-## Part 2 — Balance pass (abilities only, M1 untouched)
+### 5. New world items
+- Add `Requiem Arrow`:
+  - Spawns once in an Arrow spawn area.
+  - Once picked up, it never spawns again.
+  - Currently appears in inventory but cannot be used.
+- Add `Blue Pebble`:
+  - Spawns in DISC spawn areas.
+  - Limit uncollected Blue Pebbles on the map to 2.
+  - Picking one up adds it to inventory.
+  - Using it grants `Moon Rabbit` guaranteed and sets it unsummoned until the player manually summons it.
 
-Edit `src/game/stands.ts`:
-- Star Platinum: Star Finger 6→5, Ranged Smash 8→6, Launch 14→11.
-- RHCP: Electric Shot 5→4, Discharge 7→5, Ground Bomber 12→9, Tesla Coil tick 2.5→1.8.
-- Echoes: Explosive Text 9→7, Burning Text DPS 1.5→1.1, Three Freeze 11→8 (S.H.I.T. 25→18).
-- Ebony Devil: Spear Jab 8→6, Spin 7→5.
-- Gold Experience: Eagle 6→5, Hologram Stun 7→5.
-- Hanged Man: Brutal Slash 8→7 (already strong via bleed/stun/slow).
+### 6. Map, props, and spawning
+- Increase map size by 1.5x from the current values:
+  - `MAP_W: 1700 -> 2550`
+  - `MAP_H: 2600 -> 3900`
+- Make houses bigger again without overdoing it.
+- Expand generated prop counts/placement for the larger map.
+- Add more item spawn areas and ensure Arrows/DISCs/Requiem Arrow/Blue Pebbles never spawn on generated props, craters, houses, or the player.
 
-## Part 3 — Item spawn rate
+### 7. House damage restrictions
+- Stop basic player punches and weak attacks from damaging houses.
+- Allow house damage only from Star Platinum and selected strong abilities such as heavy explosions, Star Finger/Launch, major lightning, and other explicitly strong moves.
+- Keep smaller props destructible by normal attacks if they already are.
 
-In `engine.ts` constants:
-- `ARROW_INTERVAL` 12-22 → 6-11
-- `DISC_INTERVAL` 28-46 → 14-22
-- `MAX_ARROWS_ON_GROUND` 2 → 4
-- `MAX_DISCS_ON_GROUND` 1 → 2
+### 8. Hostile NPC balance and hit effects
+- Change hostile NPC punches to:
+  - Base damage: `2`
+  - Critical damage: `3`
+- Add an NPC M1 hit effect matching the player’s hit feel.
+- Add colored punch impacts per stand based on each stand’s main color.
+- Improve status visuals on NPCs:
+  - Bleeding: red drips/marks.
+  - Frozen/slowed: icy overlay and shards.
+  - Burning: orange embers/flames.
+  - Poisoned: purple gas bubbles/cloud puffs.
 
-## Part 4 — Boingo (tutorial NPC)
+### 9. Hanged Man shard-domain rule
+- Enforce the rule that Hanged Man can only damage enemies while inside an active mirror shard dome:
+  - Hanged Man M1 does no damage outside a shard domain.
+  - Brutal Slash does no damage outside a shard domain.
+  - Damage only applies if Hanged Man’s origin and/or the target is inside an active shard dome, so he cannot attack freely across the map.
+- Show a short warning if the player tries to attack outside the domain.
 
-- New entity type tag `friendly` already exists. Add a dedicated `w.boingo: { pos, radius, alive }` spawned once at world init via `freeSpot`.
-- Render as a smaller character (radius 7, shorter body, big head, fortune-card sprite).
-- Proximity prompt: when player within 24px, show interact hint; tap a new on-screen "Talk" button (only visible when in range) or press `E` to open dialog.
-- Dialog overlay (React in `Game.tsx`):
-  - **Tabs**: "Combat Basics" + one tab per stand the player has already encountered (or all stands).
-  - Combat: explain M1 auto-aim, abilities 1-4, arrows = roll, discs = drop, sprint, hostile NPCs.
-  - Stand tab: shows the stand's mini canvas preview (reuse `drawStand`/`drawHangedMan`/`drawPuppet` rendered to a small offscreen canvas) plus each ability name + description pulled from `STANDS[id].abilities`.
-- Boingo never takes damage, never moves.
-
-## Part 5 — Browser Save / Load
-
-- Save key: `localStorage["standtest.save.v1"]`.
-- Persisted fields: `standId`, `shitVariant`, `arrowsRef`, `discsRef`, `kills`, `player.hp/maxHp`, `player.pos`, `echoesAct`, `boingoTalkedTo` (so help banner doesn't repeat).
-- Buttons in HUD top-right: "Save" / "Load" (small chips). Auto-save every 30s and on stand change.
-- Load resets transient state (cooldowns, channel, projectiles, vfx) then applies persisted fields.
-
-## Part 6 — Banner stacking
-
-- Replace `bannerText` (single string) with `banners: { id, text, color, expireAt }[]` queue.
-- Render in `Game.tsx`: stack vertically (top-to-bottom) at top-1/3 with 4px gap, each in its own pill. Pilot / Time Stop / "Out of range" never overlap.
-- Existing call sites that set `bannerText`/`bannerUntil` become `pushBanner(w, text, durationSec, color?)` helper.
-
-## Part 7 — White Album (new stand)
-
-### Data (`stands.ts`)
-- Add `"white_album"` to `StandId` union, add to `STANDS` map and `ROLLABLE` (rarityWeight 3).
-- Aura color `#e8eaff`, accents purple `#7c5cff`, visor `#c8e64a`.
+### 10. Add Moon Rabbit stand
+- Add `moon_rabbit` to stand data, roll/save/codex/rendering, but make it currently attainable through Blue Pebble.
+- Player model replacement like White Album:
+  - Blonde hair.
+  - Maroon eyes.
+  - Light brown rabbit ears/hands/feet.
+  - Dark red suit with dull pink grid stripes.
+  - White undershirt and black tie.
+- Stats/passives:
+  - M1 base damage `0.9`, crit damage `3`.
+  - Movement speed like White Album.
+  - Slightly more max HP while equipped.
+  - DISC can remove it like any other stand.
 - Abilities:
-  - **m1 Punch**: melee, base 1.4, crit 2.1 (15% crit chance — handled in `m1DamageRoll`).
-  - **a1 Freeze Punch**: melee, dmg 5, applies new `frozenUntil` status (1.2s slow + tint), cd 3.
-  - **a2 Ice Stomp**: aoe_target, dmg 6, radius 56, applies freeze + 1.6s stun, cd 6.
-  - **a3 Ice Heal**: self-heal — restores 18 armor (suit hp), cd 8, drains a chunk of bar.
-  - **a4 Frost Expanse**: dot_zone, radius 110, dps 1.5 (chip 1-2), slow inside, duration 5s, cd 16.
+  - `1 - Wasp Swarm`: wasps surround the nearest target and sting every 3s for 6s, 5 damage per sting.
+  - `2 - Moon Carrot`: heals 8 HP.
+  - `3 - Crash`: vehicle/object charges through a target line, 3 damage first impact, 2 to other enemies hit, small knockback, then explodes for 5 damage.
+  - `4 - Eternal Curse`: nearby targets in range are struck by lightning for 15 damage.
 
-### Passives (engine)
-- `whiteAlbumActive` flag (default true on equip), with toggle cooldown 4s on top of existing `toggleStandActive`.
-- New `w.whiteAlbumBar: number` (0-100). Drains 6/s while active, refills 10/s while inactive. Each ability subtracts (a1:8, a2:18, a3:35, a4:25). At 0 → forced deactivation + 6s cooldown.
-- **Suit armor**: while active, all incoming player damage reduced by 1 (min 0.1).
-- **Speed boost**: while active, base player speed +20%.
-- **Ice trail**: while active and moving, push small `iceTile` props onto a list `w.icePath: { pos, expireAt }[]` (1s spawn cadence). NPCs whose center is within 16px of any iceTile get -25% movespeed for 0.5s. Render as thin pale-blue circles under entities.
-- **NPC slow on player ice**: handled via per-NPC `iceSlowUntil` updated each tick.
-
-### Rendering
-- `drawWhiteAlbum(ctx, w, pos)` — white body, purple trim, yellow-green visor stripe across face, ice skate triangles under feet. Skating wobble = sin(t*8).
-- Add ice-trail particles (cyan sparkles) when player moves while active.
-
-### Sound
-- New keys in `sound.ts`: `iceCast`, `iceShatter`, `iceSkate`, `whiteAlbumOn`, `whiteAlbumOff`. Cheap synth tones.
-
-## Files touched
-
-- `src/game/types.ts` — `World` additions: `hangedManActive`, `whiteAlbumActive`, `whiteAlbumBar`, `whiteAlbumToggleAt`, `icePath`, `boingo`, `banners[]`, `boingoOpen`. NPC: `iceSlowUntil`, `frozenUntil`.
-- `src/game/stands.ts` — balance numbers + new `white_album` entry + add to ROLLABLE.
-- `src/game/codex.ts` — codex entry for White Album, version bump to 1.2.0.
-- `src/game/engine.ts` — Hanged Man activation gating, puppet/hangedman as targetable, rage-mode puppet-only, ice trail logic, new ability cases (`ice_heal`, generic reuse for others), Boingo spawn + render + dialog data, save/load functions, banner queue, spawn-rate constants.
-- `src/game/sound.ts` — new sfx keys.
-- `src/components/Game.tsx` — banner stack rendering, Boingo talk button + modal with mini stand previews, Save/Load HUD chips, White Album bar UI, suit/skate icons.
-
-## Out of scope (this iteration)
-- Multiplayer.
-- Cloud (cross-device) save — local only.
-- Boingo voice lines / animations beyond idle bob.
+## Technical notes
+- `ItemPickup.kind` will expand from `arrow | disc` to include `requiem_arrow | blue_pebble`.
+- `World` will gain an `inventory` object and Boingo despawn/open/freeze flags.
+- Rendering will get custom projectile drawing for GE eagle and custom player rendering for Moon Rabbit.
+- Save data will be upgraded compatibly so older saves with `arrows`/`discs` still load into the new inventory.
