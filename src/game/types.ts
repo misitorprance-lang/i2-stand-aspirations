@@ -43,6 +43,12 @@ export interface Entity {
   pressuredUntil?: number;
   // Echoes rooting visual via Tree of Life
   rootedUntil?: number;
+  // Status: burning (orange embers + chip)
+  burnUntil?: number;
+  burnNextTickAt?: number;
+  // Wasps swarm tracker (Moon Rabbit A1)
+  waspsUntil?: number;
+  waspsNextStingAt?: number;
   // AI anti-stuck
   stuckAcc?: number;
   lastPos?: Vec2;
@@ -218,9 +224,18 @@ export interface Vfx {
 
 export interface ItemPickup {
   id: number;
-  kind: "arrow" | "disc";
+  kind: "arrow" | "disc" | "requiem_arrow" | "blue_pebble";
   pos: Vec2;
   bornAt: number;
+}
+
+export interface Inventory {
+  arrows: number;
+  discs: number;
+  requiemArrows: number;
+  bluePebbles: number;
+  tonthCopies: number;
+  hasMoonRabbitUnlocked: boolean;
 }
 
 export interface UIState {

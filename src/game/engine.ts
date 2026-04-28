@@ -29,8 +29,9 @@ import { play, type SfxKey } from "./sound";
 // ---------- constants ----------
 export const VW = 360;
 export const VH = 640;
-export const MAP_W = 1700;
-export const MAP_H = 2600;
+// Map 1.5x previous size (1700x2600 -> 2550x3900).
+export const MAP_W = 2550;
+export const MAP_H = 3900;
 export const CAMERA_ZOOM = 1.7;
 
 const PLAYER_SPEED = 110;
@@ -40,26 +41,37 @@ const NPC_SPEED = 55;
 const ENEMY_SPEED = 70;
 const ENEMY_AGGRO = 140;
 const ENEMY_ATTACK_RANGE = 22;
-const ENEMY_ATTACK_DMG_MIN = 2;
-const ENEMY_ATTACK_DMG_MAX = 4;
+// Hostile NPC base / crit damage (rebalanced).
+const ENEMY_ATTACK_DMG = 2;
+const ENEMY_ATTACK_DMG_CRIT = 3;
+const ENEMY_CRIT_CHANCE = 0.18;
 const ENEMY_ATTACK_CD = 1.3;
 const PLAYER_MAX_HP = 100;
 const NPC_MAX_HP = 30;
 const ENEMY_MAX_HP = 45;
 const RESPAWN_DELAY = 6;
-const FRIENDLY_COUNT = 9;
-const ENEMY_COUNT = 8;
+const FRIENDLY_COUNT = 14;
+const ENEMY_COUNT = 14;
 const ARROW_INTERVAL = [6, 11] as const;
 const DISC_INTERVAL = [14, 22] as const;
-const MAX_ARROWS_ON_GROUND = 5;
-const MAX_DISCS_ON_GROUND = 3;
+const MAX_ARROWS_ON_GROUND = 6;
+const MAX_DISCS_ON_GROUND = 4;
+const MAX_BLUE_PEBBLES_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
 const FROG_MAX = 3;
-const STAND_TETHER = 360; // max distance puppet/hangedman can be from player before snap-back
+const STAND_TETHER = 360;
 
 // Stands that hold a weapon — punches with these spawn slash hit FX, not punch impacts.
 const WEAPON_STANDS = new Set<StandId>(["hanged_man", "ebony_devil"]);
+
+// Stands whose basic punches CAN damage houses. Anything else is no-op vs houses.
+// Houses are also damaged by explicitly "strong" abilities listed in HOUSE_STRONG_KINDS below.
+const HOUSE_BREAKERS = new Set<StandId>(["star_platinum"]);
+const HOUSE_STRONG_KINDS = new Set([
+  "aoe_target", "auto_aim", "knockback", "tesla", "lobbed", "brutal_slash",
+  "rage_mode", "time_stop", "pierce", "crash", "eternal_curse",
+]);
 
 // ---------- helpers ----------
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -202,9 +214,9 @@ interface World {
 function makeProps(): Prop[] {
   const props: Prop[] = [];
 
-  // Trees (round canopies + brown trunk; collision = trunk + roots area, smaller than canopy)
+  // Trees — denser for the larger map.
   const treeSpots: Vec2[] = [];
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < 90; i++) {
     let tries = 0;
     while (tries++ < 20) {
       const x = rand(40, MAP_W - 60);
@@ -218,7 +230,6 @@ function makeProps(): Prop[] {
     props.push({
       rect: r,
       draw: (ctx, rr) => {
-        // canopy
         ctx.fillStyle = "#1f5d2a";
         ctx.beginPath();
         ctx.arc(rr.x + rr.w / 2, rr.y - 8, 22, 0, Math.PI * 2);
@@ -227,16 +238,14 @@ function makeProps(): Prop[] {
         ctx.beginPath();
         ctx.arc(rr.x + rr.w / 2 - 4, rr.y - 12, 14, 0, Math.PI * 2);
         ctx.fill();
-        // trunk
         ctx.fillStyle = "#5a3a1c";
         ctx.fillRect(rr.x + rr.w / 2 - 4, rr.y, 8, rr.h);
       },
     });
   }
-  // (prop hp tagging — deferred to next round)
 
-  // Rocks (gray ovals)
-  for (let i = 0; i < 21; i++) {
+  // Rocks
+  for (let i = 0; i < 45; i++) {
     const x = rand(30, MAP_W - 30), y = rand(30, MAP_H - 30);
     const w = rand(18, 30), h = rand(12, 18);
     const r: Rect = { x: x - w / 2, y: y - h / 2, w, h };
@@ -255,8 +264,8 @@ function makeProps(): Prop[] {
     });
   }
 
-  // Bushes (small dark green) — non-blocking? Make them blocking small
-  for (let i = 0; i < 27; i++) {
+  // Bushes
+  for (let i = 0; i < 60; i++) {
     const x = rand(20, MAP_W - 20), y = rand(20, MAP_H - 20);
     const r: Rect = { x: x - 9, y: y - 7, w: 18, h: 14 };
     props.push({
@@ -272,45 +281,45 @@ function makeProps(): Prop[] {
     });
   }
 
-  // Houses (5) — bigger collision; placed at varied locations across the bigger map
+  // Houses (10) — bigger collision (110×84) spread across the bigger map.
   const houses: Vec2[] = [
-    { x: 220, y: 320 },
-    { x: 1050, y: 480 },
-    { x: 380, y: 1500 },
-    { x: 1100, y: 1700 },
-    { x: 700, y: 1100 },
+    { x: 280, y: 360 },
+    { x: 1380, y: 540 },
+    { x: 2200, y: 380 },
+    { x: 460, y: 1700 },
+    { x: 1500, y: 1950 },
+    { x: 2350, y: 1700 },
+    { x: 820, y: 1250 },
+    { x: 1900, y: 2700 },
+    { x: 380, y: 3100 },
+    { x: 2200, y: 3300 },
   ];
   for (const h of houses) {
-    const r: Rect = { x: h.x - 40, y: h.y - 30, w: 80, h: 60 };
+    const r: Rect = { x: h.x - 55, y: h.y - 42, w: 110, h: 84 };
     props.push({
       rect: r,
       draw: (ctx, rr) => {
-        // body
         ctx.fillStyle = "#caa472";
-        ctx.fillRect(rr.x, rr.y + 10, rr.w, rr.h - 10);
-        // roof
+        ctx.fillRect(rr.x, rr.y + 14, rr.w, rr.h - 14);
         ctx.fillStyle = "#7a3a2a";
         ctx.beginPath();
-        ctx.moveTo(rr.x - 4, rr.y + 14);
-        ctx.lineTo(rr.x + rr.w / 2, rr.y - 12);
-        ctx.lineTo(rr.x + rr.w + 4, rr.y + 14);
+        ctx.moveTo(rr.x - 6, rr.y + 18);
+        ctx.lineTo(rr.x + rr.w / 2, rr.y - 16);
+        ctx.lineTo(rr.x + rr.w + 6, rr.y + 18);
         ctx.closePath();
         ctx.fill();
-        // door
         ctx.fillStyle = "#3a2418";
-        ctx.fillRect(rr.x + rr.w / 2 - 7, rr.y + rr.h - 18, 14, 18);
-        // window
+        ctx.fillRect(rr.x + rr.w / 2 - 9, rr.y + rr.h - 26, 18, 26);
         ctx.fillStyle = "#9bd9ff";
-        ctx.fillRect(rr.x + 8, rr.y + 20, 12, 10);
-        ctx.fillRect(rr.x + rr.w - 20, rr.y + 20, 12, 10);
+        ctx.fillRect(rr.x + 12, rr.y + 28, 16, 14);
+        ctx.fillRect(rr.x + rr.w - 28, rr.y + 28, 16, 14);
       },
     });
   }
-  // (prop hp tagging — deferred)
 
-
-  for (let i = 0; i < 9; i++) {
-    const x = rand(50, MAP_W - 100);
+  // Fences
+  for (let i = 0; i < 22; i++) {
+    const x = rand(50, MAP_W - 140);
     const y = rand(50, MAP_H - 50);
     const w = rand(60, 120);
     const r: Rect = { x, y, w, h: 6 };
@@ -326,12 +335,12 @@ function makeProps(): Prop[] {
       },
     });
   }
-  // ---- prop tagging: assign destruction HP per category by rect signature ----
-  // Trees: 20×16; Rocks: variable ovals; Bushes: 18×14; Houses: 80×60; Fences: w×6.
+
+  // Prop tagging — assign HP. Houses are now 110×84.
   for (const p of props) {
     const r = p.rect;
     let hp = 0;
-    if (r.w === 80 && r.h === 60) hp = 60;            // house
+    if (r.w === 110 && r.h === 84) hp = 80;           // house
     else if (r.w === 20 && r.h === 16) hp = 12;       // tree
     else if (r.w === 18 && r.h === 14) hp = 12;       // bush
     else if (r.h === 6) hp = 12;                      // fence
@@ -343,6 +352,11 @@ function makeProps(): Prop[] {
   }
 
   return props;
+}
+
+// True if a prop is a "house" (the only props basic punches cannot break).
+function isHouse(p: Prop): boolean {
+  return p.rect.w === 110 && p.rect.h === 84;
 }
 
 // Strict spawn: never inside a prop, never inside an existing crater, never on player.
@@ -950,7 +964,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
       // Melee chops at props in front of you (heavy stands break things faster).
-      damagePropsInRadius(w, tx, ty, (ab.radius ?? 14) + 4, dmg);
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 14) + 4, dmg, { abilityKind: ab.kind, standId: w.standId });
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
       // trigger stand-punch animation
       w.standPunchUntil = w.time + 0.25;
@@ -1043,7 +1057,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - p.x, y: e.pos.y - p.y }), amount: 60 });
         }
       }
-      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage);
+      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage, { abilityKind: ab.kind, standId: w.standId });
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: ab.radius!, color: ab.color, life: 0.45 });
       // arcing lightning to nearby targets
       for (const e of w.npcs) {
@@ -1072,7 +1086,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage);
         }
       }
-      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage);
+      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage, { abilityKind: ab.kind, standId: w.standId });
       spawnVfx(w, { kind: "explosion_ring", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
       spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius! * 0.8, color: ab.color, life: 0.55 });
       if (ab.crater) {
@@ -1399,7 +1413,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       }
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
-      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage);
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage, { abilityKind: ab.kind, standId: w.standId });
       play("brutal");
       break;
     }
@@ -1914,10 +1928,15 @@ export function update(w: World, input: InputState, dt: number) {
       e.facing = dir;
       if (dist(e.pos, targetPos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
         e.nextAttackAt = w.time + ENEMY_ATTACK_CD;
-        const dmg = rand(ENEMY_ATTACK_DMG_MIN, ENEMY_ATTACK_DMG_MAX);
+        const isCrit = Math.random() < ENEMY_CRIT_CHANCE;
+        const dmg = isCrit ? ENEMY_ATTACK_DMG_CRIT : ENEMY_ATTACK_DMG;
+        // NPC swing FX (matches the player's M1 hit feel).
+        spawnVfx(w, { kind: "punch_impact", pos: { ...targetPos }, color: "#ffd0a8", radius: 10, life: 0.22 });
+        if (isCrit) spawnVfx(w, { kind: "crit_burst", pos: { ...targetPos }, color: "#ffd24a", radius: 16, life: 0.32 });
         if (frogTarget) {
-          // Frog absorbs and reflects 50% back
+          // Frog leaps onto the strike, dies, reflects 50% back.
           frogTarget.alive = false;
+          spawnVfx(w, { kind: "shockwave", pos: { ...frogTarget.pos }, radius: 14, color: "#5fd16a", life: 0.3 });
           spawnParticles(w, frogTarget.pos, "#7fc97f", 14, { gravity: 80, life: 0.6 });
           play("frog");
           damageEntity(w, e, dmg * 0.5);
@@ -2099,7 +2118,7 @@ export function update(w: World, input: InputState, dt: number) {
           damageEntity(w, e, 9);
         }
       }
-      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14);
+      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14, { abilityKind: "aoe_target", standId: w.standId });
       w.zones.push({
         id: w.nextId++,
         pos: { ...pr.pos },
@@ -3704,12 +3723,26 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
 }
 
 const PROP_RESPAWN_DELAY = 30;
-function damageProp(w: World, p: Prop, dmg: number) {
+// Routes all prop damage. If `kind` is "house" we require the source to be a house-breaker stand
+// or a strong ability. Otherwise the hit is ignored (the bonk lands but the wall holds).
+function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
   if (p.destructible !== true) return;
   if ((p.hp ?? 0) <= 0) return;
+  if (isHouse(p)) {
+    const sid = source?.standId ?? w.standId;
+    const ak = source?.abilityKind ?? "";
+    const allowed = HOUSE_BREAKERS.has(sid) || HOUSE_STRONG_KINDS.has(ak);
+    if (!allowed) {
+      // Show a tiny "ineffective" puff so the player understands.
+      p.hitFlashUntil = w.time + 0.06;
+      spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#caa472", 2, {
+        shape: "square", gravity: 40, speedMin: 10, speedMax: 30, life: 0.25,
+      });
+      return;
+    }
+  }
   p.hp = (p.hp ?? 0) - dmg;
   p.hitFlashUntil = w.time + 0.12;
-  // wood/stone chip particles
   spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#a07050", 4, {
     shape: "square", gravity: 80, speedMin: 30, speedMax: 100, life: 0.4,
   });
@@ -3726,11 +3759,10 @@ function damageProp(w: World, p: Prop, dmg: number) {
   }
 }
 
-// Damage every solid prop that overlaps the AOE circle.
-function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number) {
+function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
   for (const p of w.props) {
     if (!propSolid(p)) continue;
-    if (circleRectOverlap(x, y, radius, p.rect)) damageProp(w, p, dmg);
+    if (circleRectOverlap(x, y, radius, p.rect)) damageProp(w, p, dmg, source);
   }
 }
 

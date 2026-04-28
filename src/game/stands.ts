@@ -10,7 +10,8 @@ export type StandId =
   | "gold_experience"
   | "hanged_man"
   | "white_album"
-  | "purple_haze";
+  | "purple_haze"
+  | "moon_rabbit";
 
 export type AbilityKind =
   | "melee"
@@ -40,18 +41,21 @@ export type AbilityKind =
   | "brutal_slash"
   | "ice_heal"
   | "ice_stomp"
-  | "ge_eagle_pierce"        // GE A1 — straight piercing eagle that hits many in a line
-  // Echoes rework
-  | "bleed_text"             // Sent Bleed: red text projectile that applies bleed
-  | "explosion_text"         // self-buff that knocks back attackers
-  | "frost_text"             // ground text — slow + small chip
-  | "burn_text"              // ground text — chip damage, no stun, short
-  | "three_freeze_pressure"  // pressure: chip damage + heavy slow + can't fight
-  // Purple Haze
-  | "capsule_shot"           // shoots a gold capsule that explodes into poison gas
-  | "gas_release"            // self-AOE poison cloud (also damages user weakly)
-  | "ph_pilot_toggle"        // Purple Haze pilot (slower)
-  | "cleansly_violence";     // damage boost duration with bar
+  | "ge_eagle_pierce"
+  | "bleed_text"
+  | "explosion_text"
+  | "frost_text"
+  | "burn_text"
+  | "three_freeze_pressure"
+  | "capsule_shot"
+  | "gas_release"
+  | "ph_pilot_toggle"
+  | "cleansly_violence"
+  // Moon Rabbit
+  | "wasp_swarm"        // surround nearest target with stinging wasps
+  | "moon_carrot"       // self-heal
+  | "crash"             // line-attack vehicle that explodes
+  | "eternal_curse";    // multi-target lightning strike
 
 export interface Ability {
   name: string;
@@ -199,6 +203,19 @@ export const STANDS: Record<StandId, Stand> = {
       a2: { name: "Gas Release", kind: "gas_release", damage: 1.0, range: 0, radius: 80, cooldown: 9, duration: 5, tickEvery: 0.45, color: "#a06bff" },
       a3: { name: "Pilot", kind: "ph_pilot_toggle", damage: 0, range: 0, cooldown: 0.4, color: "#a06bff" },
       a4: { name: "Cleansly Violence", kind: "cleansly_violence", damage: 0, range: 0, cooldown: 18, duration: 8, color: "#ff6bd1" },
+    },
+  },
+  moon_rabbit: {
+    id: "moon_rabbit",
+    name: "Moon Rabbit",
+    color: "#a8334a",
+    rarityWeight: 0, // not in arrow pool — only obtained via Blue Pebble
+    abilities: {
+      m1: { name: "Punch", kind: "melee", damage: 0.9, range: 22, radius: 14, cooldown: 0.3, color: "#ffd1d1" },
+      a1: { name: "Wasp Swarm", kind: "wasp_swarm", damage: 5, range: 220, radius: 36, cooldown: 9, duration: 6, tickEvery: 3, color: "#ffd24a" },
+      a2: { name: "Moon Carrot", kind: "moon_carrot", damage: 0, range: 0, cooldown: 7, color: "#ff6688" },
+      a3: { name: "Crash", kind: "crash", damage: 3, range: 260, radius: 26, cooldown: 10, speed: 360, color: "#5a2a1a" },
+      a4: { name: "Eternal Curse", kind: "eternal_curse", damage: 15, range: 160, radius: 160, cooldown: 22, color: "#cfd6ff" },
     },
   },
 };
