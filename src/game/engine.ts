@@ -29,8 +29,9 @@ import { play, type SfxKey } from "./sound";
 // ---------- constants ----------
 export const VW = 360;
 export const VH = 640;
-export const MAP_W = 1700;
-export const MAP_H = 2600;
+// Map 1.5x previous size (1700x2600 -> 2550x3900).
+export const MAP_W = 2550;
+export const MAP_H = 3900;
 export const CAMERA_ZOOM = 1.7;
 
 const PLAYER_SPEED = 110;
@@ -40,26 +41,37 @@ const NPC_SPEED = 55;
 const ENEMY_SPEED = 70;
 const ENEMY_AGGRO = 140;
 const ENEMY_ATTACK_RANGE = 22;
-const ENEMY_ATTACK_DMG_MIN = 2;
-const ENEMY_ATTACK_DMG_MAX = 4;
+// Hostile NPC base / crit damage (rebalanced).
+const ENEMY_ATTACK_DMG = 2;
+const ENEMY_ATTACK_DMG_CRIT = 3;
+const ENEMY_CRIT_CHANCE = 0.18;
 const ENEMY_ATTACK_CD = 1.3;
 const PLAYER_MAX_HP = 100;
 const NPC_MAX_HP = 30;
 const ENEMY_MAX_HP = 45;
 const RESPAWN_DELAY = 6;
-const FRIENDLY_COUNT = 9;
-const ENEMY_COUNT = 8;
+const FRIENDLY_COUNT = 14;
+const ENEMY_COUNT = 14;
 const ARROW_INTERVAL = [6, 11] as const;
 const DISC_INTERVAL = [14, 22] as const;
-const MAX_ARROWS_ON_GROUND = 5;
-const MAX_DISCS_ON_GROUND = 3;
+const MAX_ARROWS_ON_GROUND = 6;
+const MAX_DISCS_ON_GROUND = 4;
+const MAX_BLUE_PEBBLES_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
 const FROG_MAX = 3;
-const STAND_TETHER = 360; // max distance puppet/hangedman can be from player before snap-back
+const STAND_TETHER = 360;
 
 // Stands that hold a weapon — punches with these spawn slash hit FX, not punch impacts.
 const WEAPON_STANDS = new Set<StandId>(["hanged_man", "ebony_devil"]);
+
+// Stands whose basic punches CAN damage houses. Anything else is no-op vs houses.
+// Houses are also damaged by explicitly "strong" abilities listed in HOUSE_STRONG_KINDS below.
+const HOUSE_BREAKERS = new Set<StandId>(["star_platinum"]);
+const HOUSE_STRONG_KINDS = new Set([
+  "aoe_target", "auto_aim", "knockback", "tesla", "lobbed", "brutal_slash",
+  "rage_mode", "time_stop", "pierce", "crash", "eternal_curse",
+]);
 
 // ---------- helpers ----------
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
