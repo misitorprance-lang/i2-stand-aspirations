@@ -2476,11 +2476,12 @@ export function useArrow(w: World) {
   resetStandRuntime(w);
   w.standId = id;
   w.shitVariant = shitVariant;
+  // Player must MANUALLY summon the new stand.
+  w.standActive = false;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
-  w.bannerText = "Stand: " + name;
-  w.bannerUntil = w.time + 2.5;
+  w.bannerText = "Got Stand: " + name + " — tap Stand to summon";
+  w.bannerUntil = w.time + 3;
   play("rollStand");
-  play("standSummon");
 }
 
 export function useDisc(w: World) {
