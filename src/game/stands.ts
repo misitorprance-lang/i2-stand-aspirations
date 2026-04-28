@@ -205,6 +205,19 @@ export const STANDS: Record<StandId, Stand> = {
       a4: { name: "Cleansly Violence", kind: "cleansly_violence", damage: 0, range: 0, cooldown: 18, duration: 8, color: "#ff6bd1" },
     },
   },
+  moon_rabbit: {
+    id: "moon_rabbit",
+    name: "Moon Rabbit",
+    color: "#a8334a",
+    rarityWeight: 0, // not in arrow pool — only obtained via Blue Pebble
+    abilities: {
+      m1: { name: "Punch", kind: "melee", damage: 0.9, range: 22, radius: 14, cooldown: 0.3, color: "#ffd1d1" },
+      a1: { name: "Wasp Swarm", kind: "wasp_swarm", damage: 5, range: 220, radius: 36, cooldown: 9, duration: 6, tickEvery: 3, color: "#ffd24a" },
+      a2: { name: "Moon Carrot", kind: "moon_carrot", damage: 0, range: 0, cooldown: 7, color: "#ff6688" },
+      a3: { name: "Crash", kind: "crash", damage: 3, range: 260, radius: 26, cooldown: 10, speed: 360, color: "#5a2a1a" },
+      a4: { name: "Eternal Curse", kind: "eternal_curse", damage: 15, range: 160, radius: 160, cooldown: 22, color: "#cfd6ff" },
+    },
+  },
 };
 
 // Kept for save-format/back-compat. Not selected by current code paths.
