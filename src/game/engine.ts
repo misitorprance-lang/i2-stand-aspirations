@@ -59,7 +59,7 @@ const MAX_DISCS_ON_GROUND = 4;
 const MAX_BLUE_PEBBLES_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
-const FROG_MAX = 3;
+const FROG_MAX = 8;
 const STAND_TETHER = 360;
 
 // Stands that hold a weapon — punches with these spawn slash hit FX, not punch impacts.
