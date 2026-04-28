@@ -1057,7 +1057,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - p.x, y: e.pos.y - p.y }), amount: 60 });
         }
       }
-      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage);
+      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage, { abilityKind: ab.kind, standId: w.standId });
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: ab.radius!, color: ab.color, life: 0.45 });
       // arcing lightning to nearby targets
       for (const e of w.npcs) {
@@ -1086,7 +1086,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage);
         }
       }
-      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage);
+      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage, { abilityKind: ab.kind, standId: w.standId });
       spawnVfx(w, { kind: "explosion_ring", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
       spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius! * 0.8, color: ab.color, life: 0.55 });
       if (ab.crater) {
@@ -1413,7 +1413,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       }
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
-      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage);
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage, { abilityKind: ab.kind, standId: w.standId });
       play("brutal");
       break;
     }
@@ -2118,7 +2118,7 @@ export function update(w: World, input: InputState, dt: number) {
           damageEntity(w, e, 9);
         }
       }
-      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14);
+      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14, { abilityKind: "aoe_target", standId: w.standId });
       w.zones.push({
         id: w.nextId++,
         pos: { ...pr.pos },
