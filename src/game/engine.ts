@@ -2448,6 +2448,14 @@ function resetStandRuntime(w: World) {
   w.hangedManActive = false;
   w.shards = [];
   w.shardPickerOpen = false;
+  // Clear Gold Experience runtime (frogs, trees, hologram tracking).
+  w.frogs = [];
+  w.trees = [];
+  w.hologramHits = [];
+  for (const e of w.npcs) {
+    e.hologramUntil = 0;
+    e.rootedUntil = 0;
+  }
   // Drop any in-flight player projectiles so a stand swap doesn't leak homing locks.
   w.projectiles = [];
 }
