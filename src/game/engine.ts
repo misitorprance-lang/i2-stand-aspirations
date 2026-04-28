@@ -882,6 +882,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     w.bannerUntil = w.time + 0.9;
     return;
   }
+  // Hanged Man: M1 / damaging abilities only work while inside (or attacking from) a mirror-shard dome.
+  if (w.standId === "hanged_man" && (key === "m1" || ab.kind === "melee" || ab.kind === "pierce")) {
+    const origin = w.hangedManActive ? w.hangedMan.pos : w.player.pos;
+    const inDome = w.shards.some((s) => w.time < s.expireAt && dist2(origin, s.pos) < s.radius * s.radius);
+    if (!inDome) {
+      w.bannerText = "Hanged Man only attacks inside a shard domain";
+      w.bannerUntil = w.time + 1.2;
+      w.cdTimers[key] = 0.4;
+      return;
+    }
+  }
   // Ebony Devil: Rage Mode now requires the puppet to be summoned.
   if (ab.kind === "rage_mode" && !w.puppet.active) {
     w.bannerText = "Summon Puppet first";
