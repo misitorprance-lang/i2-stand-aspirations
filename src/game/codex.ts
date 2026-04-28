@@ -168,5 +168,20 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       a4: moveOf("purple_haze", "a4", "Cleansly Violence — +8% damage for several seconds, shown by a bar."),
     },
   },
+  moon_rabbit: {
+    id: "moon_rabbit",
+    model: {
+      description: "Replaces the player. Blonde hair, maroon eyes, light-brown rabbit ears/hands/feet, dark red suit with dull pink grid stripes, white shirt, black tie.",
+      silhouette: ["rabbit ears on top", "dark red suit body", "white collar + black tie"],
+      auraColor: "#a8334a",
+    },
+    moves: {
+      m1: moveOf("moon_rabbit", "m1", "Soft punch — 0.9 base, 3 on crits."),
+      a1: moveOf("moon_rabbit", "a1", "Wasps swarm the nearest target and sting every 3s for 6s."),
+      a2: moveOf("moon_rabbit", "a2", "Heals 8 HP."),
+      a3: moveOf("moon_rabbit", "a3", "Vehicle slams forward in a line, then explodes for 5 extra."),
+      a4: moveOf("moon_rabbit", "a4", "Lightning strikes every nearby target for 15."),
+    },
+  },
 };
 
