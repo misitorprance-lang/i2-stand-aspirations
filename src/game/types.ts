@@ -43,6 +43,12 @@ export interface Entity {
   pressuredUntil?: number;
   // Echoes rooting visual via Tree of Life
   rootedUntil?: number;
+  // Status: burning (orange embers + chip)
+  burnUntil?: number;
+  burnNextTickAt?: number;
+  // Wasps swarm tracker (Moon Rabbit A1)
+  waspsUntil?: number;
+  waspsNextStingAt?: number;
   // AI anti-stuck
   stuckAcc?: number;
   lastPos?: Vec2;
