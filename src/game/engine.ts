@@ -2676,6 +2676,53 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
 
   // Projectiles
   for (const pr of w.projectiles) {
+    if (pr.textGlyph === "GE_EAGLE") {
+      // Custom golden eagle silhouette flying along velocity direction.
+      const ang = Math.atan2(pr.vel.y, pr.vel.x);
+      const flap = Math.sin(w.time * 28) * 0.6;
+      ctx.save();
+      ctx.translate(pr.pos.x, pr.pos.y);
+      ctx.rotate(ang);
+      // body
+      ctx.fillStyle = "#caa14a";
+      ctx.beginPath(); ctx.ellipse(0, 0, 9, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+      // tail
+      ctx.fillStyle = "#a87f30";
+      ctx.beginPath();
+      ctx.moveTo(-9, 0);
+      ctx.lineTo(-14, -3);
+      ctx.lineTo(-14, 3);
+      ctx.closePath(); ctx.fill();
+      // wings (flap)
+      ctx.fillStyle = "#e0c068";
+      ctx.beginPath();
+      ctx.moveTo(-2, -1);
+      ctx.lineTo(2, -10 - flap * 4);
+      ctx.lineTo(6, -1);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-2, 1);
+      ctx.lineTo(2, 10 + flap * 4);
+      ctx.lineTo(6, 1);
+      ctx.closePath(); ctx.fill();
+      // head + beak
+      ctx.fillStyle = "#fff1b8";
+      ctx.beginPath(); ctx.arc(8, 0, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffaa1f";
+      ctx.beginPath();
+      ctx.moveTo(10, -0.6);
+      ctx.lineTo(13, 0);
+      ctx.lineTo(10, 0.6);
+      ctx.closePath(); ctx.fill();
+      // eye
+      ctx.fillStyle = "#1a1a1f";
+      ctx.fillRect(8, -1, 1, 1);
+      ctx.restore();
+      // glow trail
+      ctx.fillStyle = hexToRgba("#ffd24a", 0.35);
+      ctx.beginPath(); ctx.arc(pr.pos.x - pr.vel.x * 0.02, pr.pos.y - pr.vel.y * 0.02, 4, 0, Math.PI * 2); ctx.fill();
+      continue;
+    }
     ctx.fillStyle = pr.color;
     ctx.beginPath(); ctx.arc(pr.pos.x, pr.pos.y, pr.radius, 0, Math.PI * 2); ctx.fill();
     if (pr.lobbed) {
