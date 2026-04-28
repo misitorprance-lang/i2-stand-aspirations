@@ -1928,10 +1928,15 @@ export function update(w: World, input: InputState, dt: number) {
       e.facing = dir;
       if (dist(e.pos, targetPos) < ENEMY_ATTACK_RANGE && (!e.nextAttackAt || w.time >= e.nextAttackAt)) {
         e.nextAttackAt = w.time + ENEMY_ATTACK_CD;
-        const dmg = rand(ENEMY_ATTACK_DMG_MIN, ENEMY_ATTACK_DMG_MAX);
+        const isCrit = Math.random() < ENEMY_CRIT_CHANCE;
+        const dmg = isCrit ? ENEMY_ATTACK_DMG_CRIT : ENEMY_ATTACK_DMG;
+        // NPC swing FX (matches the player's M1 hit feel).
+        spawnVfx(w, { kind: "punch_impact", pos: { ...targetPos }, color: "#ffd0a8", radius: 10, life: 0.22 });
+        if (isCrit) spawnVfx(w, { kind: "crit_burst", pos: { ...targetPos }, color: "#ffd24a", radius: 16, life: 0.32 });
         if (frogTarget) {
-          // Frog absorbs and reflects 50% back
+          // Frog leaps onto the strike, dies, reflects 50% back.
           frogTarget.alive = false;
+          spawnVfx(w, { kind: "shockwave", pos: { ...frogTarget.pos }, radius: 14, color: "#5fd16a", life: 0.3 });
           spawnParticles(w, frogTarget.pos, "#7fc97f", 14, { gravity: 80, life: 0.6 });
           play("frog");
           damageEntity(w, e, dmg * 0.5);
