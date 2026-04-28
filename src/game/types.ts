@@ -218,9 +218,18 @@ export interface Vfx {
 
 export interface ItemPickup {
   id: number;
-  kind: "arrow" | "disc";
+  kind: "arrow" | "disc" | "requiem_arrow" | "blue_pebble";
   pos: Vec2;
   bornAt: number;
+}
+
+export interface Inventory {
+  arrows: number;
+  discs: number;
+  requiemArrows: number;
+  bluePebbles: number;
+  tonthCopies: number;
+  hasMoonRabbitUnlocked: boolean;
 }
 
 export interface UIState {
