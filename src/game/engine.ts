@@ -59,7 +59,7 @@ const MAX_DISCS_ON_GROUND = 4;
 const MAX_BLUE_PEBBLES_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
-const FROG_MAX = 3;
+const FROG_MAX = 8;
 const STAND_TETHER = 360;
 
 // Stands that hold a weapon — punches with these spawn slash hit FX, not punch impacts.
@@ -882,6 +882,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     w.bannerUntil = w.time + 0.9;
     return;
   }
+  // Hanged Man: M1 / damaging abilities only work while inside (or attacking from) a mirror-shard dome.
+  if (w.standId === "hanged_man" && (key === "m1" || ab.kind === "melee" || ab.kind === "pierce")) {
+    const origin = w.hangedManActive ? w.hangedMan.pos : w.player.pos;
+    const inDome = w.shards.some((s) => w.time < s.expireAt && dist2(origin, s.pos) < s.radius * s.radius);
+    if (!inDome) {
+      w.bannerText = "Hanged Man only attacks inside a shard domain";
+      w.bannerUntil = w.time + 1.2;
+      w.cdTimers[key] = 0.4;
+      return;
+    }
+  }
   // Ebony Devil: Rage Mode now requires the puppet to be summoned.
   if (ab.kind === "rage_mode" && !w.puppet.active) {
     w.bannerText = "Summon Puppet first";
@@ -1487,7 +1498,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         hitSet: new Set(),
         expireAt: w.time + ab.range / ab.speed!,
         speed: ab.speed,
-        textGlyph: "🦅",
+        textGlyph: "GE_EAGLE",
       });
       if (target) w.standAimTarget = { ...target.pos };
       spawnVfx(w, { kind: "stab_line", pos: { x: p.x, y: p.y }, to: { x: p.x + shootDir.x * 30, y: p.y + shootDir.y * 30 }, radius: 6, color: ab.color, life: 0.25 });
@@ -2240,7 +2251,8 @@ export function update(w: World, input: InputState, dt: number) {
       w.player.poisonNextTickAt = w.time + 0.6;
     }
   }
-  // Tree of Life passive heal — heal player slowly while inside an active tree.
+  // Tree of Life: heal player inside an active tree, root enemies inside dome,
+  // and remove expired trees from the world (so the visuals + dome despawn cleanly).
   if (w.standId === "gold_experience" && w.player.alive) {
     for (const t of w.trees) {
       if (w.time < t.expireAt && dist2(w.player.pos, t.pos) < t.radius * t.radius) {
@@ -2249,19 +2261,44 @@ export function update(w: World, input: InputState, dt: number) {
       }
     }
   }
+  // Apply root/slow to NPCs inside any active tree dome (re-applied each tick).
+  for (const t of w.trees) {
+    if (w.time >= t.expireAt) continue;
+    for (const e of w.npcs) {
+      if (!e.alive) continue;
+      if (dist2(e.pos, t.pos) < t.radius * t.radius) {
+        e.rootedUntil = Math.max(e.rootedUntil ?? 0, w.time + 0.4);
+        e.slowUntil = Math.max(e.slowUntil ?? 0, w.time + 0.4);
+        // Occasional root sprout VFX
+        if (!t.rooted.has(e.id) || w.time > (t.rooted.get(e.id) ?? 0)) {
+          spawnParticles(w, e.pos, "#5a3a1c", 3, { gravity: 60, life: 0.5, speedMin: 20, speedMax: 60, shape: "square" });
+          t.rooted.set(e.id, w.time + 0.6);
+        }
+      }
+    }
+  }
+  // Despawn expired trees (fixes the bug where trees never disappeared).
+  if (w.trees.length) w.trees = w.trees.filter((t) => w.time < t.expireAt);
 
-  // Frogs follow the player (gentle homing) so they're useful as bodyguards.
-  for (const f of w.frogs) {
-    if (!f.alive) continue;
-    const dx = w.player.pos.x - f.pos.x, dy = w.player.pos.y - f.pos.y;
+  // Frogs follow the player in stable orbit slots (no jitter / stacking).
+  const aliveFrogsList = w.frogs.filter((f) => f.alive);
+  for (let i = 0; i < aliveFrogsList.length; i++) {
+    const f = aliveFrogsList[i];
+    const slot = (i / Math.max(1, aliveFrogsList.length)) * Math.PI * 2;
+    const orbit = 22;
+    const tx = w.player.pos.x + Math.cos(slot + w.time * 0.6) * orbit;
+    const ty = w.player.pos.y + Math.sin(slot + w.time * 0.6) * orbit;
+    const dx = tx - f.pos.x, dy = ty - f.pos.y;
     const d = Math.hypot(dx, dy);
-    if (d > 18) {
-      const sp = 70;
+    if (d > 1) {
+      const sp = Math.min(d * 6, 140);
       f.pos.x += (dx / d) * sp * dt;
       f.pos.y += (dy / d) * sp * dt;
     }
     f.bobPhase += dt * 4;
   }
+  // Clean dead frogs from list periodically.
+  if (w.frogs.some((f) => !f.alive)) w.frogs = w.frogs.filter((f) => f.alive);
 
   // Purple Haze pilot movement (mirrors Hanged Man pilot behavior, slower).
   if (w.standId === "purple_haze" && w.purpleHazeActive) {
@@ -2422,6 +2459,14 @@ function resetStandRuntime(w: World) {
   w.hangedManActive = false;
   w.shards = [];
   w.shardPickerOpen = false;
+  // Clear Gold Experience runtime (frogs, trees, hologram tracking).
+  w.frogs = [];
+  w.trees = [];
+  w.hologramHits = [];
+  for (const e of w.npcs) {
+    e.hologramUntil = 0;
+    e.rootedUntil = 0;
+  }
   // Drop any in-flight player projectiles so a stand swap doesn't leak homing locks.
   w.projectiles = [];
 }
@@ -2431,11 +2476,12 @@ export function useArrow(w: World) {
   resetStandRuntime(w);
   w.standId = id;
   w.shitVariant = shitVariant;
+  // Player must MANUALLY summon the new stand.
+  w.standActive = false;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
-  w.bannerText = "Stand: " + name;
-  w.bannerUntil = w.time + 2.5;
+  w.bannerText = "Got Stand: " + name + " — tap Stand to summon";
+  w.bannerUntil = w.time + 3;
   play("rollStand");
-  play("standSummon");
 }
 
 export function useDisc(w: World) {
@@ -2642,6 +2688,53 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
 
   // Projectiles
   for (const pr of w.projectiles) {
+    if (pr.textGlyph === "GE_EAGLE") {
+      // Custom golden eagle silhouette flying along velocity direction.
+      const ang = Math.atan2(pr.vel.y, pr.vel.x);
+      const flap = Math.sin(w.time * 28) * 0.6;
+      ctx.save();
+      ctx.translate(pr.pos.x, pr.pos.y);
+      ctx.rotate(ang);
+      // body
+      ctx.fillStyle = "#caa14a";
+      ctx.beginPath(); ctx.ellipse(0, 0, 9, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+      // tail
+      ctx.fillStyle = "#a87f30";
+      ctx.beginPath();
+      ctx.moveTo(-9, 0);
+      ctx.lineTo(-14, -3);
+      ctx.lineTo(-14, 3);
+      ctx.closePath(); ctx.fill();
+      // wings (flap)
+      ctx.fillStyle = "#e0c068";
+      ctx.beginPath();
+      ctx.moveTo(-2, -1);
+      ctx.lineTo(2, -10 - flap * 4);
+      ctx.lineTo(6, -1);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-2, 1);
+      ctx.lineTo(2, 10 + flap * 4);
+      ctx.lineTo(6, 1);
+      ctx.closePath(); ctx.fill();
+      // head + beak
+      ctx.fillStyle = "#fff1b8";
+      ctx.beginPath(); ctx.arc(8, 0, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffaa1f";
+      ctx.beginPath();
+      ctx.moveTo(10, -0.6);
+      ctx.lineTo(13, 0);
+      ctx.lineTo(10, 0.6);
+      ctx.closePath(); ctx.fill();
+      // eye
+      ctx.fillStyle = "#1a1a1f";
+      ctx.fillRect(8, -1, 1, 1);
+      ctx.restore();
+      // glow trail
+      ctx.fillStyle = hexToRgba("#ffd24a", 0.35);
+      ctx.beginPath(); ctx.arc(pr.pos.x - pr.vel.x * 0.02, pr.pos.y - pr.vel.y * 0.02, 4, 0, Math.PI * 2); ctx.fill();
+      continue;
+    }
     ctx.fillStyle = pr.color;
     ctx.beginPath(); ctx.arc(pr.pos.x, pr.pos.y, pr.radius, 0, Math.PI * 2); ctx.fill();
     if (pr.lobbed) {
@@ -3395,6 +3488,30 @@ function drawProtectionTree(ctx: CanvasRenderingContext2D, w: World, t: Protecti
 }
 
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
+  // Gold Experience hologram afterimage — render a faded copy of the NPC at hologramOrigin.
+  if (e.hologramOrigin && w.time < (e.hologramUntil ?? 0)) {
+    const ho = e.hologramOrigin;
+    const flick = 0.55 + Math.sin(w.time * 24) * 0.25;
+    ctx.save();
+    ctx.globalAlpha = 0.55 * flick;
+    // shadow
+    ctx.fillStyle = "rgba(202,161,74,0.25)";
+    ctx.beginPath(); ctx.ellipse(ho.x, ho.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+    // body silhouette in gold
+    ctx.fillStyle = "#caa14a";
+    ctx.fillRect(ho.x - 6, ho.y - 2, 12, 10);
+    ctx.fillStyle = "#ffe89a";
+    ctx.fillRect(ho.x - 5, ho.y - 10, 10, 9);
+    // outline shimmer
+    ctx.strokeStyle = "rgba(255,232,154,0.9)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ho.x - 6.5, ho.y - 10.5, 13, 19.5);
+    ctx.restore();
+    // sparkle particles
+    if (Math.random() < 0.35) {
+      spawnParticles(w, ho, "#ffe89a", 1, { life: 0.4, gravity: -20, speedMin: 10, speedMax: 30, shape: "spark" });
+    }
+  }
   // Match player silhouette: shadow 8x3, body 12x10, head 10x9, hp bar at -16.
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(e.pos.x, e.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
