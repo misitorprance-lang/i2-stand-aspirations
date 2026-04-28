@@ -3476,6 +3476,30 @@ function drawProtectionTree(ctx: CanvasRenderingContext2D, w: World, t: Protecti
 }
 
 function drawNpc(ctx: CanvasRenderingContext2D, w: World, e: Entity) {
+  // Gold Experience hologram afterimage — render a faded copy of the NPC at hologramOrigin.
+  if (e.hologramOrigin && w.time < (e.hologramUntil ?? 0)) {
+    const ho = e.hologramOrigin;
+    const flick = 0.55 + Math.sin(w.time * 24) * 0.25;
+    ctx.save();
+    ctx.globalAlpha = 0.55 * flick;
+    // shadow
+    ctx.fillStyle = "rgba(202,161,74,0.25)";
+    ctx.beginPath(); ctx.ellipse(ho.x, ho.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+    // body silhouette in gold
+    ctx.fillStyle = "#caa14a";
+    ctx.fillRect(ho.x - 6, ho.y - 2, 12, 10);
+    ctx.fillStyle = "#ffe89a";
+    ctx.fillRect(ho.x - 5, ho.y - 10, 10, 9);
+    // outline shimmer
+    ctx.strokeStyle = "rgba(255,232,154,0.9)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ho.x - 6.5, ho.y - 10.5, 13, 19.5);
+    ctx.restore();
+    // sparkle particles
+    if (Math.random() < 0.35) {
+      spawnParticles(w, ho, "#ffe89a", 1, { life: 0.4, gravity: -20, speedMin: 10, speedMax: 30, shape: "spark" });
+    }
+  }
   // Match player silhouette: shadow 8x3, body 12x10, head 10x9, hp bar at -16.
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(e.pos.x, e.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
