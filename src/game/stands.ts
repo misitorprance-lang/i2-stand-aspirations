@@ -41,18 +41,21 @@ export type AbilityKind =
   | "brutal_slash"
   | "ice_heal"
   | "ice_stomp"
-  | "ge_eagle_pierce"        // GE A1 — straight piercing eagle that hits many in a line
-  // Echoes rework
-  | "bleed_text"             // Sent Bleed: red text projectile that applies bleed
-  | "explosion_text"         // self-buff that knocks back attackers
-  | "frost_text"             // ground text — slow + small chip
-  | "burn_text"              // ground text — chip damage, no stun, short
-  | "three_freeze_pressure"  // pressure: chip damage + heavy slow + can't fight
-  // Purple Haze
-  | "capsule_shot"           // shoots a gold capsule that explodes into poison gas
-  | "gas_release"            // self-AOE poison cloud (also damages user weakly)
-  | "ph_pilot_toggle"        // Purple Haze pilot (slower)
-  | "cleansly_violence";     // damage boost duration with bar
+  | "ge_eagle_pierce"
+  | "bleed_text"
+  | "explosion_text"
+  | "frost_text"
+  | "burn_text"
+  | "three_freeze_pressure"
+  | "capsule_shot"
+  | "gas_release"
+  | "ph_pilot_toggle"
+  | "cleansly_violence"
+  // Moon Rabbit
+  | "wasp_swarm"        // surround nearest target with stinging wasps
+  | "moon_carrot"       // self-heal
+  | "crash"             // line-attack vehicle that explodes
+  | "eternal_curse";    // multi-target lightning strike
 
 export interface Ability {
   name: string;
