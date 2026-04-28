@@ -1487,7 +1487,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         hitSet: new Set(),
         expireAt: w.time + ab.range / ab.speed!,
         speed: ab.speed,
-        textGlyph: "🦅",
+        textGlyph: "GE_EAGLE",
       });
       if (target) w.standAimTarget = { ...target.pos };
       spawnVfx(w, { kind: "stab_line", pos: { x: p.x, y: p.y }, to: { x: p.x + shootDir.x * 30, y: p.y + shootDir.y * 30 }, radius: 6, color: ab.color, life: 0.25 });
