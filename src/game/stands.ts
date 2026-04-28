@@ -10,7 +10,8 @@ export type StandId =
   | "gold_experience"
   | "hanged_man"
   | "white_album"
-  | "purple_haze";
+  | "purple_haze"
+  | "moon_rabbit";
 
 export type AbilityKind =
   | "melee"
