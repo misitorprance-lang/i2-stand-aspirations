@@ -3465,6 +3465,7 @@ function drawBoingo(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillStyle = "#f3d9b1";
   ctx.fillRect(x - 7, y + 3, 2, 2);
   ctx.fillRect(x + 5, y + 3, 2, 2);
+  ctx.restore();
 }
 
 function drawFrog(ctx: CanvasRenderingContext2D, w: World, f: Frog) {
