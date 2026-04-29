@@ -658,7 +658,7 @@ export default function Game() {
       {ui.boingoNearby && !boingoOpen && (
         <div className="absolute left-1/2 -translate-x-1/2 bottom-[40%] z-30 pointer-events-auto">
           <button
-            onClick={() => setBoingoOpen(true)}
+            onClick={onTalkBoingo}
             className="px-3 py-1.5 rounded-md text-[11px] font-bold text-white animate-pulse"
             style={{
               background: "linear-gradient(180deg, #3a1a5a, #1a0a2a)",
