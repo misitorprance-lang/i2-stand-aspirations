@@ -385,38 +385,73 @@ export default function Game() {
       <div className="absolute top-0 left-0 right-0 px-3 pt-3 flex flex-col gap-2 pointer-events-none z-30">
         <div className="flex items-center justify-between">
           <div className="text-white text-sm font-bold tracking-wider drop-shadow">STAND TEST</div>
-          <div className="flex items-center gap-2 pointer-events-auto">
+          <div className="flex items-center gap-1 pointer-events-auto flex-wrap justify-end max-w-[70%]">
             <button
               onClick={onUseArrow}
-              className="bg-black/60 border border-white/30 rounded px-2 py-1 flex items-center gap-1 text-white text-xs"
+              className="bg-black/60 border border-white/30 rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
+              title="Use Arrow"
             >
               <span style={{ color: "#caa14a" }}>➤</span>
-              <span>Arrow {ui.arrows}</span>
+              <span>{ui.arrows}</span>
             </button>
             <button
               onClick={onUseDisc}
-              className="bg-black/60 border border-white/30 rounded px-2 py-1 flex items-center gap-1 text-white text-xs"
+              className="bg-black/60 border border-white/30 rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
+              title="Use DISC"
             >
               <span style={{ color: "#cfd2d8" }}>◎</span>
-              <span>DISC {ui.discs}</span>
+              <span>{ui.discs}</span>
             </button>
+            {ui.requiemArrows > 0 && (
+              <button
+                onClick={onUseRequiem}
+                className="bg-black/60 border rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
+                style={{ borderColor: "#ff5ac8", boxShadow: "0 0 6px rgba(255,90,200,0.5)" }}
+                title="Use Requiem Arrow"
+              >
+                <span style={{ color: "#ff5ac8" }}>✦</span>
+                <span>{ui.requiemArrows}</span>
+              </button>
+            )}
+            {ui.bluePebbles > 0 && (
+              <button
+                onClick={onUsePebble}
+                className="bg-black/60 border rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
+                style={{ borderColor: "#4a86d6", boxShadow: "0 0 6px rgba(80,160,255,0.5)" }}
+                title="Use Blue Pebble (Moon Rabbit)"
+              >
+                <span style={{ color: "#4a86d6" }}>●</span>
+                <span>{ui.bluePebbles}</span>
+              </button>
+            )}
+            {ui.tonthCopies > 0 && (
+              <button
+                onClick={onUseTonth}
+                className="bg-black/60 border rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
+                style={{ borderColor: "#ba8cff" }}
+                title="Open Tonth Copy"
+              >
+                <span style={{ color: "#ba8cff" }}>📖</span>
+                <span>{ui.tonthCopies}</span>
+              </button>
+            )}
             <button
               onClick={() => { const n = !soundOn; setSoundOn(n); setSoundEnabled(n); applyMusicSetting(n); }}
-              className="bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-xs"
+              className="bg-black/60 border border-white/30 rounded px-1.5 py-1 text-white text-[10px]"
               title="Toggle sound"
             >
               {soundOn ? "🔊" : "🔇"}
             </button>
             <button
               onClick={onSave}
-              className="bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-[10px]"
+              className="bg-black/60 border border-white/30 rounded px-1.5 py-1 text-white text-[10px]"
               title="Save game"
-            >Save</button>
+            >S</button>
             <button
               onClick={onLoad}
-              className="bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-[10px]"
+              className="bg-black/60 border border-white/30 rounded px-1.5 py-1 text-white text-[10px]"
               title="Load saved game"
-            >Load</button>
+            >L</button>
           </div>
         </div>
         {/* HP bar */}
