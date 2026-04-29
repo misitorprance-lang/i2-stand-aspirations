@@ -49,6 +49,11 @@ interface UIData {
   cleanslyActive: boolean;
   cleanslyFrac: number;
   boingoNearby: boolean;
+  boingoAlive: boolean;
+  requiemArrows: number;
+  bluePebbles: number;
+  tonthCopies: number;
+  toast: string | null;
 }
 
 export default function Game() {
@@ -81,6 +86,11 @@ export default function Game() {
     cleanslyActive: false,
     cleanslyFrac: 0,
     boingoNearby: false,
+    boingoAlive: true,
+    requiemArrows: 0,
+    bluePebbles: 0,
+    tonthCopies: 0,
+    toast: null,
   });
   const [boingoOpen, setBoingoOpen] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
