@@ -464,7 +464,7 @@ export function createWorld(): World {
   };
   pushOutOfProps(player, props);
 
-  return {
+  const world: World = {
     time: 0,
     player,
     npcs,
@@ -544,7 +544,15 @@ export function createWorld(): World {
       bobPhase: Math.random() * Math.PI * 2,
       pageFlipAt: 0,
       pageIndex: 0,
+      alive: true,
+      fadeUntil: 0,
     },
+    requiemArrowCount: 0,
+    bluePebbleCount: 0,
+    tonthCopyCount: 0,
+    toastText: null,
+    toastUntil: 0,
+    swarms: [],
   };
 
   // Pre-seed a starter pool of arrows and discs scattered across the (now larger) map
