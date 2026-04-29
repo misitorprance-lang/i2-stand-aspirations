@@ -2083,7 +2083,7 @@ export function update(w: World, input: InputState, dt: number) {
   // Eject any entity overlapping a prop (knockback/spawn glitches push them inside houses).
   if (pl.alive) pushOutOfProps(pl, w.props);
   for (const e of w.npcs) if (e.alive) pushOutOfProps(e, w.props);
-  pushOutOfProps(w.boingo as unknown as Entity, w.props);
+  if (w.boingo.alive) pushOutOfProps(w.boingo as unknown as Entity, w.props);
 
   // Sweep expired Hanged Man mirror shards.
   if (w.shards.length) w.shards = w.shards.filter((s) => w.time < s.expireAt);
@@ -2718,7 +2718,9 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
-  drawables.push({ y: w.boingo.pos.y, draw: () => drawBoingo(ctx, w) });
+  if (w.boingo.alive || w.time < w.boingo.fadeUntil) {
+    drawables.push({ y: w.boingo.pos.y, draw: () => drawBoingo(ctx, w) });
+  }
   // Trees (drawn as ground-anchored zones — sort by their root Y)
   for (const t of w.trees) {
     drawables.push({ y: t.pos.y - 4, draw: () => drawProtectionTree(ctx, w, t) });
