@@ -2553,6 +2553,7 @@ export function useDisc(w: World) {
   w.bannerText = "Stand discarded";
   w.bannerUntil = w.time + 1.5;
   play("pickupDisc");
+}
 
 // Requiem Arrow: rare upgrade — for now, equivalent to a normal arrow re-roll but with a special toast.
 export function useRequiemArrow(w: World) {
@@ -2580,13 +2581,12 @@ export function useBluePebble(w: World) {
   play("rollStand");
 }
 
-// Tonth Copy: opens Boingo's book without him present (handled in UI; engine just decrements count).
+// Tonth Copy: opens Boingo's book without him present (handled in UI).
 export function useTonthCopy(w: World): boolean {
-  if (w.tonthCopyCount <= 0) return false;
-  return true; // UI checks count, opens modal, no decrement (it's a reusable token)
+  return w.tonthCopyCount > 0;
 }
 
-
+export function getUIState(w: World): UIState {
   return {
     standId: w.standId,
     shitVariant: w.shitVariant,
