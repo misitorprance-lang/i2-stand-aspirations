@@ -2457,18 +2457,36 @@ export function update(w: World, input: InputState, dt: number) {
   w.cam.y += (camTargetY - w.cam.y) * Math.min(1, dt * 6);
 }
 
+// Show one toast at a time. Newer toasts replace older ones rather than stacking.
+function showToast(w: World, text: string, seconds = 1.6) {
+  w.toastText = text;
+  w.toastUntil = w.time + seconds;
+}
+
 // API for UI side
 export function tryPickupItems(w: World): { arrows: number; discs: number } {
   let a = 0, d = 0;
   const remain: ItemPickup[] = [];
   for (const it of w.items) {
     if (dist2(it.pos, w.player.pos) < (PICKUP_RADIUS + w.player.radius) ** 2) {
-      if (it.kind === "arrow") { a++; play("pickupArrow"); }
-      else { d++; play("pickupDisc"); }
+      if (it.kind === "arrow") { a++; play("pickupArrow"); showToast(w, "Picked up Arrow"); }
+      else if (it.kind === "disc") { d++; play("pickupDisc"); showToast(w, "Picked up DISC"); }
+      else if (it.kind === "requiem_arrow") { w.requiemArrowCount++; play("pickupArrow"); showToast(w, "Picked up Requiem Arrow"); }
+      else if (it.kind === "blue_pebble") { w.bluePebbleCount++; play("pickupArrow"); showToast(w, "Picked up Blue Pebble"); }
     } else remain.push(it);
   }
   w.items = remain;
   return { arrows: a, discs: d };
+}
+
+// Boingo interaction: grants one Tonth Copy and despawns Boingo permanently.
+export function talkToBoingo(w: World): { tonthGranted: boolean } {
+  if (!w.boingo.alive) return { tonthGranted: false };
+  w.tonthCopyCount++;
+  w.boingo.alive = false;
+  w.boingo.fadeUntil = w.time + 1.0;
+  showToast(w, "Received Tonth Copy");
+  return { tonthGranted: true };
 }
 
 function resetStandRuntime(w: World) {
