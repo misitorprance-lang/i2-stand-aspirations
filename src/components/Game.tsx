@@ -514,18 +514,15 @@ export default function Game() {
         )}
       </div>
 
-      {/* Banners — stacked so multiple notifications never overlap */}
-      {ui.banners.length > 0 && (
+      {/* Banners — only show the most-recent meaningful banner. Toasts (item pickups) replace this stack. */}
+      {(ui.toast || ui.banners.length > 0) && (
         <div className="absolute top-1/3 left-0 right-0 flex flex-col items-center gap-1 pointer-events-none">
-          {ui.banners.slice(-5).map((b) => (
-            <div
-              key={b.id}
-              className="px-4 py-2 rounded text-sm font-bold"
-              style={{ background: "rgba(0,0,0,0.75)", color: standColor, border: `2px solid ${standColor}` }}
-            >
-              {b.text}
-            </div>
-          ))}
+          <div
+            className="px-4 py-2 rounded text-sm font-bold"
+            style={{ background: "rgba(0,0,0,0.78)", color: standColor, border: `2px solid ${standColor}` }}
+          >
+            {ui.toast ?? ui.banners[ui.banners.length - 1]?.text}
+          </div>
         </div>
       )}
 
