@@ -296,6 +296,23 @@ export default function Game() {
     discsRef.current--;
     useDisc(worldRef.current);
   };
+  const onUseRequiem = () => {
+    if (!worldRef.current || worldRef.current.requiemArrowCount <= 0) return;
+    useRequiemArrow(worldRef.current);
+  };
+  const onUsePebble = () => {
+    if (!worldRef.current || worldRef.current.bluePebbleCount <= 0) return;
+    useBluePebble(worldRef.current);
+  };
+  const onUseTonth = () => {
+    if (!worldRef.current || worldRef.current.tonthCopyCount <= 0) return;
+    setBoingoOpen(true); // Tonth Copy opens the book without Boingo speaking
+  };
+  const onTalkBoingo = () => {
+    if (!worldRef.current) return;
+    talkToBoingo(worldRef.current); // grants Tonth Copy + despawns Boingo
+    setBoingoOpen(true);
+  };
   const onToggleStand = () => {
     if (!worldRef.current) return;
     unlockAudio();
