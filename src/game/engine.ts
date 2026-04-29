@@ -212,7 +212,18 @@ interface World {
     bobPhase: number;
     pageFlipAt: number;
     pageIndex: number;
+    alive: boolean;       // false → despawned permanently after first chat
+    fadeUntil: number;    // when > 0 and time<this, render fading-out
   };
+  // Inventory beyond arrows/discs
+  requiemArrowCount: number;
+  bluePebbleCount: number;
+  tonthCopyCount: number;
+  // One-shot toast (single notification at a time, replaces stacked banners for pickups)
+  toastText: string | null;
+  toastUntil: number;
+  // Moon Rabbit runtime: active wasp swarms attached to a target
+  swarms: { id: number; targetId: number; expireAt: number; nextStingAt: number; tickEvery: number; damage: number; range: number }[];
 }
 
 function makeProps(): Prop[] {
