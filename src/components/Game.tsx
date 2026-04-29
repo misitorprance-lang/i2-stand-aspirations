@@ -9,12 +9,15 @@ import {
   tryPickupItems,
   useArrow,
   useDisc,
+  useRequiemArrow,
+  useBluePebble,
   toggleStandActive,
   tryUseDisc,
   teleportToShard,
   closeShardPicker,
   exportSave,
   applySave,
+  talkToBoingo,
   type InputState,
 } from "@/game/engine";
 import { STANDS, SHIT_ABILITY } from "@/game/stands";
