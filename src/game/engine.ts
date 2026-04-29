@@ -2036,8 +2036,9 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
-  // Boingo update — scared NPC AI: wanders idly, flees from anything threatening (player, puppet, hanged man, hostile NPCs)
-  if (!timeStopped) {
+  // Boingo update — scared NPC AI: wanders idly, flees from anything threatening (player, puppet, hanged man, hostile NPCs).
+  // After being talked to, Boingo despawns permanently — skip all of his updates.
+  if (!timeStopped && w.boingo.alive) {
     const b = w.boingo;
     // page-flip timer (purely visual)
     if (w.time >= b.pageFlipAt) {
