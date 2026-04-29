@@ -2886,6 +2886,27 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
+  // Moon Rabbit: wasp swirl around each swarmed target.
+  for (const s of w.swarms) {
+    const t = w.npcs.find((e) => e.id === s.targetId);
+    if (!t || !t.alive) continue;
+    const baseAngle = w.time * 4;
+    for (let i = 0; i < 6; i++) {
+      const ang = baseAngle + (i * Math.PI * 2) / 6;
+      const r = 12 + Math.sin(w.time * 8 + i) * 3;
+      const wx = t.pos.x + Math.cos(ang) * r;
+      const wy = t.pos.y + Math.sin(ang) * r - 2;
+      ctx.fillStyle = "#1a1a14";
+      ctx.fillRect(wx - 1.5, wy - 1, 3, 2);
+      ctx.fillStyle = "#ffd24a";
+      ctx.fillRect(wx - 1.5, wy - 1, 3, 1);
+      // wing flicker
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillRect(wx - 2, wy - 2, 1, 1);
+      ctx.fillRect(wx + 1, wy - 2, 1, 1);
+    }
+  }
+
   // Channel cone visual (above entities)
   if (w.channel) {
     const c = w.channel;
