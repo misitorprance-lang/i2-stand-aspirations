@@ -2640,25 +2640,53 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     // soft drop shadow
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath(); ctx.ellipse(it.pos.x, it.pos.y + 6, 6, 2, 0, 0, Math.PI * 2); ctx.fill();
-    if (it.kind === "arrow") {
+    if (it.kind === "arrow" || it.kind === "requiem_arrow") {
+      const isRequiem = it.kind === "requiem_arrow";
+      // Faint glow halo for Requiem variant.
+      if (isRequiem) {
+        const pulse = 0.35 + 0.25 * Math.sin(w.time * 6);
+        const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, 14);
+        grd.addColorStop(0, `rgba(255,90,200,${0.55 * pulse})`);
+        grd.addColorStop(1, "rgba(255,90,200,0)");
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.fill();
+      }
       ctx.save();
       ctx.translate(cx, cy);
       ctx.scale(SC, SC);
       ctx.rotate(-Math.PI / 4);
       ctx.fillStyle = "#3a2418";
       ctx.fillRect(-8, -1, 13, 2);
-      ctx.fillStyle = "#caa14a";
+      ctx.fillStyle = isRequiem ? "#ff5ac8" : "#caa14a";
       ctx.beginPath();
       ctx.moveTo(5, -5); ctx.lineTo(10, 0); ctx.lineTo(5, 5); ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = "#e8c870";
+      ctx.fillStyle = isRequiem ? "#ffaee2" : "#e8c870";
       ctx.beginPath();
       ctx.moveTo(6, -2); ctx.lineTo(9, 0); ctx.lineTo(6, 2); ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = "#caa14a";
+      ctx.fillStyle = isRequiem ? "#ff5ac8" : "#caa14a";
       ctx.fillRect(-10, -3, 3, 6);
       ctx.fillStyle = "#5a3a1c";
       ctx.fillRect(-10, -1, 3, 2);
+      ctx.restore();
+    } else if (it.kind === "blue_pebble") {
+      // Glowing blue stone — unlocks Moon Rabbit when consumed.
+      const pulse = 0.4 + 0.4 * Math.sin(w.time * 5);
+      ctx.fillStyle = `rgba(80,160,255,${0.5 * pulse})`;
+      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(SC, SC);
+      const grd = ctx.createRadialGradient(-2, -2, 1, 0, 0, 7);
+      grd.addColorStop(0, "#bce0ff");
+      grd.addColorStop(0.55, "#4a86d6");
+      grd.addColorStop(1, "#1a3a78");
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(-1.5, -1.5, 1.5, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     } else {
       ctx.save();
