@@ -212,7 +212,18 @@ interface World {
     bobPhase: number;
     pageFlipAt: number;
     pageIndex: number;
+    alive: boolean;       // false → despawned permanently after first chat
+    fadeUntil: number;    // when > 0 and time<this, render fading-out
   };
+  // Inventory beyond arrows/discs
+  requiemArrowCount: number;
+  bluePebbleCount: number;
+  tonthCopyCount: number;
+  // One-shot toast (single notification at a time, replaces stacked banners for pickups)
+  toastText: string | null;
+  toastUntil: number;
+  // Moon Rabbit runtime: active wasp swarms attached to a target
+  swarms: { id: number; targetId: number; expireAt: number; nextStingAt: number; tickEvery: number; damage: number; range: number }[];
 }
 
 function makeProps(): Prop[] {
@@ -453,7 +464,7 @@ export function createWorld(): World {
   };
   pushOutOfProps(player, props);
 
-  return {
+  const world: World = {
     time: 0,
     player,
     npcs,
@@ -533,7 +544,15 @@ export function createWorld(): World {
       bobPhase: Math.random() * Math.PI * 2,
       pageFlipAt: 0,
       pageIndex: 0,
+      alive: true,
+      fadeUntil: 0,
     },
+    requiemArrowCount: 0,
+    bluePebbleCount: 0,
+    tonthCopyCount: 0,
+    toastText: null,
+    toastUntil: 0,
+    swarms: [],
   };
 
   // Pre-seed a starter pool of arrows and discs scattered across the (now larger) map
@@ -1709,16 +1728,98 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnParticles(w, p, ab.color, 18, { shape: "ember", speedMin: 60, speedMax: 180, life: 0.6 });
       break;
     }
+    // ---- Moon Rabbit: Wasp Swarm (A1) ----
+    case "wasp_swarm": {
+      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
+      if (!target) {
+        w.bannerText = "No target";
+        w.bannerUntil = w.time + 0.7;
+        w.cdTimers[key] = 1.5;
+        break;
+      }
+      w.swarms.push({
+        id: w.nextId++,
+        targetId: target.id,
+        expireAt: w.time + (ab.duration ?? 6),
+        nextStingAt: w.time + (ab.tickEvery ?? 3),
+        tickEvery: ab.tickEvery ?? 3,
+        damage: ab.damage,
+        range: ab.radius ?? 36,
+      });
+      spawnVfx(w, { kind: "beam", pos: { ...p }, to: { ...target.pos }, color: ab.color, life: 0.3 });
+      spawnParticles(w, target.pos, ab.color, 14, { speedMin: 30, speedMax: 110, life: 0.5 });
+      break;
+    }
+    // ---- Moon Rabbit: Moon Carrot (A2) — self-heal ----
+    case "moon_carrot": {
+      const heal = 8;
+      w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 26, color: ab.color, life: 0.5 });
+      spawnParticles(w, w.player.pos, ab.color, 14, { speedMin: 40, speedMax: 110, life: 0.6, gravity: -40 });
+      showToast(w, `+${heal} HP`);
+      play("toggleOn");
+      break;
+    }
+    // ---- Moon Rabbit: Crash (A3) — vehicle line attack that explodes ----
+    case "crash": {
+      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
+      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      const speed = ab.speed ?? 360;
+      const life = ab.range / speed;
+      w.projectiles.push({
+        id: w.nextId++,
+        pos: { x: p.x, y: p.y },
+        vel: { x: shootDir.x * speed, y: shootDir.y * speed },
+        radius: ab.radius ?? 14,
+        damage: ab.damage,
+        color: ab.color,
+        ownerKind: "player",
+        pierce: true,
+        hitSet: new Set(),
+        expireAt: w.time + life,
+        detonateAt: w.time + life,
+        detonateRadius: 36,
+        detonateColor: ab.color,
+        detonateCrater: false,
+      });
+      spawnParticles(w, p, ab.color, 10, { speedMin: 40, speedMax: 130, life: 0.4 });
+      break;
+    }
+    // ---- Moon Rabbit: Eternal Curse (A4) — multi-target lightning ----
+    case "eternal_curse": {
+      const radius = ab.radius ?? 160;
+      const targets = w.npcs.filter((e) => e.alive && dist2(e.pos, p) < radius * radius);
+      if (targets.length === 0) {
+        w.bannerText = "No targets";
+        w.bannerUntil = w.time + 0.7;
+        spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.6 });
+        break;
+      }
+      for (const t of targets) {
+        damageEntity(w, t, ab.damage);
+        spawnVfx(w, { kind: "chain_arc", pos: { ...p }, to: { ...t.pos }, color: ab.color, life: 0.35 });
+        spawnVfx(w, { kind: "explosion_ring", pos: { ...t.pos }, radius: 16, color: ab.color, life: 0.4 });
+        spawnParticles(w, t.pos, ab.color, 10, { speedMin: 60, speedMax: 180, life: 0.5 });
+      }
+      w.shake = Math.max(w.shake, 8);
+      w.bannerText = "Eternal Curse!";
+      w.bannerUntil = w.time + 1.0;
+      break;
+    }
   }
-  // White Album: every move drains the suit bar (Ice Heal / Ice Stomp already drained above).
   if (w.standId === "white_album" && w.whiteAlbumActive && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
     const drain = key === "m1" ? 3 : 12;
     w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - drain);
   }
 }
 
-function trySpawnItem(w: World, kind: "arrow" | "disc") {
-  const cap = kind === "arrow" ? MAX_ARROWS_ON_GROUND : MAX_DISCS_ON_GROUND;
+function trySpawnItem(w: World, kind: ItemPickup["kind"]) {
+  // Soft caps per item kind.
+  const cap =
+    kind === "arrow" ? MAX_ARROWS_ON_GROUND :
+    kind === "disc"  ? MAX_DISCS_ON_GROUND  :
+    kind === "requiem_arrow" ? 2 :
+    /* blue_pebble */         2;
   const existing = w.items.filter((it) => it.kind === kind).length;
   if (existing >= cap) return;
   const pos = freeSpot(w.props, 10, { avoid: w.player.pos, avoidR: 28, craters: w.craters });
@@ -2012,8 +2113,9 @@ export function update(w: World, input: InputState, dt: number) {
     }
   }
 
-  // Boingo update — scared NPC AI: wanders idly, flees from anything threatening (player, puppet, hanged man, hostile NPCs)
-  if (!timeStopped) {
+  // Boingo update — scared NPC AI: wanders idly, flees from anything threatening (player, puppet, hanged man, hostile NPCs).
+  // After being talked to, Boingo despawns permanently — skip all of his updates.
+  if (!timeStopped && w.boingo.alive) {
     const b = w.boingo;
     // page-flip timer (purely visual)
     if (w.time >= b.pageFlipAt) {
@@ -2058,7 +2160,7 @@ export function update(w: World, input: InputState, dt: number) {
   // Eject any entity overlapping a prop (knockback/spawn glitches push them inside houses).
   if (pl.alive) pushOutOfProps(pl, w.props);
   for (const e of w.npcs) if (e.alive) pushOutOfProps(e, w.props);
-  pushOutOfProps(w.boingo as unknown as Entity, w.props);
+  if (w.boingo.alive) pushOutOfProps(w.boingo as unknown as Entity, w.props);
 
   // Sweep expired Hanged Man mirror shards.
   if (w.shards.length) w.shards = w.shards.filter((s) => w.time < s.expireAt);
@@ -2357,12 +2459,37 @@ export function update(w: World, input: InputState, dt: number) {
   w.nextArrowAt -= dt;
   if (w.nextArrowAt <= 0) {
     trySpawnItem(w, "arrow");
+    // Rare side-loot: every ~6th arrow tick has a chance to drop a Requiem Arrow or Blue Pebble instead.
+    if (Math.random() < 0.18) {
+      trySpawnItem(w, Math.random() < 0.55 ? "blue_pebble" : "requiem_arrow");
+    }
     w.nextArrowAt = rand(ARROW_INTERVAL[0], ARROW_INTERVAL[1]);
   }
   w.nextDiscAt -= dt;
   if (w.nextDiscAt <= 0) {
     trySpawnItem(w, "disc");
     w.nextDiscAt = rand(DISC_INTERVAL[0], DISC_INTERVAL[1]);
+  }
+
+  // Single-toast lifecycle (separate from stacked banners).
+  if (w.toastText && w.time >= w.toastUntil) w.toastText = null;
+
+  // Moon Rabbit: tick wasp swarms — sting their target every `tickEvery` and despawn on expiry/death.
+  if (w.swarms.length) {
+    const remain: typeof w.swarms = [];
+    for (const s of w.swarms) {
+      if (w.time >= s.expireAt) continue;
+      const t = w.npcs.find((e) => e.id === s.targetId);
+      if (!t || !t.alive) continue;
+      if (w.time >= s.nextStingAt) {
+        damageEntity(w, t, s.damage);
+        spawnVfx(w, { kind: "explosion_ring", pos: { ...t.pos }, radius: s.range, color: "#ffd24a", life: 0.3 });
+        spawnParticles(w, t.pos, "#ffd24a", 10, { speedMin: 30, speedMax: 100, life: 0.4 });
+        s.nextStingAt = w.time + s.tickEvery;
+      }
+      remain.push(s);
+    }
+    w.swarms = remain;
   }
 
   // Banner timeout
@@ -2438,18 +2565,36 @@ export function update(w: World, input: InputState, dt: number) {
   w.cam.y += (camTargetY - w.cam.y) * Math.min(1, dt * 6);
 }
 
+// Show one toast at a time. Newer toasts replace older ones rather than stacking.
+function showToast(w: World, text: string, seconds = 1.6) {
+  w.toastText = text;
+  w.toastUntil = w.time + seconds;
+}
+
 // API for UI side
 export function tryPickupItems(w: World): { arrows: number; discs: number } {
   let a = 0, d = 0;
   const remain: ItemPickup[] = [];
   for (const it of w.items) {
     if (dist2(it.pos, w.player.pos) < (PICKUP_RADIUS + w.player.radius) ** 2) {
-      if (it.kind === "arrow") { a++; play("pickupArrow"); }
-      else { d++; play("pickupDisc"); }
+      if (it.kind === "arrow") { a++; play("pickupArrow"); showToast(w, "Picked up Arrow"); }
+      else if (it.kind === "disc") { d++; play("pickupDisc"); showToast(w, "Picked up DISC"); }
+      else if (it.kind === "requiem_arrow") { w.requiemArrowCount++; play("pickupArrow"); showToast(w, "Picked up Requiem Arrow"); }
+      else if (it.kind === "blue_pebble") { w.bluePebbleCount++; play("pickupArrow"); showToast(w, "Picked up Blue Pebble"); }
     } else remain.push(it);
   }
   w.items = remain;
   return { arrows: a, discs: d };
+}
+
+// Boingo interaction: grants one Tonth Copy and despawns Boingo permanently.
+export function talkToBoingo(w: World): { tonthGranted: boolean } {
+  if (!w.boingo.alive) return { tonthGranted: false };
+  w.tonthCopyCount++;
+  w.boingo.alive = false;
+  w.boingo.fadeUntil = w.time + 1.0;
+  showToast(w, "Received Tonth Copy");
+  return { tonthGranted: true };
 }
 
 function resetStandRuntime(w: World) {
@@ -2503,6 +2648,37 @@ export function useDisc(w: World) {
   w.bannerText = "Stand discarded";
   w.bannerUntil = w.time + 1.5;
   play("pickupDisc");
+}
+
+// Requiem Arrow: rare upgrade — for now, equivalent to a normal arrow re-roll but with a special toast.
+export function useRequiemArrow(w: World) {
+  if (w.requiemArrowCount <= 0) return;
+  w.requiemArrowCount--;
+  const { id, shitVariant } = rollStand();
+  resetStandRuntime(w);
+  w.standId = id;
+  w.shitVariant = shitVariant;
+  w.standActive = false;
+  const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
+  showToast(w, "Requiem Arrow → " + name);
+  play("rollStand");
+}
+
+// Blue Pebble: grants Moon Rabbit as the active stand.
+export function useBluePebble(w: World) {
+  if (w.bluePebbleCount <= 0) return;
+  w.bluePebbleCount--;
+  resetStandRuntime(w);
+  w.standId = "moon_rabbit";
+  w.shitVariant = false;
+  w.standActive = false;
+  showToast(w, "Got Stand: Moon Rabbit — tap Stand to summon");
+  play("rollStand");
+}
+
+// Tonth Copy: opens Boingo's book without him present (handled in UI).
+export function useTonthCopy(w: World): boolean {
+  return w.tonthCopyCount > 0;
 }
 
 export function getUIState(w: World): UIState {
@@ -2590,25 +2766,53 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
     // soft drop shadow
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath(); ctx.ellipse(it.pos.x, it.pos.y + 6, 6, 2, 0, 0, Math.PI * 2); ctx.fill();
-    if (it.kind === "arrow") {
+    if (it.kind === "arrow" || it.kind === "requiem_arrow") {
+      const isRequiem = it.kind === "requiem_arrow";
+      // Faint glow halo for Requiem variant.
+      if (isRequiem) {
+        const pulse = 0.35 + 0.25 * Math.sin(w.time * 6);
+        const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, 14);
+        grd.addColorStop(0, `rgba(255,90,200,${0.55 * pulse})`);
+        grd.addColorStop(1, "rgba(255,90,200,0)");
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.fill();
+      }
       ctx.save();
       ctx.translate(cx, cy);
       ctx.scale(SC, SC);
       ctx.rotate(-Math.PI / 4);
       ctx.fillStyle = "#3a2418";
       ctx.fillRect(-8, -1, 13, 2);
-      ctx.fillStyle = "#caa14a";
+      ctx.fillStyle = isRequiem ? "#ff5ac8" : "#caa14a";
       ctx.beginPath();
       ctx.moveTo(5, -5); ctx.lineTo(10, 0); ctx.lineTo(5, 5); ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = "#e8c870";
+      ctx.fillStyle = isRequiem ? "#ffaee2" : "#e8c870";
       ctx.beginPath();
       ctx.moveTo(6, -2); ctx.lineTo(9, 0); ctx.lineTo(6, 2); ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = "#caa14a";
+      ctx.fillStyle = isRequiem ? "#ff5ac8" : "#caa14a";
       ctx.fillRect(-10, -3, 3, 6);
       ctx.fillStyle = "#5a3a1c";
       ctx.fillRect(-10, -1, 3, 2);
+      ctx.restore();
+    } else if (it.kind === "blue_pebble") {
+      // Glowing blue stone — unlocks Moon Rabbit when consumed.
+      const pulse = 0.4 + 0.4 * Math.sin(w.time * 5);
+      ctx.fillStyle = `rgba(80,160,255,${0.5 * pulse})`;
+      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(SC, SC);
+      const grd = ctx.createRadialGradient(-2, -2, 1, 0, 0, 7);
+      grd.addColorStop(0, "#bce0ff");
+      grd.addColorStop(0.55, "#4a86d6");
+      grd.addColorStop(1, "#1a3a78");
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(-1.5, -1.5, 1.5, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     } else {
       ctx.save();
@@ -2668,7 +2872,9 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
-  drawables.push({ y: w.boingo.pos.y, draw: () => drawBoingo(ctx, w) });
+  if (w.boingo.alive || w.time < w.boingo.fadeUntil) {
+    drawables.push({ y: w.boingo.pos.y, draw: () => drawBoingo(ctx, w) });
+  }
   // Trees (drawn as ground-anchored zones — sort by their root Y)
   for (const t of w.trees) {
     drawables.push({ y: t.pos.y - 4, draw: () => drawProtectionTree(ctx, w, t) });
@@ -2679,6 +2885,27 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   }
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
+
+  // Moon Rabbit: wasp swirl around each swarmed target.
+  for (const s of w.swarms) {
+    const t = w.npcs.find((e) => e.id === s.targetId);
+    if (!t || !t.alive) continue;
+    const baseAngle = w.time * 4;
+    for (let i = 0; i < 6; i++) {
+      const ang = baseAngle + (i * Math.PI * 2) / 6;
+      const r = 12 + Math.sin(w.time * 8 + i) * 3;
+      const wx = t.pos.x + Math.cos(ang) * r;
+      const wy = t.pos.y + Math.sin(ang) * r - 2;
+      ctx.fillStyle = "#1a1a14";
+      ctx.fillRect(wx - 1.5, wy - 1, 3, 2);
+      ctx.fillStyle = "#ffd24a";
+      ctx.fillRect(wx - 1.5, wy - 1, 3, 1);
+      // wing flicker
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillRect(wx - 2, wy - 2, 1, 1);
+      ctx.fillRect(wx + 1, wy - 2, 1, 1);
+    }
+  }
 
   // Channel cone visual (above entities)
   if (w.channel) {
@@ -3312,6 +3539,15 @@ function drawBoingo(ctx: CanvasRenderingContext2D, w: World) {
   const bob = Math.sin(w.time * 3 + b.bobPhase) * 0.8;
   const x = b.pos.x;
   const y = b.pos.y + bob;
+  // Fade-out alpha while despawning after first chat.
+  let alpha = 1;
+  if (!b.alive) {
+    const remain = Math.max(0, b.fadeUntil - w.time);
+    alpha = remain;            // fade over ~1s
+    if (alpha <= 0) return;
+  }
+  ctx.save();
+  ctx.globalAlpha = alpha;
   // shadow
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(b.pos.x, b.pos.y + 9, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
@@ -3404,6 +3640,7 @@ function drawBoingo(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillStyle = "#f3d9b1";
   ctx.fillRect(x - 7, y + 3, 2, 2);
   ctx.fillRect(x + 5, y + 3, 2, 2);
+  ctx.restore();
 }
 
 function drawFrog(ctx: CanvasRenderingContext2D, w: World, f: Frog) {
