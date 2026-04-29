@@ -535,6 +535,13 @@ export function createWorld(): World {
       pageIndex: 0,
     },
   };
+
+  // Pre-seed a starter pool of arrows and discs scattered across the (now larger) map
+  // so players don't spend forever hunting for their first stand or DISC.
+  for (let i = 0; i < INITIAL_ARROW_COUNT; i++) trySpawnItem(world, "arrow");
+  for (let i = 0; i < INITIAL_DISC_COUNT; i++) trySpawnItem(world, "disc");
+
+  return world;
 }
 
 // A prop is solid only if it has HP left (or it isn't destructible).
