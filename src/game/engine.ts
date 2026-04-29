@@ -1728,8 +1728,80 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnParticles(w, p, ab.color, 18, { shape: "ember", speedMin: 60, speedMax: 180, life: 0.6 });
       break;
     }
+    // ---- Moon Rabbit: Wasp Swarm (A1) ----
+    case "wasp_swarm": {
+      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
+      if (!target) {
+        w.bannerText = "No target";
+        w.bannerUntil = w.time + 0.7;
+        w.cdTimers[key] = 1.5;
+        break;
+      }
+      w.swarms.push({
+        id: w.nextId++,
+        targetId: target.id,
+        expireAt: w.time + (ab.duration ?? 6),
+        nextStingAt: w.time + (ab.tickEvery ?? 3),
+        tickEvery: ab.tickEvery ?? 3,
+        damage: ab.damage,
+        range: ab.radius ?? 36,
+      });
+      spawnVfx(w, { kind: "beam", pos: { ...p }, to: { ...target.pos }, color: ab.color, life: 0.3 });
+      spawnParticles(w, target.pos, ab.color, 14, { speedMin: 30, speedMax: 110, life: 0.5 });
+      break;
+    }
+    // ---- Moon Rabbit: Moon Carrot (A2) — self-heal ----
+    case "moon_carrot": {
+      const heal = 8;
+      w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 26, color: ab.color, life: 0.5 });
+      spawnParticles(w, w.player.pos, ab.color, 14, { speedMin: 40, speedMax: 110, life: 0.6, gravity: -40 });
+      showToast(w, `+${heal} HP`);
+      play("toggleOn");
+      break;
+    }
+    // ---- Moon Rabbit: Crash (A3) — vehicle line attack that explodes ----
+    case "crash": {
+      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
+      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      w.projectiles.push({
+        id: w.nextId++,
+        pos: { x: p.x, y: p.y },
+        vel: { x: shootDir.x * (ab.speed ?? 360), y: shootDir.y * (ab.speed ?? 360) },
+        radius: ab.radius ?? 14,
+        damage: ab.damage,
+        color: ab.color,
+        ownerKind: "player",
+        pierce: true,
+        hitSet: new Set(),
+        expireAt: w.time + ab.range / (ab.speed ?? 360),
+        explodeOnExpire: { radius: 36, damage: 5, color: ab.color },
+      } as Projectile);
+      spawnParticles(w, p, ab.color, 10, { speedMin: 40, speedMax: 130, life: 0.4 });
+      break;
+    }
+    // ---- Moon Rabbit: Eternal Curse (A4) — multi-target lightning ----
+    case "eternal_curse": {
+      const radius = ab.radius ?? 160;
+      const targets = w.npcs.filter((e) => e.alive && dist2(e.pos, p) < radius * radius);
+      if (targets.length === 0) {
+        w.bannerText = "No targets";
+        w.bannerUntil = w.time + 0.7;
+        spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.6 });
+        break;
+      }
+      for (const t of targets) {
+        damageEntity(w, t, ab.damage);
+        spawnVfx(w, { kind: "chain_arc", pos: { ...p }, to: { ...t.pos }, color: ab.color, life: 0.35 });
+        spawnVfx(w, { kind: "explosion_ring", pos: { ...t.pos }, radius: 16, color: ab.color, life: 0.4 });
+        spawnParticles(w, t.pos, ab.color, 10, { speedMin: 60, speedMax: 180, life: 0.5 });
+      }
+      w.shake = Math.max(w.shake, 8);
+      w.bannerText = "Eternal Curse!";
+      w.bannerUntil = w.time + 1.0;
+      break;
+    }
   }
-  // White Album: every move drains the suit bar (Ice Heal / Ice Stomp already drained above).
   if (w.standId === "white_album" && w.whiteAlbumActive && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
     const drain = key === "m1" ? 3 : 12;
     w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - drain);
