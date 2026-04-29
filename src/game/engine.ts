@@ -2474,6 +2474,24 @@ export function update(w: World, input: InputState, dt: number) {
   // Single-toast lifecycle (separate from stacked banners).
   if (w.toastText && w.time >= w.toastUntil) w.toastText = null;
 
+  // Moon Rabbit: tick wasp swarms — sting their target every `tickEvery` and despawn on expiry/death.
+  if (w.swarms.length) {
+    const remain: typeof w.swarms = [];
+    for (const s of w.swarms) {
+      if (w.time >= s.expireAt) continue;
+      const t = w.npcs.find((e) => e.id === s.targetId);
+      if (!t || !t.alive) continue;
+      if (w.time >= s.nextStingAt) {
+        damageEntity(w, t, s.damage);
+        spawnVfx(w, { kind: "explosion_ring", pos: { ...t.pos }, radius: s.range, color: "#ffd24a", life: 0.3 });
+        spawnParticles(w, t.pos, "#ffd24a", 10, { speedMin: 30, speedMax: 100, life: 0.4 });
+        s.nextStingAt = w.time + s.tickEvery;
+      }
+      remain.push(s);
+    }
+    w.swarms = remain;
+  }
+
   // Banner timeout
   // Mirror current bannerText into the stacked banners queue (so multiple notifs can show at once).
   if (w.bannerText) {
