@@ -2553,9 +2553,40 @@ export function useDisc(w: World) {
   w.bannerText = "Stand discarded";
   w.bannerUntil = w.time + 1.5;
   play("pickupDisc");
+
+// Requiem Arrow: rare upgrade — for now, equivalent to a normal arrow re-roll but with a special toast.
+export function useRequiemArrow(w: World) {
+  if (w.requiemArrowCount <= 0) return;
+  w.requiemArrowCount--;
+  const { id, shitVariant } = rollStand();
+  resetStandRuntime(w);
+  w.standId = id;
+  w.shitVariant = shitVariant;
+  w.standActive = false;
+  const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
+  showToast(w, "Requiem Arrow → " + name);
+  play("rollStand");
 }
 
-export function getUIState(w: World): UIState {
+// Blue Pebble: grants Moon Rabbit as the active stand.
+export function useBluePebble(w: World) {
+  if (w.bluePebbleCount <= 0) return;
+  w.bluePebbleCount--;
+  resetStandRuntime(w);
+  w.standId = "moon_rabbit";
+  w.shitVariant = false;
+  w.standActive = false;
+  showToast(w, "Got Stand: Moon Rabbit — tap Stand to summon");
+  play("rollStand");
+}
+
+// Tonth Copy: opens Boingo's book without him present (handled in UI; engine just decrements count).
+export function useTonthCopy(w: World): boolean {
+  if (w.tonthCopyCount <= 0) return false;
+  return true; // UI checks count, opens modal, no decrement (it's a reusable token)
+}
+
+
   return {
     standId: w.standId,
     shitVariant: w.shitVariant,
