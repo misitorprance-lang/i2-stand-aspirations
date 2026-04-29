@@ -1736,8 +1736,13 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   }
 }
 
-function trySpawnItem(w: World, kind: "arrow" | "disc") {
-  const cap = kind === "arrow" ? MAX_ARROWS_ON_GROUND : MAX_DISCS_ON_GROUND;
+function trySpawnItem(w: World, kind: ItemPickup["kind"]) {
+  // Soft caps per item kind.
+  const cap =
+    kind === "arrow" ? MAX_ARROWS_ON_GROUND :
+    kind === "disc"  ? MAX_DISCS_ON_GROUND  :
+    kind === "requiem_arrow" ? 2 :
+    /* blue_pebble */         2;
   const existing = w.items.filter((it) => it.kind === kind).length;
   if (existing >= cap) return;
   const pos = freeSpot(w.props, 10, { avoid: w.player.pos, avoidR: 28, craters: w.craters });
