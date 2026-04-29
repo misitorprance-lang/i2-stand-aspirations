@@ -2381,6 +2381,10 @@ export function update(w: World, input: InputState, dt: number) {
   w.nextArrowAt -= dt;
   if (w.nextArrowAt <= 0) {
     trySpawnItem(w, "arrow");
+    // Rare side-loot: every ~6th arrow tick has a chance to drop a Requiem Arrow or Blue Pebble instead.
+    if (Math.random() < 0.18) {
+      trySpawnItem(w, Math.random() < 0.55 ? "blue_pebble" : "requiem_arrow");
+    }
     w.nextArrowAt = rand(ARROW_INTERVAL[0], ARROW_INTERVAL[1]);
   }
   w.nextDiscAt -= dt;
@@ -2388,6 +2392,9 @@ export function update(w: World, input: InputState, dt: number) {
     trySpawnItem(w, "disc");
     w.nextDiscAt = rand(DISC_INTERVAL[0], DISC_INTERVAL[1]);
   }
+
+  // Single-toast lifecycle (separate from stacked banners).
+  if (w.toastText && w.time >= w.toastUntil) w.toastText = null;
 
   // Banner timeout
   // Mirror current bannerText into the stacked banners queue (so multiple notifs can show at once).
