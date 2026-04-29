@@ -157,7 +157,12 @@ export default function Game() {
           whiteAlbumActive: w.whiteAlbumActive,
           cleanslyActive: w.time < w.cleanslyUntil,
           cleanslyFrac: w.cleanslyDuration > 0 ? Math.max(0, (w.cleanslyUntil - w.time) / w.cleanslyDuration) : 0,
-          boingoNearby: Math.hypot(w.player.pos.x - w.boingo.pos.x, w.player.pos.y - w.boingo.pos.y) < 26,
+          boingoNearby: w.boingo.alive && Math.hypot(w.player.pos.x - w.boingo.pos.x, w.player.pos.y - w.boingo.pos.y) < 26,
+          boingoAlive: w.boingo.alive,
+          requiemArrows: w.requiemArrowCount,
+          bluePebbles: w.bluePebbleCount,
+          tonthCopies: w.tonthCopyCount,
+          toast: w.toastText,
         });
       }
     };
