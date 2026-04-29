@@ -52,10 +52,14 @@ const ENEMY_MAX_HP = 45;
 const RESPAWN_DELAY = 6;
 const FRIENDLY_COUNT = 14;
 const ENEMY_COUNT = 14;
-const ARROW_INTERVAL = [6, 11] as const;
-const DISC_INTERVAL = [14, 22] as const;
-const MAX_ARROWS_ON_GROUND = 6;
-const MAX_DISCS_ON_GROUND = 4;
+// Faster respawn + bigger ground pool — map is 1.5x bigger now, so finding items
+// shouldn't feel like a chore. Initial world also pre-seeds a starter pool.
+const ARROW_INTERVAL = [3, 6] as const;
+const DISC_INTERVAL = [7, 12] as const;
+const MAX_ARROWS_ON_GROUND = 14;
+const MAX_DISCS_ON_GROUND = 9;
+const INITIAL_ARROW_COUNT = 8;
+const INITIAL_DISC_COUNT = 5;
 const MAX_BLUE_PEBBLES_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
