@@ -3364,6 +3364,15 @@ function drawBoingo(ctx: CanvasRenderingContext2D, w: World) {
   const bob = Math.sin(w.time * 3 + b.bobPhase) * 0.8;
   const x = b.pos.x;
   const y = b.pos.y + bob;
+  // Fade-out alpha while despawning after first chat.
+  let alpha = 1;
+  if (!b.alive) {
+    const remain = Math.max(0, b.fadeUntil - w.time);
+    alpha = remain;            // fade over ~1s
+    if (alpha <= 0) return;
+  }
+  ctx.save();
+  ctx.globalAlpha = alpha;
   // shadow
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(b.pos.x, b.pos.y + 9, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
