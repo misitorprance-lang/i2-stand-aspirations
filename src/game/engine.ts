@@ -1764,19 +1764,24 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     case "crash": {
       const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
       const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      const speed = ab.speed ?? 360;
+      const life = ab.range / speed;
       w.projectiles.push({
         id: w.nextId++,
         pos: { x: p.x, y: p.y },
-        vel: { x: shootDir.x * (ab.speed ?? 360), y: shootDir.y * (ab.speed ?? 360) },
+        vel: { x: shootDir.x * speed, y: shootDir.y * speed },
         radius: ab.radius ?? 14,
         damage: ab.damage,
         color: ab.color,
         ownerKind: "player",
         pierce: true,
         hitSet: new Set(),
-        expireAt: w.time + ab.range / (ab.speed ?? 360),
-        explodeOnExpire: { radius: 36, damage: 5, color: ab.color },
-      } as Projectile);
+        expireAt: w.time + life,
+        detonateAt: w.time + life,
+        detonateRadius: 36,
+        detonateColor: ab.color,
+        detonateCrater: false,
+      });
       spawnParticles(w, p, ab.color, 10, { speedMin: 40, speedMax: 130, life: 0.4 });
       break;
     }
