@@ -107,11 +107,11 @@ export const STANDS: Record<StandId, Stand> = {
     color: "#7c5cff",
     rarityWeight: 4,
     abilities: {
-      m1: { name: "Punch", kind: "melee", damage: 3, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
-      a1: { name: "Star Finger", kind: "pierce", damage: 5, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
-      a2: { name: "Ranged Smash", kind: "projectile", damage: 6, range: 220, radius: 8, cooldown: 2.0, speed: 320, color: "#b8a6ff" },
+      m1: { name: "Punch", kind: "melee", damage: 5, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
+      a1: { name: "Star Finger", kind: "pierce", damage: 8, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
+      a2: { name: "Ranged Smash", kind: "projectile", damage: 9, range: 220, radius: 8, cooldown: 2.0, speed: 320, color: "#b8a6ff" },
       a3: { name: "The World", kind: "time_stop", damage: 0, range: 0, cooldown: 18, duration: 5, color: "#dcd6ff" },
-      a4: { name: "Launch", kind: "knockback", damage: 11, range: 26, radius: 18, cooldown: 5, knockback: 220, color: "#7c5cff" },
+      a4: { name: "Launch", kind: "knockback", damage: 14, range: 26, radius: 18, cooldown: 5, knockback: 220, color: "#7c5cff" },
     },
   },
   rhcp: {
@@ -133,7 +133,7 @@ export const STANDS: Record<StandId, Stand> = {
     color: "#5fd1a0",
     rarityWeight: 6,
     abilities: {
-      m1: { name: "Act 3 Punch", kind: "melee", damage: 1.5, range: 18, radius: 12, cooldown: 0.28, color: "#bff5da" },
+      m1: { name: "Act 1 Touch", kind: "melee", damage: 0.5, range: 14, radius: 10, cooldown: 0.35, color: "#bff5da" },
       a1: { name: "Sent Bleed", kind: "bleed_text", damage: 2, range: 220, radius: 7, cooldown: 3.2, speed: 360, duration: 6, color: "#ff4d4d" },
       a2: { name: "Explosion", kind: "explosion_text", damage: 6, range: 0, radius: 26, cooldown: 7, duration: 6, knockback: 220, color: "#ffb84d" },
       a3: { name: "Ground Text", kind: "frost_text", damage: 0.8, range: 110, radius: 44, cooldown: 5, duration: 4, tickEvery: 0.45, color: "#a8e8ff" },
