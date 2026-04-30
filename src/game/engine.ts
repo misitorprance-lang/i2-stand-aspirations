@@ -224,6 +224,11 @@ interface World {
   toastUntil: number;
   // Moon Rabbit runtime: active wasp swarms attached to a target
   swarms: { id: number; targetId: number; expireAt: number; nextStingAt: number; tickEvery: number; damage: number; range: number }[];
+  // Moon Rabbit Eternal Curse: deferred lightning strikes from above (staggered)
+  curseStrikes: { targetId: number; hitAt: number; dmg: number; color: string }[];
+  // Soft-banner suppression so repeat hints ("Out of range", "Resummon stand", etc.)
+  // stop spamming the player after a few times.
+  bannerSuppressCounts: Record<string, number>;
 }
 
 function makeProps(): Prop[] {
