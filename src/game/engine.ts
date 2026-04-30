@@ -2515,6 +2515,24 @@ export function update(w: World, input: InputState, dt: number) {
     w.swarms = remain;
   }
 
+  // Moon Rabbit Eternal Curse: drain deferred lightning strikes.
+  if (w.curseStrikes.length) {
+    const remainCurse: typeof w.curseStrikes = [];
+    for (const c of w.curseStrikes) {
+      if (w.time < c.hitAt) { remainCurse.push(c); continue; }
+      const t = w.npcs.find((e) => e.id === c.targetId);
+      if (!t || !t.alive) continue;
+      // Bolt FROM ABOVE (not from the player).
+      const skyAbove = { x: t.pos.x, y: t.pos.y - 220 };
+      spawnVfx(w, { kind: "lightning_bolt", pos: skyAbove, to: { ...t.pos }, color: c.color, life: 0.35 });
+      spawnVfx(w, { kind: "explosion_ring", pos: { ...t.pos }, radius: 18, color: c.color, life: 0.4 });
+      spawnParticles(w, t.pos, c.color, 12, { speedMin: 60, speedMax: 200, life: 0.5 });
+      damageEntity(w, t, c.dmg);
+      w.shake = Math.max(w.shake, 4);
+    }
+    w.curseStrikes = remainCurse;
+  }
+
   // Banner timeout
   // Mirror current bannerText into the stacked banners queue (so multiple notifs can show at once).
   if (w.bannerText) {
