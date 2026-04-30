@@ -1776,15 +1776,11 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     }
     // ---- Moon Rabbit: Moon Carrot (A2) — self-heal ----
     case "moon_carrot": {
-      const heal = 8;
-      w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
-      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 26, color: ab.color, life: 0.5 });
-      spawnParticles(w, w.player.pos, ab.color, 14, { speedMin: 40, speedMax: 110, life: 0.6, gravity: -40 });
-      showToast(w, `+${heal} HP`);
+      healPlayer(w, 8, "#ff6688");
       play("toggleOn");
       break;
     }
-    // ---- Moon Rabbit: Crash (A3) — vehicle line attack that explodes ----
+    // ---- Moon Rabbit: Crash (A3) — drawn motorcycle that rams forward and explodes ----
     case "crash": {
       const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
       const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
@@ -1794,7 +1790,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         id: w.nextId++,
         pos: { x: p.x, y: p.y },
         vel: { x: shootDir.x * speed, y: shootDir.y * speed },
-        radius: ab.radius ?? 14,
+        radius: 10,
         damage: ab.damage,
         color: ab.color,
         ownerKind: "player",
@@ -1803,29 +1799,32 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         expireAt: w.time + life,
         detonateAt: w.time + life,
         detonateRadius: 36,
-        detonateColor: ab.color,
+        detonateColor: "#ff6b3a",
         detonateCrater: false,
+        textGlyph: "CRASH_BIKE",
       });
-      spawnParticles(w, p, ab.color, 10, { speedMin: 40, speedMax: 130, life: 0.4 });
+      spawnParticles(w, p, "#cccccc", 10, { speedMin: 40, speedMax: 130, life: 0.4 });
       break;
     }
-    // ---- Moon Rabbit: Eternal Curse (A4) — multi-target lightning ----
+    // ---- Moon Rabbit: Eternal Curse (A4) — lightning RAINS DOWN from above on every nearby target ----
     case "eternal_curse": {
       const radius = ab.radius ?? 160;
       const targets = w.npcs.filter((e) => e.alive && dist2(e.pos, p) < radius * radius);
       if (targets.length === 0) {
-        w.bannerText = "No targets";
-        w.bannerUntil = w.time + 0.7;
+        softBanner(w, "no_targets", "No targets in range", 0.7);
         spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.6 });
         break;
       }
-      for (const t of targets) {
-        damageEntity(w, t, ab.damage);
-        spawnVfx(w, { kind: "chain_arc", pos: { ...p }, to: { ...t.pos }, color: ab.color, life: 0.35 });
-        spawnVfx(w, { kind: "explosion_ring", pos: { ...t.pos }, radius: 16, color: ab.color, life: 0.4 });
-        spawnParticles(w, t.pos, ab.color, 10, { speedMin: 60, speedMax: 180, life: 0.5 });
-      }
-      w.shake = Math.max(w.shake, 8);
+      // Stagger strikes by 0.08s each so it feels like a downpour, not a single zap.
+      targets.forEach((t, i) => {
+        w.curseStrikes.push({
+          targetId: t.id,
+          hitAt: w.time + 0.25 + i * 0.08,
+          dmg: ab.damage,
+          color: ab.color,
+        });
+      });
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.5 });
       w.bannerText = "Eternal Curse!";
       w.bannerUntil = w.time + 1.0;
       break;
