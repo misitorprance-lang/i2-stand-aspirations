@@ -1279,7 +1279,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "puppet_spin": {
-      if (!w.puppet.active || w.puppet.hp <= 0) { w.bannerText = "Summon puppet first"; w.bannerUntil = w.time + 0.9; break; }
+      if (!w.puppet.active || w.puppet.hp <= 0) { softBanner(w, "puppet_first", "Summon puppet first", 0.9); break; }
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, w.puppet.pos) < ((ab.radius ?? 58) + e.radius) ** 2) damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - w.puppet.pos.x, y: e.pos.y - w.puppet.pos.y }), amount: 90 });
