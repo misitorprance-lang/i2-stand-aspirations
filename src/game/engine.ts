@@ -4191,16 +4191,30 @@ function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg
 // ---- public toggles for UI ----
 export function toggleStandActive(w: World): boolean {
   if (w.standId === "none") return w.standActive;
-  // White Album: no manual toggle — the suit only flips when the bar overheats / recharges.
-  // Tapping the toggle just informs the user.
+  // White Album: manual toggle, but blocked while bar empty / cooling.
   if (w.standId === "white_album") {
     if (w.whiteAlbumActive) {
-      w.bannerText = `Suit: ${Math.round(w.whiteAlbumBar)}%`;
+      // Turning OFF
+      w.whiteAlbumActive = false;
+      w.standActive = false;
+      w.bannerText = "Suit removed";
+      w.bannerUntil = w.time + 1.0;
+      play("toggleOff");
+      w.channel = null;
     } else {
-      const left = Math.max(0, Math.ceil(w.whiteAlbumLockUntil - w.time));
-      w.bannerText = left > 0 ? `Suit cooling (${left}s)` : `Recharging ${Math.round(w.whiteAlbumBar)}%`;
+      // Turning ON — only if bar has charge and lockout has elapsed.
+      if (w.whiteAlbumBar <= 0 || w.time < w.whiteAlbumLockUntil) {
+        const left = Math.max(0, Math.ceil(w.whiteAlbumLockUntil - w.time));
+        w.bannerText = left > 0 ? `Suit cooling (${left}s)` : `Recharging ${Math.round(w.whiteAlbumBar)}%`;
+        w.bannerUntil = w.time + 1.0;
+      } else {
+        w.whiteAlbumActive = true;
+        w.standActive = true;
+        w.bannerText = "Suit equipped";
+        w.bannerUntil = w.time + 1.0;
+        play("toggleOn");
+      }
     }
-    w.bannerUntil = w.time + 1.0;
     return w.whiteAlbumActive;
   }
   w.standActive = !w.standActive;
