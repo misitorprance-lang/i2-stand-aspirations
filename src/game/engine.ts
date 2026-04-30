@@ -2668,17 +2668,22 @@ function resetStandRuntime(w: World) {
   w.projectiles = [];
 }
 
-export function useArrow(w: World) {
+export function useArrow(w: World): boolean {
+  if (w.standId !== "none") {
+    showToast(w, "Use a DISC to drop your stand first");
+    return false;
+  }
   const { id, shitVariant } = rollStand();
   resetStandRuntime(w);
   w.standId = id;
   w.shitVariant = shitVariant;
-  // Player must MANUALLY summon the new stand.
   w.standActive = false;
+  if (id === "white_album") (w as any).whiteAlbumActive = false;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
   w.bannerText = "Got Stand: " + name + " — tap Stand to summon";
   w.bannerUntil = w.time + 3;
   play("rollStand");
+  return true;
 }
 
 export function useDisc(w: World) {
@@ -2691,23 +2696,33 @@ export function useDisc(w: World) {
   play("pickupDisc");
 }
 
-// Requiem Arrow: rare upgrade — for now, equivalent to a normal arrow re-roll but with a special toast.
-export function useRequiemArrow(w: World) {
-  if (w.requiemArrowCount <= 0) return;
+// Requiem Arrow: decorative-only (kept for back-compat; UI no longer offers a use button).
+export function useRequiemArrow(w: World): boolean {
+  if (w.standId !== "none") {
+    showToast(w, "Use a DISC to drop your stand first");
+    return false;
+  }
+  if (w.requiemArrowCount <= 0) return false;
   w.requiemArrowCount--;
   const { id, shitVariant } = rollStand();
   resetStandRuntime(w);
   w.standId = id;
   w.shitVariant = shitVariant;
   w.standActive = false;
+  if (id === "white_album") (w as any).whiteAlbumActive = false;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
   showToast(w, "Requiem Arrow → " + name);
   play("rollStand");
+  return true;
 }
 
 // Blue Pebble: grants Moon Rabbit as the active stand.
-export function useBluePebble(w: World) {
-  if (w.bluePebbleCount <= 0) return;
+export function useBluePebble(w: World): boolean {
+  if (w.standId !== "none") {
+    showToast(w, "Use a DISC to drop your stand first");
+    return false;
+  }
+  if (w.bluePebbleCount <= 0) return false;
   w.bluePebbleCount--;
   resetStandRuntime(w);
   w.standId = "moon_rabbit";
@@ -2715,6 +2730,7 @@ export function useBluePebble(w: World) {
   w.standActive = false;
   showToast(w, "Got Stand: Moon Rabbit — tap Stand to summon");
   play("rollStand");
+  return true;
 }
 
 // Tonth Copy: opens Boingo's book without him present (handled in UI).
