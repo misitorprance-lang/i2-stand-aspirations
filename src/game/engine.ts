@@ -645,10 +645,10 @@ function pushOutOfNpcs(w: World, pos: Vec2, radius: number) {
   }
 }
 
-function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false) {
+function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false, prefix = "") {
   let tier = dmg >= 15 ? 22 : dmg >= 8 ? 17 : dmg >= 3 ? 13 : 10;
   if (crit) tier = Math.round(tier * 1.35);
-  const text = (dmg < 1 ? dmg.toFixed(1) : Math.round(dmg).toString()) + (crit ? "!" : "");
+  const text = prefix + (dmg < 1 ? dmg.toFixed(1) : Math.round(dmg).toString()) + (crit ? "!" : "");
   w.damageNumbers.push({
     id: w.nextId++,
     pos: { x: pos.x + rand(-6, 6), y: pos.y - 6 },
@@ -659,6 +659,34 @@ function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false
     bornAt: w.time,
     expireAt: w.time + (crit ? 1.1 : 0.9),
   });
+}
+
+// Repeat-hint suppression: a banner key is allowed to fire 3 times, then is silenced
+// for the rest of the session. Player figures it out or grabs Boingo's book.
+function softBanner(w: World, key: string, text: string, seconds = 0.9) {
+  const n = (w.bannerSuppressCounts[key] ?? 0) + 1;
+  w.bannerSuppressCounts[key] = n;
+  if (n > 3) return;
+  w.bannerText = text;
+  w.bannerUntil = w.time + seconds;
+}
+
+// Visible heal: green +N popup, sparkle ring, upward sparks. Used by every self-heal so
+// the move never feels broken even at full HP.
+function healPlayer(w: World, amount: number, color = "#5fd16a") {
+  const before = w.player.hp;
+  w.player.hp = Math.min(w.player.maxHp, w.player.hp + amount);
+  const got = Math.round(w.player.hp - before);
+  const shown = got > 0 ? got : amount;
+  spawnDmg(w, { x: w.player.pos.x, y: w.player.pos.y - 4 }, shown, color, false, "+");
+  spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 24, color, life: 0.45 });
+  for (let i = 0; i < 12; i++) {
+    spawnParticles(w, { x: w.player.pos.x + rand(-6, 6), y: w.player.pos.y + 4 }, color, 1, {
+      shape: "spark", gravity: -90, speedMin: 20, speedMax: 60, life: 0.7,
+    });
+  }
+  showToast(w, got > 0 ? `+${got} HP` : "Already full");
+  return got;
 }
 
 function spawnParticles(w: World, pos: Vec2, color: string, n = 6, opts?: { shape?: Particle["shape"]; gravity?: number; speedMin?: number; speedMax?: number; life?: number }) {
