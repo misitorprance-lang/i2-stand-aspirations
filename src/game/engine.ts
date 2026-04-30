@@ -1599,6 +1599,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         expireAt: w.time + dur,
         color: ab.color,
         ringColor: ab.color,
+        glyph: "BOMB",
       });
       spawnVfx(w, { kind: "explosion_ring", pos: { ...p }, radius: 32, color: ab.color, life: 0.5 });
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 36, color: ab.color, life: 0.45 });
