@@ -107,11 +107,11 @@ export const STANDS: Record<StandId, Stand> = {
     color: "#7c5cff",
     rarityWeight: 4,
     abilities: {
-      m1: { name: "Punch", kind: "melee", damage: 3, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
-      a1: { name: "Star Finger", kind: "pierce", damage: 5, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
-      a2: { name: "Ranged Smash", kind: "projectile", damage: 6, range: 220, radius: 8, cooldown: 2.0, speed: 320, color: "#b8a6ff" },
+      m1: { name: "Punch", kind: "melee", damage: 5, range: 22, radius: 16, cooldown: 0.3, color: "#b8a6ff" },
+      a1: { name: "Star Finger", kind: "pierce", damage: 8, range: 70, radius: 8, cooldown: 1.6, color: "#fff2a8" },
+      a2: { name: "Ranged Smash", kind: "projectile", damage: 9, range: 220, radius: 8, cooldown: 2.0, speed: 320, color: "#b8a6ff" },
       a3: { name: "The World", kind: "time_stop", damage: 0, range: 0, cooldown: 18, duration: 5, color: "#dcd6ff" },
-      a4: { name: "Launch", kind: "knockback", damage: 11, range: 26, radius: 18, cooldown: 5, knockback: 220, color: "#7c5cff" },
+      a4: { name: "Launch", kind: "knockback", damage: 14, range: 26, radius: 18, cooldown: 5, knockback: 220, color: "#7c5cff" },
     },
   },
   rhcp: {
