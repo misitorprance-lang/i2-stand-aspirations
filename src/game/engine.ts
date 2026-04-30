@@ -1652,6 +1652,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         expireAt: w.time + ab.duration!,
         color: ab.color,
         ringColor: ab.color,
+        glyph: "BURN",
       });
       spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: ab.duration! });
       break;
