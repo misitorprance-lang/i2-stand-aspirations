@@ -1623,6 +1623,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         expireAt: w.time + ab.duration!,
         color: ab.color,
         ringColor: ab.color,
+        glyph: "FREEZE",
       });
       // Apply slow to enemies stepping in via slowUntil tagging in zone tick? simpler: tag now in radius
       for (const e of w.npcs) {
