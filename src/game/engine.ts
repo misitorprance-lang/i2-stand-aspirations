@@ -2568,13 +2568,11 @@ export function update(w: World, input: InputState, dt: number) {
         w.icePath.push({ pos: { x: pl.pos.x, y: pl.pos.y + 6 }, bornAt: w.time, expireAt: w.time + 4 });
       }
     } else {
-      // Suit off: refill the bar. Fully cooled at 100, then auto-comes-back online once lockout ends.
+      // Suit off: refill the bar. Player must MANUALLY tap Stand to re-equip.
       w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 6 * dt);
-      if (w.whiteAlbumBar >= 100 && w.time >= w.whiteAlbumLockUntil) {
-        w.whiteAlbumActive = true;
-        w.standActive = true;
-        w.bannerText = "Suit recharged"; w.bannerUntil = w.time + 1.0;
-        play("toggleOn");
+      if (w.whiteAlbumBar >= 100 && w.time >= w.whiteAlbumLockUntil &&
+          (w.bannerSuppressCounts["wa_ready"] ?? 0) < 1) {
+        softBanner(w, "wa_ready", "Suit ready — tap Stand to wear", 1.4);
       }
     }
     // Slow NPCs on ice.
