@@ -133,7 +133,7 @@ export const STANDS: Record<StandId, Stand> = {
     color: "#5fd1a0",
     rarityWeight: 6,
     abilities: {
-      m1: { name: "Act 3 Punch", kind: "melee", damage: 1.5, range: 18, radius: 12, cooldown: 0.28, color: "#bff5da" },
+      m1: { name: "Act 1 Touch", kind: "melee", damage: 0.5, range: 14, radius: 10, cooldown: 0.35, color: "#bff5da" },
       a1: { name: "Sent Bleed", kind: "bleed_text", damage: 2, range: 220, radius: 7, cooldown: 3.2, speed: 360, duration: 6, color: "#ff4d4d" },
       a2: { name: "Explosion", kind: "explosion_text", damage: 6, range: 0, radius: 26, cooldown: 7, duration: 6, knockback: 220, color: "#ffb84d" },
       a3: { name: "Ground Text", kind: "frost_text", damage: 0.8, range: 110, radius: 44, cooldown: 5, duration: 4, tickEvery: 0.45, color: "#a8e8ff" },
