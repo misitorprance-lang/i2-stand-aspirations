@@ -1490,18 +1490,9 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     }
     case "ice_heal": {
       // Restore HP and drain a hefty chunk of the bar.
-      const heal = 28;
-      const before = w.player.hp;
-      w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
-      const actual = Math.round(w.player.hp - before);
+      healPlayer(w, 28, "#9be7ff");
       w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 45);
-      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 36, color: ab.color, life: 0.55 });
       spawnVfx(w, { kind: "ice_burst", pos: { ...p }, radius: 30, color: ab.color, life: 0.5 });
-      spawnParticles(w, p, ab.color, 22, { shape: "spark", speedMin: 30, speedMax: 120, life: 0.7 });
-      // Always show feedback even if at full HP, so the move never feels "broken".
-      spawnDmg(w, p, actual > 0 ? actual : heal, actual > 0 ? "#9be7ff" : "#7c5cff");
-      w.bannerText = actual > 0 ? `+${actual} Suit` : "Suit at full";
-      w.bannerUntil = w.time + 1.0;
       play("standSummon");
       break;
     }
