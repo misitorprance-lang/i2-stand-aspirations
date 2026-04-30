@@ -558,6 +558,8 @@ export function createWorld(): World {
     toastText: null,
     toastUntil: 0,
     swarms: [],
+    curseStrikes: [],
+    bannerSuppressCounts: {},
   };
 
   // Pre-seed a starter pool of arrows and discs scattered across the (now larger) map
