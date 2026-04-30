@@ -1256,7 +1256,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "puppet_spear": {
-      if (!w.puppet.active || w.puppet.hp <= 0) { w.bannerText = "Summon puppet first"; w.bannerUntil = w.time + 0.9; break; }
+      if (!w.puppet.active || w.puppet.hp <= 0) { softBanner(w, "puppet_first", "Summon puppet first", 0.9); break; }
       const target = nearestTarget(w, w.puppet.pos, ab.range + 80);
       const spearDir = target ? norm({ x: target.pos.x - w.puppet.pos.x, y: target.pos.y - w.puppet.pos.y }) : dir;
       w.puppet.facing = spearDir;
