@@ -934,8 +934,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   if (stand.id === "none" && key !== "m1") return;
   // Stand desummoned: no abilities work (M1 = no-stand fallback below at "none")
   if (stand.id !== "none" && !w.standActive) {
-    w.bannerText = "Resummon stand to attack";
-    w.bannerUntil = w.time + 0.8;
+    softBanner(w, "stand_off", "Resummon stand to attack", 0.8);
     return;
   }
   const ab = getAbility(w, key);
@@ -943,8 +942,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   if (w.cdTimers[key] > 0) return;
   // Hanged Man: A2/A3/A4 require the stand to be summoned first.
   if (w.standId === "hanged_man" && key !== "m1" && ab.kind !== "pilot_toggle" && !w.hangedManActive) {
-    w.bannerText = "Summon Hanged Man first";
-    w.bannerUntil = w.time + 0.9;
+    softBanner(w, "hm_summon", "Summon Hanged Man first", 0.9);
     return;
   }
   // Hanged Man: M1 / damaging abilities only work while inside (or attacking from) a mirror-shard dome.
@@ -952,16 +950,14 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     const origin = w.hangedManActive ? w.hangedMan.pos : w.player.pos;
     const inDome = w.shards.some((s) => w.time < s.expireAt && dist2(origin, s.pos) < s.radius * s.radius);
     if (!inDome) {
-      w.bannerText = "Hanged Man only attacks inside a shard domain";
-      w.bannerUntil = w.time + 1.2;
+      softBanner(w, "hm_dome", "Hanged Man only attacks inside a shard domain", 1.2);
       w.cdTimers[key] = 0.4;
       return;
     }
   }
   // Ebony Devil: Rage Mode now requires the puppet to be summoned.
   if (ab.kind === "rage_mode" && !w.puppet.active) {
-    w.bannerText = "Summon Puppet first";
-    w.bannerUntil = w.time + 0.9;
+    softBanner(w, "puppet_first", "Summon Puppet first", 0.9);
     return;
   }
   if (ab.kind === "rage_mode" && w.rage < 100) {
@@ -977,8 +973,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   if (!input.aim && targetedKinds.includes(ab.kind) && ab.range > 0) {
     const t = nearestTarget(w, w.player.pos, ab.range);
     if (!t) {
-      w.bannerText = "Out of range";
-      w.bannerUntil = w.time + 0.6;
+      softBanner(w, "out_of_range", "Out of range", 0.6);
       return;
     }
   }
