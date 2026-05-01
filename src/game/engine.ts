@@ -3097,7 +3097,34 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   for (const f of w.frogs) {
     if (f.alive) drawables.push({ y: f.pos.y, draw: () => drawFrog(ctx, w, f) });
   }
-  drawables.sort((a, b) => a.y - b.y);
+  // Harvest beetles — each gets its own y so it sorts naturally with everything else.
+  for (const b of w.harvestBeetles) {
+    drawables.push({ y: b.pos.y, draw: () => {
+      // shadow
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.beginPath(); ctx.ellipse(b.pos.x, b.pos.y + 2, 2.5, 1, 0, 0, Math.PI * 2); ctx.fill();
+      // body
+      ctx.fillStyle = "#ffd24a";
+      ctx.fillRect(b.pos.x - 2, b.pos.y - 1, 4, 3);
+      // head dot
+      ctx.fillStyle = "#caa14a";
+      ctx.fillRect(b.pos.x - 2, b.pos.y - 2, 4, 1);
+      // tiny legs flicker
+      ctx.fillStyle = "#222";
+      const legPhase = Math.sin(b.phase * 6) > 0 ? 1 : 0;
+      ctx.fillRect(b.pos.x - 3, b.pos.y + legPhase, 1, 1);
+      ctx.fillRect(b.pos.x + 2, b.pos.y + (1 - legPhase), 1, 1);
+      // carrying icon
+      if (b.carryingKind) {
+        const c =
+          b.carryingKind === "arrow" ? "#caa14a" :
+          b.carryingKind === "disc" ? "#cfd2d8" :
+          b.carryingKind === "requiem_arrow" ? "#ffd24a" : "#4a86d6";
+        ctx.fillStyle = c;
+        ctx.fillRect(b.pos.x - 1, b.pos.y - 5, 2, 2);
+      }
+    }});
+  }
   for (const d of drawables) d.draw();
 
   // Moon Rabbit: wasp swirl around each swarmed target.
