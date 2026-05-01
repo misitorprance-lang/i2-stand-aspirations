@@ -258,17 +258,64 @@ const ROLLABLE: StandId[] = [
   "hanged_man",
   "white_album",
   "purple_haze",
+  "harvest",
 ];
 
-export function rollStand(): { id: StandId; shitVariant: boolean } {
-  const total = ROLLABLE.reduce((s, id) => s + STANDS[id].rarityWeight, 0);
-  let r = Math.random() * total;
-  for (const id of ROLLABLE) {
-    r -= STANDS[id].rarityWeight;
+// ----- Real RNG for stand rolls (seedable, uniform) -----
+// `Math.random()` was the only entropy source before; plenty of JS engines bias the
+// low bits in tight loops, so we wire up a proper mulberry32 PRNG seeded once per
+// session from `crypto.getRandomValues`. This produces a uniform 32-bit float in
+// [0, 1) and is reseedable for save/load.
+function makeMulberry32(seed: number) {
+  let a = seed >>> 0;
+  return function rng(): number {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function makeSeed(): number {
+  try {
+    const u32 = new Uint32Array(1);
+    (globalThis.crypto ?? (globalThis as any).msCrypto).getRandomValues(u32);
+    return u32[0] || (Date.now() >>> 0);
+  } catch {
+    return ((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0);
+  }
+}
+
+let standRng: () => number = makeMulberry32(makeSeed());
+
+export function reseedStandRng(seed?: number) {
+  standRng = makeMulberry32(seed ?? makeSeed());
+}
+
+export interface RollOptions {
+  // Multiplier applied to each rare stand's weight (e.g., requiem arrow can pass 1.5).
+  // Common stands' weights are unaffected.
+  rareLuck?: number;
+}
+
+// Stands considered "rare" — their weight scales with rareLuck.
+const RARE_SET = new Set<StandId>(["star_platinum", "purple_haze"]);
+
+export function rollStand(opts: RollOptions = {}): { id: StandId; shitVariant: boolean; roll: number; pool: { id: StandId; weight: number }[] } {
+  const luck = opts.rareLuck ?? 1;
+  const pool = ROLLABLE.map((id) => ({
+    id,
+    weight: STANDS[id].rarityWeight * (RARE_SET.has(id) ? luck : 1),
+  }));
+  const total = pool.reduce((s, x) => s + x.weight, 0);
+  const roll = standRng();
+  let r = roll * total;
+  for (const x of pool) {
+    r -= x.weight;
     if (r <= 0) {
-      // S.H.I.T. variant fully removed.
-      return { id, shitVariant: false };
+      return { id: x.id, shitVariant: false, roll, pool };
     }
   }
-  return { id: "rhcp", shitVariant: false };
+  return { id: pool[pool.length - 1].id, shitVariant: false, roll, pool };
 }
