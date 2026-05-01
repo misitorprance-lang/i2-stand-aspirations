@@ -3125,6 +3125,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
       }
     }});
   }
+  drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
   // Moon Rabbit: wasp swirl around each swarmed target.
