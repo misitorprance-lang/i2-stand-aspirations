@@ -571,6 +571,9 @@ export function createWorld(): World {
     toastUntil: 0,
     swarms: [],
     curseStrikes: [],
+    harvestGatherActive: false,
+    harvestCarryActive: false,
+    harvestBeetles: [],
     bannerSuppressCounts: {},
   };
 
