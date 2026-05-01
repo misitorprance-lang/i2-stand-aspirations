@@ -1861,6 +1861,28 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       w.bannerUntil = w.time + 1.0;
       break;
     }
+    case "harvest_gather": {
+      // Toggle the swarm's gather behavior. Beetles persist either way; this just flips intent.
+      w.harvestGatherActive = !w.harvestGatherActive;
+      // Cancel any in-progress seek so they all return when toggling off.
+      if (!w.harvestGatherActive) {
+        for (const b of w.harvestBeetles) {
+          if (b.state === "seek") { b.state = "return"; b.targetItemId = undefined; }
+        }
+        showToast(w, "Harvest: Gather OFF");
+      } else {
+        showToast(w, "Harvest: Gather ON");
+      }
+      break;
+    }
+    case "harvest_carry": {
+      // Toggle player carry. While active, player moves faster and can't damage props with M1.
+      w.harvestCarryActive = !w.harvestCarryActive;
+      showToast(w, w.harvestCarryActive ? "Harvest: Carry ON" : "Harvest: Carry OFF");
+      // Visual flourish: a few beetles burst around the player to acknowledge the toggle.
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 22, color: "#ffd24a", life: 0.3 });
+      break;
+    }
   }
   if (w.standId === "white_album" && w.whiteAlbumActive && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
     const drain = key === "m1" ? 3 : 12;
