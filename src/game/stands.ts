@@ -222,6 +222,19 @@ export const STANDS: Record<StandId, Stand> = {
       a4: { name: "Eternal Curse", kind: "eternal_curse", damage: 15, range: 160, radius: 160, cooldown: 22, color: "#cfd6ff" },
     },
   },
+  harvest: {
+    id: "harvest",
+    name: "Harvest",
+    color: "#ffd24a",
+    rarityWeight: 28, // common
+    abilities: {
+      m1: { name: "Bite", kind: "melee", damage: 0.4, range: 16, radius: 10, cooldown: 0.4, color: "#fff36b" },
+      a1: { name: "Resource Gather", kind: "harvest_gather", damage: 0, range: 220, cooldown: 4, color: "#ffd24a" },
+      a2: { name: "Carry", kind: "harvest_carry", damage: 0, range: 0, cooldown: 4, color: "#ffe28a" },
+      a3: { name: "-", kind: "melee", damage: 0, range: 0, cooldown: 999, color: "#888" },
+      a4: { name: "-", kind: "melee", damage: 0, range: 0, cooldown: 999, color: "#888" },
+    },
+  },
 };
 
 // Kept for save-format/back-compat. Not selected by current code paths.
