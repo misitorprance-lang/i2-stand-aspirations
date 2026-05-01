@@ -967,13 +967,21 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     return;
   }
 
-  // Range-gate targeted abilities: don't burn cooldown on a cast that has nothing to hit.
-  // Skipped for self-AoE, channels, summons, toggles, and pierce (which is fire-along-line).
-  const targetedKinds = ["projectile", "lobbed", "aoe_target", "stun_touch", "knockback", "auto_aim", "chain_projectile", "hologram_stun", "dot_zone"];
-  if (!input.aim && targetedKinds.includes(ab.kind) && ab.range > 0) {
-    const t = nearestTarget(w, w.player.pos, ab.range);
+  // Range-gate ALL damaging abilities: don't burn cooldown on a cast that has nothing to hit.
+  // Self-buffs, heals, summons, toggles, and pure utility are exempt.
+  const SELF_OR_UTILITY = new Set<string>([
+    "aoe_self", "ice_heal", "moon_carrot", "rage_mode", "tree_zone", "time_stop",
+    "pilot_toggle", "ph_pilot_toggle", "puppet_toggle", "mirror_shard",
+    "shard_teleport", "frog_summon", "cleansly_violence",
+    // Harvest utility toggles (no damage, just QoL)
+    "harvest_gather", "harvest_carry",
+  ]);
+  if (!input.aim && !SELF_OR_UTILITY.has(ab.kind) && ab.kind !== "melee") {
+    // Use ability range, or a generous fallback for big AoEs that fire from the player.
+    const checkRange = ab.range > 0 ? ab.range : (ab.radius ?? 60) + 20;
+    const t = nearestTarget(w, w.player.pos, checkRange);
     if (!t) {
-      softBanner(w, "out_of_range", "Out of range", 0.6);
+      softBanner(w, "out_of_range", "No target in range", 0.6);
       return;
     }
   }
@@ -985,6 +993,15 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     const reach = ab.range + (ab.radius ?? 14);
     const t = nearestAnyNpc(w, origin, reach + 12);
     if (!t) return; // silent — feels better than a banner spam on hold
+  }
+  // Non-M1 melee abilities (Star Finger, Freeze Punch, Brutal Slash, Echoes Act 1 touch...) need a target too.
+  if (key !== "m1" && ab.kind === "melee" && !input.aim) {
+    const reach = ab.range + (ab.radius ?? 14);
+    const t = nearestAnyNpc(w, w.player.pos, reach + 8);
+    if (!t) {
+      softBanner(w, "out_of_range", "No target in range", 0.6);
+      return;
+    }
   }
 
   // Echoes: act is driven by the LAST ability used (a1 -> 1, a2/a3 -> 2, a4 -> 3).
