@@ -137,8 +137,6 @@ export interface Zone {
   ringColor?: string;
   crater?: boolean;
   craterPlaced?: boolean;
-  // optional text glyph rendered repeating inside the zone (Echoes ground texts)
-  glyph?: string;
 }
 
 export interface PuppetState {
