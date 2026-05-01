@@ -287,8 +287,9 @@ export default function Game() {
 
   const onUseArrow = () => {
     if (arrowsRef.current <= 0 || !worldRef.current) return;
-    arrowsRef.current--;
-    useArrow(worldRef.current);
+    // Only consume the arrow if the engine actually accepted it (e.g. no stand equipped).
+    const ok = useArrow(worldRef.current);
+    if (ok) arrowsRef.current--;
   };
   const onUseDisc = () => {
     if (discsRef.current <= 0 || !worldRef.current) return;

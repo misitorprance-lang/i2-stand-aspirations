@@ -11,7 +11,8 @@ export type StandId =
   | "hanged_man"
   | "white_album"
   | "purple_haze"
-  | "moon_rabbit";
+  | "moon_rabbit"
+  | "harvest";
 
 export type AbilityKind =
   | "melee"
@@ -55,7 +56,10 @@ export type AbilityKind =
   | "wasp_swarm"        // surround nearest target with stinging wasps
   | "moon_carrot"       // self-heal
   | "crash"             // line-attack vehicle that explodes
-  | "eternal_curse";    // multi-target lightning strike
+  | "eternal_curse"     // multi-target lightning strike
+  // Harvest
+  | "harvest_gather"    // beetles fan out and bring nearby items to the player (toggle)
+  | "harvest_carry";    // beetles lift the player and carry them along the joystick (toggle)
 
 export interface Ability {
   name: string;
@@ -218,6 +222,19 @@ export const STANDS: Record<StandId, Stand> = {
       a4: { name: "Eternal Curse", kind: "eternal_curse", damage: 15, range: 160, radius: 160, cooldown: 22, color: "#cfd6ff" },
     },
   },
+  harvest: {
+    id: "harvest",
+    name: "Harvest",
+    color: "#ffd24a",
+    rarityWeight: 28, // common
+    abilities: {
+      m1: { name: "Bite", kind: "melee", damage: 0.4, range: 16, radius: 10, cooldown: 0.4, color: "#fff36b" },
+      a1: { name: "Resource Gather", kind: "harvest_gather", damage: 0, range: 220, cooldown: 4, color: "#ffd24a" },
+      a2: { name: "Carry", kind: "harvest_carry", damage: 0, range: 0, cooldown: 4, color: "#ffe28a" },
+      a3: { name: "-", kind: "melee", damage: 0, range: 0, cooldown: 999, color: "#888" },
+      a4: { name: "-", kind: "melee", damage: 0, range: 0, cooldown: 999, color: "#888" },
+    },
+  },
 };
 
 // Kept for save-format/back-compat. Not selected by current code paths.
@@ -241,17 +258,64 @@ const ROLLABLE: StandId[] = [
   "hanged_man",
   "white_album",
   "purple_haze",
+  "harvest",
 ];
 
-export function rollStand(): { id: StandId; shitVariant: boolean } {
-  const total = ROLLABLE.reduce((s, id) => s + STANDS[id].rarityWeight, 0);
-  let r = Math.random() * total;
-  for (const id of ROLLABLE) {
-    r -= STANDS[id].rarityWeight;
+// ----- Real RNG for stand rolls (seedable, uniform) -----
+// `Math.random()` was the only entropy source before; plenty of JS engines bias the
+// low bits in tight loops, so we wire up a proper mulberry32 PRNG seeded once per
+// session from `crypto.getRandomValues`. This produces a uniform 32-bit float in
+// [0, 1) and is reseedable for save/load.
+function makeMulberry32(seed: number) {
+  let a = seed >>> 0;
+  return function rng(): number {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function makeSeed(): number {
+  try {
+    const u32 = new Uint32Array(1);
+    (globalThis.crypto ?? (globalThis as any).msCrypto).getRandomValues(u32);
+    return u32[0] || (Date.now() >>> 0);
+  } catch {
+    return ((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0);
+  }
+}
+
+let standRng: () => number = makeMulberry32(makeSeed());
+
+export function reseedStandRng(seed?: number) {
+  standRng = makeMulberry32(seed ?? makeSeed());
+}
+
+export interface RollOptions {
+  // Multiplier applied to each rare stand's weight (e.g., requiem arrow can pass 1.5).
+  // Common stands' weights are unaffected.
+  rareLuck?: number;
+}
+
+// Stands considered "rare" — their weight scales with rareLuck.
+const RARE_SET = new Set<StandId>(["star_platinum", "purple_haze"]);
+
+export function rollStand(opts: RollOptions = {}): { id: StandId; shitVariant: boolean; roll: number; pool: { id: StandId; weight: number }[] } {
+  const luck = opts.rareLuck ?? 1;
+  const pool = ROLLABLE.map((id) => ({
+    id,
+    weight: STANDS[id].rarityWeight * (RARE_SET.has(id) ? luck : 1),
+  }));
+  const total = pool.reduce((s, x) => s + x.weight, 0);
+  const roll = standRng();
+  let r = roll * total;
+  for (const x of pool) {
+    r -= x.weight;
     if (r <= 0) {
-      // S.H.I.T. variant fully removed.
-      return { id, shitVariant: false };
+      return { id: x.id, shitVariant: false, roll, pool };
     }
   }
-  return { id: "rhcp", shitVariant: false };
+  return { id: pool[pool.length - 1].id, shitVariant: false, roll, pool };
 }

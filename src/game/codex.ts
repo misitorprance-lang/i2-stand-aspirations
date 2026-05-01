@@ -183,5 +183,20 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       a4: moveOf("moon_rabbit", "a4", "Lightning strikes every nearby target for 15."),
     },
   },
+  harvest: {
+    id: "harvest",
+    model: {
+      description: "A swarm of dozens of tiny yellow beetles. Each one is a thumbnail-sized stand. They normally orbit the user in a low cloud and only fan out when commanded.",
+      silhouette: ["yellow beetle cloud", "low buzzing orbit", "tiny black legs"],
+      auraColor: "#ffd24a",
+    },
+    moves: {
+      m1: moveOf("harvest", "m1", "A few beetles latch onto the closest target. Tiny per-bite damage."),
+      a1: moveOf("harvest", "a1", "Resource Gather (toggle) — beetles fan out within 220 units, picking up one item at a time and ferrying it home to you."),
+      a2: moveOf("harvest", "a2", "Carry (toggle) — the swarm lifts you up and ferries you along the joystick. Faster, no terrain damage."),
+      a3: moveOf("harvest", "a3", "—"),
+      a4: moveOf("harvest", "a4", "—"),
+    },
+  },
 };
 

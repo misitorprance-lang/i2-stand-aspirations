@@ -226,6 +226,18 @@ interface World {
   swarms: { id: number; targetId: number; expireAt: number; nextStingAt: number; tickEvery: number; damage: number; range: number }[];
   // Moon Rabbit Eternal Curse: deferred lightning strikes from above (staggered)
   curseStrikes: { targetId: number; hitAt: number; dmg: number; color: string }[];
+  // Harvest runtime
+  harvestGatherActive: boolean;     // a1 toggle
+  harvestCarryActive: boolean;      // a2 toggle
+  harvestBeetles: {
+    id: number;
+    pos: Vec2;
+    vel: Vec2;
+    state: "orbit" | "seek" | "return";
+    targetItemId?: number;
+    carryingKind?: ItemPickup["kind"];
+    phase: number;                  // for orbit bobbing
+  }[];
   // Soft-banner suppression so repeat hints ("Out of range", "Resummon stand", etc.)
   // stop spamming the player after a few times.
   bannerSuppressCounts: Record<string, number>;
@@ -559,6 +571,9 @@ export function createWorld(): World {
     toastUntil: 0,
     swarms: [],
     curseStrikes: [],
+    harvestGatherActive: false,
+    harvestCarryActive: false,
+    harvestBeetles: [],
     bannerSuppressCounts: {},
   };
 
@@ -967,13 +982,21 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     return;
   }
 
-  // Range-gate targeted abilities: don't burn cooldown on a cast that has nothing to hit.
-  // Skipped for self-AoE, channels, summons, toggles, and pierce (which is fire-along-line).
-  const targetedKinds = ["projectile", "lobbed", "aoe_target", "stun_touch", "knockback", "auto_aim", "chain_projectile", "hologram_stun", "dot_zone"];
-  if (!input.aim && targetedKinds.includes(ab.kind) && ab.range > 0) {
-    const t = nearestTarget(w, w.player.pos, ab.range);
+  // Range-gate ALL damaging abilities: don't burn cooldown on a cast that has nothing to hit.
+  // Self-buffs, heals, summons, toggles, and pure utility are exempt.
+  const SELF_OR_UTILITY = new Set<string>([
+    "aoe_self", "ice_heal", "moon_carrot", "rage_mode", "tree_zone", "time_stop",
+    "pilot_toggle", "ph_pilot_toggle", "puppet_toggle", "mirror_shard",
+    "shard_teleport", "frog_summon", "cleansly_violence",
+    // Harvest utility toggles (no damage, just QoL)
+    "harvest_gather", "harvest_carry",
+  ]);
+  if (!input.aim && !SELF_OR_UTILITY.has(ab.kind) && ab.kind !== "melee") {
+    // Use ability range, or a generous fallback for big AoEs that fire from the player.
+    const checkRange = ab.range > 0 ? ab.range : (ab.radius ?? 60) + 20;
+    const t = nearestTarget(w, w.player.pos, checkRange);
     if (!t) {
-      softBanner(w, "out_of_range", "Out of range", 0.6);
+      softBanner(w, "out_of_range", "No target in range", 0.6);
       return;
     }
   }
@@ -985,6 +1008,15 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     const reach = ab.range + (ab.radius ?? 14);
     const t = nearestAnyNpc(w, origin, reach + 12);
     if (!t) return; // silent — feels better than a banner spam on hold
+  }
+  // Non-M1 melee abilities (Star Finger, Freeze Punch, Brutal Slash, Echoes Act 1 touch...) need a target too.
+  if (key !== "m1" && ab.kind === "melee" && !input.aim) {
+    const reach = ab.range + (ab.radius ?? 14);
+    const t = nearestAnyNpc(w, w.player.pos, reach + 8);
+    if (!t) {
+      softBanner(w, "out_of_range", "No target in range", 0.6);
+      return;
+    }
   }
 
   // Echoes: act is driven by the LAST ability used (a1 -> 1, a2/a3 -> 2, a4 -> 3).
@@ -1829,6 +1861,28 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       w.bannerUntil = w.time + 1.0;
       break;
     }
+    case "harvest_gather": {
+      // Toggle the swarm's gather behavior. Beetles persist either way; this just flips intent.
+      w.harvestGatherActive = !w.harvestGatherActive;
+      // Cancel any in-progress seek so they all return when toggling off.
+      if (!w.harvestGatherActive) {
+        for (const b of w.harvestBeetles) {
+          if (b.state === "seek") { b.state = "return"; b.targetItemId = undefined; }
+        }
+        showToast(w, "Harvest: Gather OFF");
+      } else {
+        showToast(w, "Harvest: Gather ON");
+      }
+      break;
+    }
+    case "harvest_carry": {
+      // Toggle player carry. While active, player moves faster and can't damage props with M1.
+      w.harvestCarryActive = !w.harvestCarryActive;
+      showToast(w, w.harvestCarryActive ? "Harvest: Carry ON" : "Harvest: Carry OFF");
+      // Visual flourish: a few beetles burst around the player to acknowledge the toggle.
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 22, color: "#ffd24a", life: 0.3 });
+      break;
+    }
   }
   if (w.standId === "white_album" && w.whiteAlbumActive && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
     const drain = key === "m1" ? 3 : 12;
@@ -1893,6 +1947,8 @@ export function update(w: World, input: InputState, dt: number) {
       let baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
       // White Album: ice skating boost while suit is active.
       if (w.standId === "white_album" && w.whiteAlbumActive) baseSpeed *= 1.2;
+      // Harvest: Carry mode lifts the player along — faster, smoother movement.
+      if (w.standId === "harvest" && w.harvestCarryActive && w.standActive) baseSpeed *= 1.45;
       const speed = baseSpeed * Math.min(1, len);
       const before = { x: pl.pos.x, y: pl.pos.y };
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
@@ -2533,7 +2589,106 @@ export function update(w: World, input: InputState, dt: number) {
     w.curseStrikes = remainCurse;
   }
 
-  // Banner timeout
+  // ---------- Harvest beetles ----------
+  // Spawn / despawn the swarm to match equipped state. Idle beetles orbit the
+  // player; with Gather ON they pursue items and ferry them back; with Carry
+  // ON they cluster low under the player as a "platform" of legs.
+  {
+    const HARVEST_BEETLE_COUNT = 14;
+    const GATHER_RANGE = 220;
+    const HOME_RADIUS = 14;
+    const beetleSpeed = 180;
+    if (w.standId === "harvest" && w.standActive) {
+      // Lazy spawn
+      while (w.harvestBeetles.length < HARVEST_BEETLE_COUNT) {
+        w.harvestBeetles.push({
+          id: w.nextId++,
+          pos: { x: w.player.pos.x + (Math.random() - 0.5) * 20, y: w.player.pos.y + (Math.random() - 0.5) * 20 },
+          vel: { x: 0, y: 0 },
+          state: "orbit",
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
+    } else if (w.harvestBeetles.length) {
+      w.harvestBeetles = [];
+    }
+
+    if (w.harvestBeetles.length) {
+      // Build set of items already targeted so beetles don't all chase the same one.
+      const claimed = new Set<number>();
+      for (const b of w.harvestBeetles) if (b.targetItemId != null) claimed.add(b.targetItemId);
+
+      for (const b of w.harvestBeetles) {
+        b.phase += dt * 4;
+        const goHome = (target: Vec2, sp: number) => {
+          const dx = target.x - b.pos.x, dy = target.y - b.pos.y;
+          const d = Math.hypot(dx, dy) || 1;
+          b.vel.x = (dx / d) * sp;
+          b.vel.y = (dy / d) * sp;
+          b.pos.x += b.vel.x * dt;
+          b.pos.y += b.vel.y * dt;
+          return d;
+        };
+
+        // Gather mode: idle orbiting beetles look for an unclaimed item to fetch.
+        if (w.harvestGatherActive && b.state === "orbit") {
+          let best: ItemPickup | null = null;
+          let bestD = GATHER_RANGE * GATHER_RANGE;
+          for (const it of w.items) {
+            if (claimed.has(it.id)) continue;
+            const d = dist2(it.pos, w.player.pos);
+            if (d < bestD) { bestD = d; best = it; }
+          }
+          if (best) {
+            b.state = "seek";
+            b.targetItemId = best.id;
+            claimed.add(best.id);
+          }
+        }
+
+        if (b.state === "seek" && b.targetItemId != null) {
+          const it = w.items.find((x) => x.id === b.targetItemId);
+          if (!it) {
+            b.state = "orbit"; b.targetItemId = undefined;
+          } else {
+            const d = goHome(it.pos, beetleSpeed);
+            if (d < 8) {
+              // Pick up the item: remove from world, beetle now carries it home.
+              w.items = w.items.filter((x) => x.id !== it.id);
+              b.state = "return";
+              b.carryingKind = it.kind;
+              b.targetItemId = undefined;
+            }
+          }
+        } else if (b.state === "return") {
+          const d = goHome(w.player.pos, beetleSpeed);
+          if (d < HOME_RADIUS) {
+            // Drop the item AT the player as a fresh pickup so existing pickup logic
+            // handles inventory increment & sound.
+            if (b.carryingKind) {
+              w.items.push({
+                id: w.nextId++,
+                kind: b.carryingKind,
+                pos: { x: w.player.pos.x, y: w.player.pos.y },
+                bornAt: w.time,
+              });
+              spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 14, color: "#ffd24a", life: 0.25 });
+            }
+            b.carryingKind = undefined;
+            b.state = "orbit";
+          }
+        } else {
+          // Orbit: low buzzing cloud around the player. Carry mode tightens the cloud beneath them.
+          const radius = w.harvestCarryActive ? 10 : 22;
+          const yOffset = w.harvestCarryActive ? 8 : 0;
+          const tx = w.player.pos.x + Math.cos(b.phase) * radius;
+          const ty = w.player.pos.y + yOffset + Math.sin(b.phase * 1.3) * (radius * 0.4);
+          goHome({ x: tx, y: ty }, beetleSpeed * 0.9);
+        }
+      }
+    }
+  }
+
   // Mirror current bannerText into the stacked banners queue (so multiple notifs can show at once).
   if (w.bannerText) {
     const last = w.banners[w.banners.length - 1];
@@ -2664,6 +2819,10 @@ function resetStandRuntime(w: World) {
   }
   // Drop any in-flight player projectiles so a stand swap doesn't leak homing locks.
   w.projectiles = [];
+  // Harvest cleanup
+  w.harvestGatherActive = false;
+  w.harvestCarryActive = false;
+  w.harvestBeetles = [];
 }
 
 export function useArrow(w: World): boolean {
@@ -2937,6 +3096,34 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   // Frogs
   for (const f of w.frogs) {
     if (f.alive) drawables.push({ y: f.pos.y, draw: () => drawFrog(ctx, w, f) });
+  }
+  // Harvest beetles — each gets its own y so it sorts naturally with everything else.
+  for (const b of w.harvestBeetles) {
+    drawables.push({ y: b.pos.y, draw: () => {
+      // shadow
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.beginPath(); ctx.ellipse(b.pos.x, b.pos.y + 2, 2.5, 1, 0, 0, Math.PI * 2); ctx.fill();
+      // body
+      ctx.fillStyle = "#ffd24a";
+      ctx.fillRect(b.pos.x - 2, b.pos.y - 1, 4, 3);
+      // head dot
+      ctx.fillStyle = "#caa14a";
+      ctx.fillRect(b.pos.x - 2, b.pos.y - 2, 4, 1);
+      // tiny legs flicker
+      ctx.fillStyle = "#222";
+      const legPhase = Math.sin(b.phase * 6) > 0 ? 1 : 0;
+      ctx.fillRect(b.pos.x - 3, b.pos.y + legPhase, 1, 1);
+      ctx.fillRect(b.pos.x + 2, b.pos.y + (1 - legPhase), 1, 1);
+      // carrying icon
+      if (b.carryingKind) {
+        const c =
+          b.carryingKind === "arrow" ? "#caa14a" :
+          b.carryingKind === "disc" ? "#cfd2d8" :
+          b.carryingKind === "requiem_arrow" ? "#ffd24a" : "#4a86d6";
+        ctx.fillStyle = c;
+        ctx.fillRect(b.pos.x - 1, b.pos.y - 5, 2, 2);
+      }
+    }});
   }
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
