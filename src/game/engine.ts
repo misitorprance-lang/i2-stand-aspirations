@@ -224,6 +224,11 @@ interface World {
   toastUntil: number;
   // Moon Rabbit runtime: active wasp swarms attached to a target
   swarms: { id: number; targetId: number; expireAt: number; nextStingAt: number; tickEvery: number; damage: number; range: number }[];
+  // Moon Rabbit Eternal Curse: deferred lightning strikes from above (staggered)
+  curseStrikes: { targetId: number; hitAt: number; dmg: number; color: string }[];
+  // Soft-banner suppression so repeat hints ("Out of range", "Resummon stand", etc.)
+  // stop spamming the player after a few times.
+  bannerSuppressCounts: Record<string, number>;
 }
 
 function makeProps(): Prop[] {
@@ -553,6 +558,8 @@ export function createWorld(): World {
     toastText: null,
     toastUntil: 0,
     swarms: [],
+    curseStrikes: [],
+    bannerSuppressCounts: {},
   };
 
   // Pre-seed a starter pool of arrows and discs scattered across the (now larger) map
@@ -638,10 +645,10 @@ function pushOutOfNpcs(w: World, pos: Vec2, radius: number) {
   }
 }
 
-function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false) {
+function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false, prefix = "") {
   let tier = dmg >= 15 ? 22 : dmg >= 8 ? 17 : dmg >= 3 ? 13 : 10;
   if (crit) tier = Math.round(tier * 1.35);
-  const text = (dmg < 1 ? dmg.toFixed(1) : Math.round(dmg).toString()) + (crit ? "!" : "");
+  const text = prefix + (dmg < 1 ? dmg.toFixed(1) : Math.round(dmg).toString()) + (crit ? "!" : "");
   w.damageNumbers.push({
     id: w.nextId++,
     pos: { x: pos.x + rand(-6, 6), y: pos.y - 6 },
@@ -652,6 +659,34 @@ function spawnDmg(w: World, pos: Vec2, dmg: number, color = "#fff", crit = false
     bornAt: w.time,
     expireAt: w.time + (crit ? 1.1 : 0.9),
   });
+}
+
+// Repeat-hint suppression: a banner key is allowed to fire 3 times, then is silenced
+// for the rest of the session. Player figures it out or grabs Boingo's book.
+function softBanner(w: World, key: string, text: string, seconds = 0.9) {
+  const n = (w.bannerSuppressCounts[key] ?? 0) + 1;
+  w.bannerSuppressCounts[key] = n;
+  if (n > 3) return;
+  w.bannerText = text;
+  w.bannerUntil = w.time + seconds;
+}
+
+// Visible heal: green +N popup, sparkle ring, upward sparks. Used by every self-heal so
+// the move never feels broken even at full HP.
+function healPlayer(w: World, amount: number, color = "#5fd16a") {
+  const before = w.player.hp;
+  w.player.hp = Math.min(w.player.maxHp, w.player.hp + amount);
+  const got = Math.round(w.player.hp - before);
+  const shown = got > 0 ? got : amount;
+  spawnDmg(w, { x: w.player.pos.x, y: w.player.pos.y - 4 }, shown, color, false, "+");
+  spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 24, color, life: 0.45 });
+  for (let i = 0; i < 12; i++) {
+    spawnParticles(w, { x: w.player.pos.x + rand(-6, 6), y: w.player.pos.y + 4 }, color, 1, {
+      shape: "spark", gravity: -90, speedMin: 20, speedMax: 60, life: 0.7,
+    });
+  }
+  showToast(w, got > 0 ? `+${got} HP` : "Already full");
+  return got;
 }
 
 function spawnParticles(w: World, pos: Vec2, color: string, n = 6, opts?: { shape?: Particle["shape"]; gravity?: number; speedMin?: number; speedMax?: number; life?: number }) {
@@ -899,8 +934,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   if (stand.id === "none" && key !== "m1") return;
   // Stand desummoned: no abilities work (M1 = no-stand fallback below at "none")
   if (stand.id !== "none" && !w.standActive) {
-    w.bannerText = "Resummon stand to attack";
-    w.bannerUntil = w.time + 0.8;
+    softBanner(w, "stand_off", "Resummon stand to attack", 0.8);
     return;
   }
   const ab = getAbility(w, key);
@@ -908,8 +942,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   if (w.cdTimers[key] > 0) return;
   // Hanged Man: A2/A3/A4 require the stand to be summoned first.
   if (w.standId === "hanged_man" && key !== "m1" && ab.kind !== "pilot_toggle" && !w.hangedManActive) {
-    w.bannerText = "Summon Hanged Man first";
-    w.bannerUntil = w.time + 0.9;
+    softBanner(w, "hm_summon", "Summon Hanged Man first", 0.9);
     return;
   }
   // Hanged Man: M1 / damaging abilities only work while inside (or attacking from) a mirror-shard dome.
@@ -917,16 +950,14 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     const origin = w.hangedManActive ? w.hangedMan.pos : w.player.pos;
     const inDome = w.shards.some((s) => w.time < s.expireAt && dist2(origin, s.pos) < s.radius * s.radius);
     if (!inDome) {
-      w.bannerText = "Hanged Man only attacks inside a shard domain";
-      w.bannerUntil = w.time + 1.2;
+      softBanner(w, "hm_dome", "Hanged Man only attacks inside a shard domain", 1.2);
       w.cdTimers[key] = 0.4;
       return;
     }
   }
   // Ebony Devil: Rage Mode now requires the puppet to be summoned.
   if (ab.kind === "rage_mode" && !w.puppet.active) {
-    w.bannerText = "Summon Puppet first";
-    w.bannerUntil = w.time + 0.9;
+    softBanner(w, "puppet_first", "Summon Puppet first", 0.9);
     return;
   }
   if (ab.kind === "rage_mode" && w.rage < 100) {
@@ -942,8 +973,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   if (!input.aim && targetedKinds.includes(ab.kind) && ab.range > 0) {
     const t = nearestTarget(w, w.player.pos, ab.range);
     if (!t) {
-      w.bannerText = "Out of range";
-      w.bannerUntil = w.time + 0.6;
+      softBanner(w, "out_of_range", "Out of range", 0.6);
       return;
     }
   }
@@ -1226,7 +1256,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "puppet_spear": {
-      if (!w.puppet.active || w.puppet.hp <= 0) { w.bannerText = "Summon puppet first"; w.bannerUntil = w.time + 0.9; break; }
+      if (!w.puppet.active || w.puppet.hp <= 0) { softBanner(w, "puppet_first", "Summon puppet first", 0.9); break; }
       const target = nearestTarget(w, w.puppet.pos, ab.range + 80);
       const spearDir = target ? norm({ x: target.pos.x - w.puppet.pos.x, y: target.pos.y - w.puppet.pos.y }) : dir;
       w.puppet.facing = spearDir;
@@ -1249,7 +1279,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "puppet_spin": {
-      if (!w.puppet.active || w.puppet.hp <= 0) { w.bannerText = "Summon puppet first"; w.bannerUntil = w.time + 0.9; break; }
+      if (!w.puppet.active || w.puppet.hp <= 0) { softBanner(w, "puppet_first", "Summon puppet first", 0.9); break; }
       for (const e of w.npcs) {
         if (!e.alive) continue;
         if (dist2(e.pos, w.puppet.pos) < ((ab.radius ?? 58) + e.radius) ** 2) damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - w.puppet.pos.x, y: e.pos.y - w.puppet.pos.y }), amount: 90 });
@@ -1460,18 +1490,9 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     }
     case "ice_heal": {
       // Restore HP and drain a hefty chunk of the bar.
-      const heal = 28;
-      const before = w.player.hp;
-      w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
-      const actual = Math.round(w.player.hp - before);
+      healPlayer(w, 28, "#9be7ff");
       w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 45);
-      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 36, color: ab.color, life: 0.55 });
       spawnVfx(w, { kind: "ice_burst", pos: { ...p }, radius: 30, color: ab.color, life: 0.5 });
-      spawnParticles(w, p, ab.color, 22, { shape: "spark", speedMin: 30, speedMax: 120, life: 0.7 });
-      // Always show feedback even if at full HP, so the move never feels "broken".
-      spawnDmg(w, p, actual > 0 ? actual : heal, actual > 0 ? "#9be7ff" : "#7c5cff");
-      w.bannerText = actual > 0 ? `+${actual} Suit` : "Suit at full";
-      w.bannerUntil = w.time + 1.0;
       play("standSummon");
       break;
     }
@@ -1578,6 +1599,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         expireAt: w.time + dur,
         color: ab.color,
         ringColor: ab.color,
+        glyph: "BOMB",
       });
       spawnVfx(w, { kind: "explosion_ring", pos: { ...p }, radius: 32, color: ab.color, life: 0.5 });
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 36, color: ab.color, life: 0.45 });
@@ -1601,6 +1623,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         expireAt: w.time + ab.duration!,
         color: ab.color,
         ringColor: ab.color,
+        glyph: "FREEZE",
       });
       // Apply slow to enemies stepping in via slowUntil tagging in zone tick? simpler: tag now in radius
       for (const e of w.npcs) {
@@ -1629,6 +1652,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         expireAt: w.time + ab.duration!,
         color: ab.color,
         ringColor: ab.color,
+        glyph: "BURN",
       });
       spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: ab.duration! });
       break;
@@ -1752,15 +1776,11 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     }
     // ---- Moon Rabbit: Moon Carrot (A2) — self-heal ----
     case "moon_carrot": {
-      const heal = 8;
-      w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
-      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 26, color: ab.color, life: 0.5 });
-      spawnParticles(w, w.player.pos, ab.color, 14, { speedMin: 40, speedMax: 110, life: 0.6, gravity: -40 });
-      showToast(w, `+${heal} HP`);
+      healPlayer(w, 8, "#ff6688");
       play("toggleOn");
       break;
     }
-    // ---- Moon Rabbit: Crash (A3) — vehicle line attack that explodes ----
+    // ---- Moon Rabbit: Crash (A3) — drawn motorcycle that rams forward and explodes ----
     case "crash": {
       const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
       const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
@@ -1770,7 +1790,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         id: w.nextId++,
         pos: { x: p.x, y: p.y },
         vel: { x: shootDir.x * speed, y: shootDir.y * speed },
-        radius: ab.radius ?? 14,
+        radius: 10,
         damage: ab.damage,
         color: ab.color,
         ownerKind: "player",
@@ -1779,29 +1799,32 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         expireAt: w.time + life,
         detonateAt: w.time + life,
         detonateRadius: 36,
-        detonateColor: ab.color,
+        detonateColor: "#ff6b3a",
         detonateCrater: false,
+        textGlyph: "CRASH_BIKE",
       });
-      spawnParticles(w, p, ab.color, 10, { speedMin: 40, speedMax: 130, life: 0.4 });
+      spawnParticles(w, p, "#cccccc", 10, { speedMin: 40, speedMax: 130, life: 0.4 });
       break;
     }
-    // ---- Moon Rabbit: Eternal Curse (A4) — multi-target lightning ----
+    // ---- Moon Rabbit: Eternal Curse (A4) — lightning RAINS DOWN from above on every nearby target ----
     case "eternal_curse": {
       const radius = ab.radius ?? 160;
       const targets = w.npcs.filter((e) => e.alive && dist2(e.pos, p) < radius * radius);
       if (targets.length === 0) {
-        w.bannerText = "No targets";
-        w.bannerUntil = w.time + 0.7;
+        softBanner(w, "no_targets", "No targets in range", 0.7);
         spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.6 });
         break;
       }
-      for (const t of targets) {
-        damageEntity(w, t, ab.damage);
-        spawnVfx(w, { kind: "chain_arc", pos: { ...p }, to: { ...t.pos }, color: ab.color, life: 0.35 });
-        spawnVfx(w, { kind: "explosion_ring", pos: { ...t.pos }, radius: 16, color: ab.color, life: 0.4 });
-        spawnParticles(w, t.pos, ab.color, 10, { speedMin: 60, speedMax: 180, life: 0.5 });
-      }
-      w.shake = Math.max(w.shake, 8);
+      // Stagger strikes by 0.08s each so it feels like a downpour, not a single zap.
+      targets.forEach((t, i) => {
+        w.curseStrikes.push({
+          targetId: t.id,
+          hitAt: w.time + 0.25 + i * 0.08,
+          dmg: ab.damage,
+          color: ab.color,
+        });
+      });
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.5 });
       w.bannerText = "Eternal Curse!";
       w.bannerUntil = w.time + 1.0;
       break;
@@ -2492,6 +2515,24 @@ export function update(w: World, input: InputState, dt: number) {
     w.swarms = remain;
   }
 
+  // Moon Rabbit Eternal Curse: drain deferred lightning strikes.
+  if (w.curseStrikes.length) {
+    const remainCurse: typeof w.curseStrikes = [];
+    for (const c of w.curseStrikes) {
+      if (w.time < c.hitAt) { remainCurse.push(c); continue; }
+      const t = w.npcs.find((e) => e.id === c.targetId);
+      if (!t || !t.alive) continue;
+      // Bolt FROM ABOVE (not from the player).
+      const skyAbove = { x: t.pos.x, y: t.pos.y - 220 };
+      spawnVfx(w, { kind: "lightning_bolt", pos: skyAbove, to: { ...t.pos }, color: c.color, life: 0.35 });
+      spawnVfx(w, { kind: "explosion_ring", pos: { ...t.pos }, radius: 18, color: c.color, life: 0.4 });
+      spawnParticles(w, t.pos, c.color, 12, { speedMin: 60, speedMax: 200, life: 0.5 });
+      damageEntity(w, t, c.dmg);
+      w.shake = Math.max(w.shake, 4);
+    }
+    w.curseStrikes = remainCurse;
+  }
+
   // Banner timeout
   // Mirror current bannerText into the stacked banners queue (so multiple notifs can show at once).
   if (w.bannerText) {
@@ -2527,13 +2568,11 @@ export function update(w: World, input: InputState, dt: number) {
         w.icePath.push({ pos: { x: pl.pos.x, y: pl.pos.y + 6 }, bornAt: w.time, expireAt: w.time + 4 });
       }
     } else {
-      // Suit off: refill the bar. Fully cooled at 100, then auto-comes-back online once lockout ends.
+      // Suit off: refill the bar. Player must MANUALLY tap Stand to re-equip.
       w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 6 * dt);
-      if (w.whiteAlbumBar >= 100 && w.time >= w.whiteAlbumLockUntil) {
-        w.whiteAlbumActive = true;
-        w.standActive = true;
-        w.bannerText = "Suit recharged"; w.bannerUntil = w.time + 1.0;
-        play("toggleOn");
+      if (w.whiteAlbumBar >= 100 && w.time >= w.whiteAlbumLockUntil &&
+          (w.bannerSuppressCounts["wa_ready"] ?? 0) < 1) {
+        softBanner(w, "wa_ready", "Suit ready — tap Stand to wear", 1.4);
       }
     }
     // Slow NPCs on ice.
@@ -2627,17 +2666,22 @@ function resetStandRuntime(w: World) {
   w.projectiles = [];
 }
 
-export function useArrow(w: World) {
+export function useArrow(w: World): boolean {
+  if (w.standId !== "none") {
+    showToast(w, "Use a DISC to drop your stand first");
+    return false;
+  }
   const { id, shitVariant } = rollStand();
   resetStandRuntime(w);
   w.standId = id;
   w.shitVariant = shitVariant;
-  // Player must MANUALLY summon the new stand.
   w.standActive = false;
+  if (id === "white_album") (w as any).whiteAlbumActive = false;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
   w.bannerText = "Got Stand: " + name + " — tap Stand to summon";
   w.bannerUntil = w.time + 3;
   play("rollStand");
+  return true;
 }
 
 export function useDisc(w: World) {
@@ -2650,23 +2694,33 @@ export function useDisc(w: World) {
   play("pickupDisc");
 }
 
-// Requiem Arrow: rare upgrade — for now, equivalent to a normal arrow re-roll but with a special toast.
-export function useRequiemArrow(w: World) {
-  if (w.requiemArrowCount <= 0) return;
+// Requiem Arrow: decorative-only (kept for back-compat; UI no longer offers a use button).
+export function useRequiemArrow(w: World): boolean {
+  if (w.standId !== "none") {
+    showToast(w, "Use a DISC to drop your stand first");
+    return false;
+  }
+  if (w.requiemArrowCount <= 0) return false;
   w.requiemArrowCount--;
   const { id, shitVariant } = rollStand();
   resetStandRuntime(w);
   w.standId = id;
   w.shitVariant = shitVariant;
   w.standActive = false;
+  if (id === "white_album") (w as any).whiteAlbumActive = false;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
   showToast(w, "Requiem Arrow → " + name);
   play("rollStand");
+  return true;
 }
 
 // Blue Pebble: grants Moon Rabbit as the active stand.
-export function useBluePebble(w: World) {
-  if (w.bluePebbleCount <= 0) return;
+export function useBluePebble(w: World): boolean {
+  if (w.standId !== "none") {
+    showToast(w, "Use a DISC to drop your stand first");
+    return false;
+  }
+  if (w.bluePebbleCount <= 0) return false;
   w.bluePebbleCount--;
   resetStandRuntime(w);
   w.standId = "moon_rabbit";
@@ -2674,6 +2728,7 @@ export function useBluePebble(w: World) {
   w.standActive = false;
   showToast(w, "Got Stand: Moon Rabbit — tap Stand to summon");
   play("rollStand");
+  return true;
 }
 
 // Tonth Copy: opens Boingo's book without him present (handled in UI).
@@ -4134,16 +4189,30 @@ function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg
 // ---- public toggles for UI ----
 export function toggleStandActive(w: World): boolean {
   if (w.standId === "none") return w.standActive;
-  // White Album: no manual toggle — the suit only flips when the bar overheats / recharges.
-  // Tapping the toggle just informs the user.
+  // White Album: manual toggle, but blocked while bar empty / cooling.
   if (w.standId === "white_album") {
     if (w.whiteAlbumActive) {
-      w.bannerText = `Suit: ${Math.round(w.whiteAlbumBar)}%`;
+      // Turning OFF
+      w.whiteAlbumActive = false;
+      w.standActive = false;
+      w.bannerText = "Suit removed";
+      w.bannerUntil = w.time + 1.0;
+      play("toggleOff");
+      w.channel = null;
     } else {
-      const left = Math.max(0, Math.ceil(w.whiteAlbumLockUntil - w.time));
-      w.bannerText = left > 0 ? `Suit cooling (${left}s)` : `Recharging ${Math.round(w.whiteAlbumBar)}%`;
+      // Turning ON — only if bar has charge and lockout has elapsed.
+      if (w.whiteAlbumBar <= 0 || w.time < w.whiteAlbumLockUntil) {
+        const left = Math.max(0, Math.ceil(w.whiteAlbumLockUntil - w.time));
+        w.bannerText = left > 0 ? `Suit cooling (${left}s)` : `Recharging ${Math.round(w.whiteAlbumBar)}%`;
+        w.bannerUntil = w.time + 1.0;
+      } else {
+        w.whiteAlbumActive = true;
+        w.standActive = true;
+        w.bannerText = "Suit equipped";
+        w.bannerUntil = w.time + 1.0;
+        play("toggleOn");
+      }
     }
-    w.bannerUntil = w.time + 1.0;
     return w.whiteAlbumActive;
   }
   w.standActive = !w.standActive;
