@@ -989,7 +989,7 @@ function AbilityBtn({
 function InvSlot({
   icon, name, count, desc, color, onUse,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   name: string;
   count: number;
   desc: string;
