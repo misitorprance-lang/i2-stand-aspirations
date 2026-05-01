@@ -56,7 +56,10 @@ export type AbilityKind =
   | "wasp_swarm"        // surround nearest target with stinging wasps
   | "moon_carrot"       // self-heal
   | "crash"             // line-attack vehicle that explodes
-  | "eternal_curse";    // multi-target lightning strike
+  | "eternal_curse"     // multi-target lightning strike
+  // Harvest
+  | "harvest_gather"    // beetles fan out and bring nearby items to the player (toggle)
+  | "harvest_carry";    // beetles lift the player and carry them along the joystick (toggle)
 
 export interface Ability {
   name: string;
