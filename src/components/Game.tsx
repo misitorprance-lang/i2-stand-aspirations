@@ -389,54 +389,18 @@ export default function Game() {
           <div className="text-white text-sm font-bold tracking-wider drop-shadow">STAND TEST</div>
           <div className="flex items-center gap-1 pointer-events-auto flex-wrap justify-end max-w-[70%]">
             <button
-              onClick={onUseArrow}
-              className="bg-black/60 border border-white/30 rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-              title="Use Arrow"
+              onClick={() => setInventoryOpen(true)}
+              className="bg-black/70 border border-white/40 rounded px-2 py-1 flex items-center gap-1 text-white text-[11px] font-bold"
+              title="Open Inventory"
             >
-              <span style={{ color: "#caa14a" }}>➤</span>
-              <span>{ui.arrows}</span>
+              <span>🎒</span>
+              <span>INV</span>
+              {(ui.arrows + ui.discs + ui.requiemArrows + ui.bluePebbles + ui.tonthCopies) > 0 && (
+                <span className="ml-0.5 px-1 rounded bg-white/20 text-[9px]">
+                  {ui.arrows + ui.discs + ui.requiemArrows + ui.bluePebbles + ui.tonthCopies}
+                </span>
+              )}
             </button>
-            <button
-              onClick={onUseDisc}
-              className="bg-black/60 border border-white/30 rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-              title="Use DISC"
-            >
-              <span style={{ color: "#cfd2d8" }}>◎</span>
-              <span>{ui.discs}</span>
-            </button>
-            {ui.requiemArrows > 0 && (
-              <button
-                onClick={onUseRequiem}
-                className="bg-black/60 border rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-                style={{ borderColor: "#ff5ac8", boxShadow: "0 0 6px rgba(255,90,200,0.5)" }}
-                title="Use Requiem Arrow"
-              >
-                <span style={{ color: "#ff5ac8" }}>✦</span>
-                <span>{ui.requiemArrows}</span>
-              </button>
-            )}
-            {ui.bluePebbles > 0 && (
-              <button
-                onClick={onUsePebble}
-                className="bg-black/60 border rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-                style={{ borderColor: "#4a86d6", boxShadow: "0 0 6px rgba(80,160,255,0.5)" }}
-                title="Use Blue Pebble (Moon Rabbit)"
-              >
-                <span style={{ color: "#4a86d6" }}>●</span>
-                <span>{ui.bluePebbles}</span>
-              </button>
-            )}
-            {ui.tonthCopies > 0 && (
-              <button
-                onClick={onUseTonth}
-                className="bg-black/60 border rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-                style={{ borderColor: "#ba8cff" }}
-                title="Open Tonth Copy"
-              >
-                <span style={{ color: "#ba8cff" }}>📖</span>
-                <span>{ui.tonthCopies}</span>
-              </button>
-            )}
             <button
               onClick={() => { const n = !soundOn; setSoundOn(n); setSoundEnabled(n); applyMusicSetting(n); }}
               className="bg-black/60 border border-white/30 rounded px-1.5 py-1 text-white text-[10px]"
