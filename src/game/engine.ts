@@ -2718,6 +2718,10 @@ function resetStandRuntime(w: World) {
   }
   // Drop any in-flight player projectiles so a stand swap doesn't leak homing locks.
   w.projectiles = [];
+  // Harvest cleanup
+  w.harvestGatherActive = false;
+  w.harvestCarryActive = false;
+  w.harvestBeetles = [];
 }
 
 export function useArrow(w: World): boolean {
