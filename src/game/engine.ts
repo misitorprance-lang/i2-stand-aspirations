@@ -1947,6 +1947,8 @@ export function update(w: World, input: InputState, dt: number) {
       let baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
       // White Album: ice skating boost while suit is active.
       if (w.standId === "white_album" && w.whiteAlbumActive) baseSpeed *= 1.2;
+      // Harvest: Carry mode lifts the player along — faster, smoother movement.
+      if (w.standId === "harvest" && w.harvestCarryActive && w.standActive) baseSpeed *= 1.45;
       const speed = baseSpeed * Math.min(1, len);
       const before = { x: pl.pos.x, y: pl.pos.y };
       tryMove(pl, nx * speed * dt, ny * speed * dt, w.props);
