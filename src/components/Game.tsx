@@ -482,10 +482,10 @@ export default function Game() {
 
       {/* Banners — only show the most-recent meaningful banner. Toasts (item pickups) replace this stack. */}
       {(ui.toast || ui.banners.length > 0) && (
-        <div className="absolute top-1/3 left-0 right-0 flex flex-col items-center gap-1 pointer-events-none">
+        <div className="absolute left-0 right-0 flex flex-col items-center pointer-events-none" style={{ top: 64 }}>
           <div
-            className="px-4 py-2 rounded text-sm font-bold"
-            style={{ background: "rgba(0,0,0,0.78)", color: standColor, border: `2px solid ${standColor}` }}
+            className="px-2 py-0.5 rounded text-[10px] font-bold leading-tight"
+            style={{ background: "rgba(0,0,0,0.78)", color: standColor, border: `1px solid ${standColor}` }}
           >
             {ui.toast ?? ui.banners[ui.banners.length - 1]?.text}
           </div>
