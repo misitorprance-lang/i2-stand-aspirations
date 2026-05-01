@@ -93,6 +93,8 @@ export default function Game() {
     toast: null,
   });
   const [boingoOpen, setBoingoOpen] = useState(false);
+  const [bookPage, setBookPage] = useState<1 | 2>(1);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
   const [showHelp, setShowHelp] = useState<boolean>(true);
 
