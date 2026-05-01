@@ -226,6 +226,18 @@ interface World {
   swarms: { id: number; targetId: number; expireAt: number; nextStingAt: number; tickEvery: number; damage: number; range: number }[];
   // Moon Rabbit Eternal Curse: deferred lightning strikes from above (staggered)
   curseStrikes: { targetId: number; hitAt: number; dmg: number; color: string }[];
+  // Harvest runtime
+  harvestGatherActive: boolean;     // a1 toggle
+  harvestCarryActive: boolean;      // a2 toggle
+  harvestBeetles: {
+    id: number;
+    pos: Vec2;
+    vel: Vec2;
+    state: "orbit" | "seek" | "return";
+    targetItemId?: number;
+    carryingKind?: ItemPickup["kind"];
+    phase: number;                  // for orbit bobbing
+  }[];
   // Soft-banner suppression so repeat hints ("Out of range", "Resummon stand", etc.)
   // stop spamming the player after a few times.
   bannerSuppressCounts: Record<string, number>;
