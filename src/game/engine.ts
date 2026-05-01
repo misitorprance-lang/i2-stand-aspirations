@@ -4148,12 +4148,14 @@ const PROP_RESPAWN_DELAY = 30;
 function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
   if (p.destructible !== true) return;
   if ((p.hp ?? 0) <= 0) return;
-  if (isHouse(p)) {
+  // Strict gate: trees, fences, rocks AND houses can ONLY be damaged by Star Platinum
+  // (HOUSE_BREAKERS) or by an ability flagged as strong (HOUSE_STRONG_KINDS).
+  // Everything else just bonks harmlessly.
+  {
     const sid = source?.standId ?? w.standId;
     const ak = source?.abilityKind ?? "";
     const allowed = HOUSE_BREAKERS.has(sid) || HOUSE_STRONG_KINDS.has(ak);
     if (!allowed) {
-      // Show a tiny "ineffective" puff so the player understands.
       p.hitFlashUntil = w.time + 0.06;
       spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#caa472", 2, {
         shape: "square", gravity: 40, speedMin: 10, speedMax: 30, life: 0.25,
