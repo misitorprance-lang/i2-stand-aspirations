@@ -2589,7 +2589,106 @@ export function update(w: World, input: InputState, dt: number) {
     w.curseStrikes = remainCurse;
   }
 
-  // Banner timeout
+  // ---------- Harvest beetles ----------
+  // Spawn / despawn the swarm to match equipped state. Idle beetles orbit the
+  // player; with Gather ON they pursue items and ferry them back; with Carry
+  // ON they cluster low under the player as a "platform" of legs.
+  {
+    const HARVEST_BEETLE_COUNT = 14;
+    const GATHER_RANGE = 220;
+    const HOME_RADIUS = 14;
+    const beetleSpeed = 180;
+    if (w.standId === "harvest" && w.standActive) {
+      // Lazy spawn
+      while (w.harvestBeetles.length < HARVEST_BEETLE_COUNT) {
+        w.harvestBeetles.push({
+          id: w.nextId++,
+          pos: { x: w.player.pos.x + (Math.random() - 0.5) * 20, y: w.player.pos.y + (Math.random() - 0.5) * 20 },
+          vel: { x: 0, y: 0 },
+          state: "orbit",
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
+    } else if (w.harvestBeetles.length) {
+      w.harvestBeetles = [];
+    }
+
+    if (w.harvestBeetles.length) {
+      // Build set of items already targeted so beetles don't all chase the same one.
+      const claimed = new Set<number>();
+      for (const b of w.harvestBeetles) if (b.targetItemId != null) claimed.add(b.targetItemId);
+
+      for (const b of w.harvestBeetles) {
+        b.phase += dt * 4;
+        const goHome = (target: Vec2, sp: number) => {
+          const dx = target.x - b.pos.x, dy = target.y - b.pos.y;
+          const d = Math.hypot(dx, dy) || 1;
+          b.vel.x = (dx / d) * sp;
+          b.vel.y = (dy / d) * sp;
+          b.pos.x += b.vel.x * dt;
+          b.pos.y += b.vel.y * dt;
+          return d;
+        };
+
+        // Gather mode: idle orbiting beetles look for an unclaimed item to fetch.
+        if (w.harvestGatherActive && b.state === "orbit") {
+          let best: ItemPickup | null = null;
+          let bestD = GATHER_RANGE * GATHER_RANGE;
+          for (const it of w.items) {
+            if (claimed.has(it.id)) continue;
+            const d = dist2(it.pos, w.player.pos);
+            if (d < bestD) { bestD = d; best = it; }
+          }
+          if (best) {
+            b.state = "seek";
+            b.targetItemId = best.id;
+            claimed.add(best.id);
+          }
+        }
+
+        if (b.state === "seek" && b.targetItemId != null) {
+          const it = w.items.find((x) => x.id === b.targetItemId);
+          if (!it) {
+            b.state = "orbit"; b.targetItemId = undefined;
+          } else {
+            const d = goHome(it.pos, beetleSpeed);
+            if (d < 8) {
+              // Pick up the item: remove from world, beetle now carries it home.
+              w.items = w.items.filter((x) => x.id !== it.id);
+              b.state = "return";
+              b.carryingKind = it.kind;
+              b.targetItemId = undefined;
+            }
+          }
+        } else if (b.state === "return") {
+          const d = goHome(w.player.pos, beetleSpeed);
+          if (d < HOME_RADIUS) {
+            // Drop the item AT the player as a fresh pickup so existing pickup logic
+            // handles inventory increment & sound.
+            if (b.carryingKind) {
+              w.items.push({
+                id: w.nextId++,
+                kind: b.carryingKind,
+                pos: { x: w.player.pos.x, y: w.player.pos.y },
+                bornAt: w.time,
+              });
+              spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 14, color: "#ffd24a", life: 0.25 });
+            }
+            b.carryingKind = undefined;
+            b.state = "orbit";
+          }
+        } else {
+          // Orbit: low buzzing cloud around the player. Carry mode tightens the cloud beneath them.
+          const radius = w.harvestCarryActive ? 10 : 22;
+          const yOffset = w.harvestCarryActive ? 8 : 0;
+          const tx = w.player.pos.x + Math.cos(b.phase) * radius;
+          const ty = w.player.pos.y + yOffset + Math.sin(b.phase * 1.3) * (radius * 0.4);
+          goHome({ x: tx, y: ty }, beetleSpeed * 0.9);
+        }
+      }
+    }
+  }
+
   // Mirror current bannerText into the stacked banners queue (so multiple notifs can show at once).
   if (w.bannerText) {
     const last = w.banners[w.banners.length - 1];
