@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   VW,
   VH,
@@ -93,6 +93,8 @@ export default function Game() {
     toast: null,
   });
   const [boingoOpen, setBoingoOpen] = useState(false);
+  const [bookPage, setBookPage] = useState<1 | 2>(1);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
   const [showHelp, setShowHelp] = useState<boolean>(true);
 
@@ -387,54 +389,18 @@ export default function Game() {
           <div className="text-white text-sm font-bold tracking-wider drop-shadow">STAND TEST</div>
           <div className="flex items-center gap-1 pointer-events-auto flex-wrap justify-end max-w-[70%]">
             <button
-              onClick={onUseArrow}
-              className="bg-black/60 border border-white/30 rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-              title="Use Arrow"
+              onClick={() => setInventoryOpen(true)}
+              className="bg-black/70 border border-white/40 rounded px-2 py-1 flex items-center gap-1 text-white text-[11px] font-bold"
+              title="Open Inventory"
             >
-              <span style={{ color: "#caa14a" }}>➤</span>
-              <span>{ui.arrows}</span>
+              <span>🎒</span>
+              <span>INV</span>
+              {(ui.arrows + ui.discs + ui.requiemArrows + ui.bluePebbles + ui.tonthCopies) > 0 && (
+                <span className="ml-0.5 px-1 rounded bg-white/20 text-[9px]">
+                  {ui.arrows + ui.discs + ui.requiemArrows + ui.bluePebbles + ui.tonthCopies}
+                </span>
+              )}
             </button>
-            <button
-              onClick={onUseDisc}
-              className="bg-black/60 border border-white/30 rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-              title="Use DISC"
-            >
-              <span style={{ color: "#cfd2d8" }}>◎</span>
-              <span>{ui.discs}</span>
-            </button>
-            {ui.requiemArrows > 0 && (
-              <button
-                onClick={onUseRequiem}
-                className="bg-black/60 border rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-                style={{ borderColor: "#ff5ac8", boxShadow: "0 0 6px rgba(255,90,200,0.5)" }}
-                title="Use Requiem Arrow"
-              >
-                <span style={{ color: "#ff5ac8" }}>✦</span>
-                <span>{ui.requiemArrows}</span>
-              </button>
-            )}
-            {ui.bluePebbles > 0 && (
-              <button
-                onClick={onUsePebble}
-                className="bg-black/60 border rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-                style={{ borderColor: "#4a86d6", boxShadow: "0 0 6px rgba(80,160,255,0.5)" }}
-                title="Use Blue Pebble (Moon Rabbit)"
-              >
-                <span style={{ color: "#4a86d6" }}>●</span>
-                <span>{ui.bluePebbles}</span>
-              </button>
-            )}
-            {ui.tonthCopies > 0 && (
-              <button
-                onClick={onUseTonth}
-                className="bg-black/60 border rounded px-1.5 py-1 flex items-center gap-1 text-white text-[10px]"
-                style={{ borderColor: "#ba8cff" }}
-                title="Open Tonth Copy"
-              >
-                <span style={{ color: "#ba8cff" }}>📖</span>
-                <span>{ui.tonthCopies}</span>
-              </button>
-            )}
             <button
               onClick={() => { const n = !soundOn; setSoundOn(n); setSoundEnabled(n); applyMusicSetting(n); }}
               className="bg-black/60 border border-white/30 rounded px-1.5 py-1 text-white text-[10px]"
@@ -516,10 +482,10 @@ export default function Game() {
 
       {/* Banners — only show the most-recent meaningful banner. Toasts (item pickups) replace this stack. */}
       {(ui.toast || ui.banners.length > 0) && (
-        <div className="absolute top-1/3 left-0 right-0 flex flex-col items-center gap-1 pointer-events-none">
+        <div className="absolute left-0 right-0 flex flex-col items-center pointer-events-none" style={{ top: 64 }}>
           <div
-            className="px-4 py-2 rounded text-sm font-bold"
-            style={{ background: "rgba(0,0,0,0.78)", color: standColor, border: `2px solid ${standColor}` }}
+            className="px-2 py-0.5 rounded text-[10px] font-bold leading-tight"
+            style={{ background: "rgba(0,0,0,0.78)", color: standColor, border: `1px solid ${standColor}` }}
           >
             {ui.toast ?? ui.banners[ui.banners.length - 1]?.text}
           </div>
@@ -711,89 +677,155 @@ export default function Game() {
               </button>
             </div>
 
+            {/* Page tabs */}
+            <div className="px-4 pt-2 flex gap-1">
+              {[1, 2].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setBookPage(p as 1 | 2)}
+                  className="px-2 py-0.5 rounded text-[10px] font-bold"
+                  style={{
+                    background: bookPage === p ? "#5a2c8a" : "rgba(0,0,0,0.35)",
+                    border: "1px solid #ba8cff",
+                    color: "#fff",
+                  }}
+                >
+                  PAGE {p}
+                </button>
+              ))}
+            </div>
+
             <div className="px-4 py-3 max-h-[70vh] overflow-y-auto text-[11px] text-purple-50/95 leading-relaxed">
-              {/* Boingo speech */}
-              <div
-                className="rounded-md px-3 py-2 mb-3"
-                style={{ background: "rgba(186,140,255,0.12)", border: "1px dashed rgba(186,140,255,0.4)" }}
-              >
-                <div className="text-[10px] font-bold text-purple-200/80 mb-1">Boingo says…</div>
-                <div className="italic text-purple-100/90">
-                  "M-my book showed me you'd come… here, this is how you survive!"
-                </div>
-              </div>
-
-              {/* Basics */}
-              <div className="mb-3">
-                <div className="text-[10px] font-bold tracking-widest text-purple-200/80 mb-1">★ BASICS</div>
-                <ul className="space-y-0.5">
-                  <li>• Drag the LEFT half to move (or WASD).</li>
-                  <li>• Drag the RIGHT half to aim. Release to auto-aim.</li>
-                  <li>• Tap M1 / 1-4 (or Space, 1-4) to attack.</li>
-                  <li>• Hold M1 to auto-repeat.</li>
-                  <li>• Pick up <span style={{ color: "#caa14a" }}>Arrows</span> to roll a stand.</li>
-                  <li>• <span style={{ color: "#cfd2d8" }}>DISCs</span> remove your current stand.</li>
-                  <li>• Hostile NPCs (red) only attack if provoked.</li>
-                </ul>
-              </div>
-
-              {/* Current stand details */}
-              {ui.standId !== "none" && STAND_CODEX[ui.standId as Exclude<typeof ui.standId, "none">] && (
-                <div className="mb-3">
-                  <div className="text-[10px] font-bold tracking-widest text-purple-200/80 mb-1">
-                    ★ YOUR STAND — <span style={{ color: standColor }}>{stand.name}</span>
-                  </div>
+              {bookPage === 1 && (
+                <>
+                  {/* Boingo speech */}
                   <div
-                    className="rounded-md px-3 py-2 mb-2"
-                    style={{ background: "rgba(0,0,0,0.35)", border: `1px solid ${standColor}55` }}
+                    className="rounded-md px-3 py-2 mb-3"
+                    style={{ background: "rgba(186,140,255,0.12)", border: "1px dashed rgba(186,140,255,0.4)" }}
                   >
-                    <div className="text-[10px] italic text-purple-200/80 mb-1">
-                      {STAND_CODEX[ui.standId as Exclude<typeof ui.standId, "none">].model.description}
+                    <div className="text-[10px] font-bold text-purple-200/80 mb-1">Boingo says…</div>
+                    <div className="italic text-purple-100/90">
+                      "M-my book showed me you'd come… here, this is how you survive!"
                     </div>
                   </div>
-                  <ul className="space-y-1">
-                    {(["m1", "a1", "a2", "a3", "a4"] as const).map((k) => {
-                      const ab = abilities[k];
-                      const codexNote =
-                        STAND_CODEX[ui.standId as Exclude<typeof ui.standId, "none">].moves[k].notes;
-                      return (
-                        <li key={k} className="flex gap-2">
-                          <span
-                            className="font-bold w-7 text-center rounded text-[10px] py-0.5 shrink-0"
-                            style={{ background: `${ab.color}33`, color: ab.color, border: `1px solid ${ab.color}66` }}
-                          >
-                            {k.toUpperCase()}
-                          </span>
-                          <div>
-                            <div className="font-bold text-purple-100">
-                              {ab.name}
-                              {ab.damage > 0 && (
-                                <span className="text-purple-200/60 font-normal"> · {ab.damage} dmg</span>
-                              )}
-                              {ab.cooldown > 0 && (
-                                <span className="text-purple-200/60 font-normal"> · {ab.cooldown}s</span>
-                              )}
-                            </div>
-                            <div className="text-purple-200/80 text-[10px]">{codexNote}</div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
+
+                  {/* Basics */}
+                  <div className="mb-3">
+                    <div className="text-[10px] font-bold tracking-widest text-purple-200/80 mb-1">★ BASICS</div>
+                    <ul className="space-y-0.5">
+                      <li>• Drag the LEFT half to move (or WASD).</li>
+                      <li>• Drag the RIGHT half to aim. Release to auto-aim.</li>
+                      <li>• Tap M1 / 1-4 (or Space, 1-4) to attack.</li>
+                      <li>• Hold M1 to auto-repeat.</li>
+                      <li>• Open <span className="font-bold">🎒 INV</span> to use Arrows / DISCs / Pebbles / Tonth.</li>
+                      <li>• <span style={{ color: "#cfd2d8" }}>DISCs</span> remove your current stand (use one before swapping with an Arrow).</li>
+                      <li>• Hostile NPCs (red) only attack if provoked.</li>
+                    </ul>
+                  </div>
+
+                  {/* Current stand details */}
+                  {ui.standId !== "none" && STAND_CODEX[ui.standId as Exclude<typeof ui.standId, "none">] && (
+                    <div className="mb-3">
+                      <div className="text-[10px] font-bold tracking-widest text-purple-200/80 mb-1">
+                        ★ YOUR STAND — <span style={{ color: standColor }}>{stand.name}</span>
+                      </div>
+                      <div
+                        className="rounded-md px-3 py-2 mb-2"
+                        style={{ background: "rgba(0,0,0,0.35)", border: `1px solid ${standColor}55` }}
+                      >
+                        <div className="text-[10px] italic text-purple-200/80 mb-1">
+                          {STAND_CODEX[ui.standId as Exclude<typeof ui.standId, "none">].model.description}
+                        </div>
+                      </div>
+                      <ul className="space-y-1">
+                        {(["m1", "a1", "a2", "a3", "a4"] as const).map((k) => {
+                          const ab = abilities[k];
+                          const codexNote =
+                            STAND_CODEX[ui.standId as Exclude<typeof ui.standId, "none">].moves[k].notes;
+                          return (
+                            <li key={k} className="flex gap-2">
+                              <span
+                                className="font-bold w-7 text-center rounded text-[10px] py-0.5 shrink-0"
+                                style={{ background: `${ab.color}33`, color: ab.color, border: `1px solid ${ab.color}66` }}
+                              >
+                                {k.toUpperCase()}
+                              </span>
+                              <div>
+                                <div className="font-bold text-purple-100">
+                                  {ab.name}
+                                  {ab.damage > 0 && (
+                                    <span className="text-purple-200/60 font-normal"> · {ab.damage} dmg</span>
+                                  )}
+                                  {ab.cooldown > 0 && (
+                                    <span className="text-purple-200/60 font-normal"> · {ab.cooldown}s</span>
+                                  )}
+                                </div>
+                                <div className="text-purple-200/80 text-[10px]">{codexNote}</div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+
+                  {ui.standId === "none" && (
+                    <div
+                      className="rounded-md px-3 py-2"
+                      style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(186,140,255,0.4)" }}
+                    >
+                      <div className="text-[10px] font-bold text-purple-200/80 mb-1">★ NO STAND YET</div>
+                      <div>
+                        Open <span className="font-bold">🎒 INV</span> and use a glowing
+                        <span style={{ color: "#caa14a" }}> Arrow</span> to roll for a stand!
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
-              {ui.standId === "none" && (
-                <div
-                  className="rounded-md px-3 py-2"
-                  style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(186,140,255,0.4)" }}
-                >
-                  <div className="text-[10px] font-bold text-purple-200/80 mb-1">★ NO STAND YET</div>
-                  <div>
-                    Find a glowing <span style={{ color: "#caa14a" }}>Arrow</span> on the ground and use it from
-                    the top bar to roll for a stand!
+              {bookPage === 2 && (
+                <>
+                  <div className="text-[10px] font-bold tracking-widest text-purple-200/80 mb-2">★ STAND CATALOG</div>
+                  {(() => {
+                    const list = (Object.keys(STANDS) as (keyof typeof STANDS)[])
+                      .filter((id) => id !== "none")
+                      .map((id) => ({ id, s: STANDS[id] }));
+                    const totalWeight = list.reduce((acc, x) => acc + (x.s.rarityWeight || 0), 0) || 1;
+                    return (
+                      <ul className="space-y-1">
+                        {list.map(({ id, s }) => {
+                          const w = s.rarityWeight || 0;
+                          const pct = w > 0 ? ((w / totalWeight) * 100).toFixed(1) + "%" : "—";
+                          return (
+                            <li
+                              key={id}
+                              className="flex items-center gap-2 rounded px-2 py-1"
+                              style={{ background: "rgba(0,0,0,0.3)", border: `1px solid ${s.color}55` }}
+                            >
+                              {/* mini model = colored dot w/ aura */}
+                              <span
+                                className="inline-block rounded-full shrink-0"
+                                style={{
+                                  width: 14, height: 14,
+                                  background: s.color,
+                                  boxShadow: `0 0 6px ${s.color}, 0 0 12px ${s.color}66`,
+                                  border: "1px solid rgba(255,255,255,0.4)",
+                                }}
+                              />
+                              <span className="font-bold flex-1" style={{ color: s.color }}>{s.name}</span>
+                              <span className="text-[10px] text-purple-200/80">w {w}</span>
+                              <span className="text-[10px] text-purple-200/60 w-12 text-right">{pct}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    );
+                  })()}
+                  <div className="mt-2 text-[9px] text-purple-200/60 italic">
+                    Higher weight = more common from Arrows. Moon Rabbit is Pebble-only (weight 0).
                   </div>
-                </div>
+                </>
               )}
             </div>
 
@@ -806,6 +838,95 @@ export default function Game() {
                 style={{ background: "#5a2c8a", border: "1px solid #ba8cff" }}
               >
                 Close book
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inventory modal */}
+      {inventoryOpen && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-auto"
+          style={{ background: "rgba(0,0,0,0.78)" }}
+          onClick={() => setInventoryOpen(false)}
+        >
+          <div
+            className="relative max-w-sm w-full rounded-lg overflow-hidden"
+            style={{
+              background: "linear-gradient(180deg,#1a1a22 0%,#0d0d12 100%)",
+              border: "2px solid rgba(255,255,255,0.35)",
+              boxShadow: "0 0 24px rgba(0,0,0,0.7)",
+              fontFamily: "monospace",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-white/20">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🎒</span>
+                <div>
+                  <div className="text-[10px] text-white/60 tracking-widest">INVENTORY</div>
+                  <div className="text-sm font-bold text-white">Items & Tools</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setInventoryOpen(false)}
+                className="text-white/70 hover:text-white text-lg leading-none px-1"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 grid grid-cols-2 gap-2 text-[11px] text-white">
+              <InvSlot
+                icon={<span style={{ color: "#caa14a", fontSize: 18 }}>➤</span>}
+                name="Arrow"
+                count={ui.arrows}
+                desc="Roll a random stand. Need empty stand slot."
+                color="#caa14a"
+                onUse={() => { onUseArrow(); }}
+              />
+              <InvSlot
+                icon={<span style={{ color: "#cfd2d8", fontSize: 18 }}>◎</span>}
+                name="DISC"
+                count={ui.discs}
+                desc="Remove your current stand."
+                color="#cfd2d8"
+                onUse={() => { onUseDisc(); }}
+              />
+              <InvSlot
+                icon={<span style={{ color: "#ffd24a", fontSize: 18 }}>✦</span>}
+                name="Requiem Arrow"
+                count={ui.requiemArrows}
+                desc="Broken golden relic. (Decorative)"
+                color="#ffd24a"
+                onUse={() => { onUseRequiem(); }}
+              />
+              <InvSlot
+                icon={<span style={{ color: "#4a86d6", fontSize: 18 }}>●</span>}
+                name="Blue Pebble"
+                count={ui.bluePebbles}
+                desc="Grants Moon Rabbit. Need empty stand slot."
+                color="#4a86d6"
+                onUse={() => { onUsePebble(); }}
+              />
+              <InvSlot
+                icon={<span style={{ color: "#ba8cff", fontSize: 18 }}>📖</span>}
+                name="Tonth Copy"
+                count={ui.tonthCopies}
+                desc="Open the book of stands."
+                color="#ba8cff"
+                onUse={() => { onUseTonth(); setInventoryOpen(false); }}
+              />
+            </div>
+
+            <div className="px-4 py-2 border-t border-white/20 flex justify-end">
+              <button
+                onClick={() => setInventoryOpen(false)}
+                className="px-3 py-1 rounded text-[10px] font-bold text-white bg-white/10 border border-white/30"
+              >
+                Close
               </button>
             </div>
           </div>
@@ -861,6 +982,41 @@ function AbilityBtn({
           }}
         />
       )}
+    </button>
+  );
+}
+
+function InvSlot({
+  icon, name, count, desc, color, onUse,
+}: {
+  icon: ReactNode;
+  name: string;
+  count: number;
+  desc: string;
+  color: string;
+  onUse: () => void;
+}) {
+  const empty = count <= 0;
+  return (
+    <button
+      onClick={onUse}
+      disabled={empty}
+      className="flex flex-col items-start text-left rounded p-2 gap-1"
+      style={{
+        background: empty ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.45)",
+        border: `1px solid ${empty ? "rgba(255,255,255,0.15)" : color + "88"}`,
+        opacity: empty ? 0.45 : 1,
+        cursor: empty ? "not-allowed" : "pointer",
+      }}
+    >
+      <div className="flex items-center justify-between w-full">
+        <div className="flex items-center gap-1">
+          {icon}
+          <span className="font-bold" style={{ color }}>{name}</span>
+        </div>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10">×{count}</span>
+      </div>
+      <div className="text-[9px] text-white/70 leading-tight">{desc}</div>
     </button>
   );
 }

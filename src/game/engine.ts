@@ -2291,7 +2291,7 @@ export function update(w: World, input: InputState, dt: number) {
     if (pr.pos.x < 0 || pr.pos.x > MAP_W || pr.pos.y < 0 || pr.pos.y > MAP_H) { pr.expireAt = 0; continue; }
     // hit props?
     for (const p of w.props) {
-      if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
+      if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage, { abilityKind: "projectile", standId: w.standId }); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
     }
     if (pr.expireAt === 0) continue;
     // hit npcs
@@ -3106,52 +3106,79 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   const pl = w.player;
   // White Album reskins the player itself instead of using a floating stand body.
   const wearingWhiteAlbum = w.standId === "white_album" && w.whiteAlbumActive;
+  // Moon Rabbit also overlays the player (red suit + rabbit ears) like White Album.
+  const wearingMoonRabbit = w.standId === "moon_rabbit" && w.standActive;
+  const wearingOverlay = wearingWhiteAlbum || wearingMoonRabbit;
   // Stand drawn UNDER player when behind, OVER when in front. Hidden entirely if standActive=false
-  // OR when White Album is worn (suit replaces the model).
-  const standVisible = w.standId !== "none" && w.standActive && !wearingWhiteAlbum;
+  // OR when an overlay (White Album / Moon Rabbit) is worn.
+  const standVisible = w.standId !== "none" && w.standActive && !wearingOverlay;
   const standPos = computeStandPos(w);
   const standInFront = standPos.y >= pl.pos.y;
   if (standVisible && !standInFront) drawStand(ctx, w, standPos);
   // shadow
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath(); ctx.ellipse(pl.pos.x, pl.pos.y + 8, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
-  // stand aura — only when active
+  // stand aura — only when active (and not overlaid)
   if (standVisible) {
     const auraColor = STANDS[w.standId].color;
     ctx.fillStyle = hexToRgba(auraColor, 0.18 + Math.sin(w.time * 6) * 0.05);
     ctx.beginPath(); ctx.arc(pl.pos.x, pl.pos.y, 16, 0, Math.PI * 2); ctx.fill();
   }
+  // Overlay aura tint for Moon Rabbit
+  if (wearingMoonRabbit) {
+    ctx.fillStyle = `rgba(255,90,90,${0.16 + Math.sin(w.time * 5) * 0.05})`;
+    ctx.beginPath(); ctx.arc(pl.pos.x, pl.pos.y, 17, 0, Math.PI * 2); ctx.fill();
+  }
   // body
   const flash = w.time < pl.hitFlashUntil;
   if (wearingWhiteAlbum) {
-    // Suit body — same silhouette as the player but reskinned white w/ purple trim.
     ctx.fillStyle = flash ? "#ffffff" : "#f3f4ff";
     ctx.fillRect(pl.pos.x - 6, pl.pos.y - 2, 12, 10);
     ctx.fillStyle = flash ? "#ffffff" : "#7c5cff";
     ctx.fillRect(pl.pos.x - 6, pl.pos.y + 1, 12, 2);
-    // head / helmet
     ctx.fillStyle = flash ? "#ffffff" : "#ffffff";
     ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
-    // greenish-yellow visor strip
     ctx.fillStyle = "#c8e64a";
     ctx.fillRect(pl.pos.x - 4, pl.pos.y - 7, 8, 2);
-    // ice skate triangles under feet
     ctx.fillStyle = "#bfe9ff";
     ctx.beginPath(); ctx.moveTo(pl.pos.x - 6, pl.pos.y + 9); ctx.lineTo(pl.pos.x - 1, pl.pos.y + 12); ctx.lineTo(pl.pos.x - 6, pl.pos.y + 12); ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.moveTo(pl.pos.x + 6, pl.pos.y + 9); ctx.lineTo(pl.pos.x + 1, pl.pos.y + 12); ctx.lineTo(pl.pos.x + 6, pl.pos.y + 12); ctx.closePath(); ctx.fill();
+  } else if (wearingMoonRabbit) {
+    // Red suit body
+    ctx.fillStyle = flash ? "#ffffff" : "#c0392b";
+    ctx.fillRect(pl.pos.x - 6, pl.pos.y - 2, 12, 10);
+    // suit belt
+    ctx.fillStyle = flash ? "#ffffff" : "#5a1f17";
+    ctx.fillRect(pl.pos.x - 6, pl.pos.y + 4, 12, 2);
+    // bowtie
+    ctx.fillStyle = flash ? "#ffffff" : "#222";
+    ctx.fillRect(pl.pos.x - 2, pl.pos.y - 1, 4, 2);
+    // head (white furry)
+    ctx.fillStyle = flash ? "#ffffff" : "#f5f5f5";
+    ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
+    // rabbit ears
+    ctx.fillStyle = flash ? "#ffffff" : "#f5f5f5";
+    ctx.fillRect(pl.pos.x - 5, pl.pos.y - 16, 3, 7);
+    ctx.fillRect(pl.pos.x + 2, pl.pos.y - 16, 3, 7);
+    // ear inner pink
+    ctx.fillStyle = "#ff9bb5";
+    ctx.fillRect(pl.pos.x - 4, pl.pos.y - 15, 1, 5);
+    ctx.fillRect(pl.pos.x + 3, pl.pos.y - 15, 1, 5);
+    // red eyes (rabbit)
+    ctx.fillStyle = "#d12727";
+    const fx = pl.facing.x, fy = pl.facing.y;
+    ctx.fillRect(pl.pos.x - 3 + Math.sign(fx), pl.pos.y - 6 + Math.sign(fy), 2, 2);
+    ctx.fillRect(pl.pos.x + 1 + Math.sign(fx), pl.pos.y - 6 + Math.sign(fy), 2, 2);
   } else {
     ctx.fillStyle = flash ? "#ffffff" : "#caa14a";
     ctx.fillRect(pl.pos.x - 6, pl.pos.y - 2, 12, 10);
-    // head
     ctx.fillStyle = flash ? "#ffffff" : pl.color;
     ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
-    // eyes (face direction)
     const fx = pl.facing.x, fy = pl.facing.y;
     ctx.fillStyle = "#222";
     ctx.fillRect(pl.pos.x - 3 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
     ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
   }
-  // hp bar (only if damaged)
   if (pl.hp < pl.maxHp) drawHpBar(ctx, pl.pos.x, pl.pos.y - 16, pl.hp / pl.maxHp);
   if (standVisible && standInFront) drawStand(ctx, w, standPos);
   if (w.time < w.rageUntil) {
@@ -4148,12 +4175,14 @@ const PROP_RESPAWN_DELAY = 30;
 function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
   if (p.destructible !== true) return;
   if ((p.hp ?? 0) <= 0) return;
-  if (isHouse(p)) {
+  // Strict gate: trees, fences, rocks AND houses can ONLY be damaged by Star Platinum
+  // (HOUSE_BREAKERS) or by an ability flagged as strong (HOUSE_STRONG_KINDS).
+  // Everything else just bonks harmlessly.
+  {
     const sid = source?.standId ?? w.standId;
     const ak = source?.abilityKind ?? "";
     const allowed = HOUSE_BREAKERS.has(sid) || HOUSE_STRONG_KINDS.has(ak);
     if (!allowed) {
-      // Show a tiny "ineffective" puff so the player understands.
       p.hitFlashUntil = w.time + 0.06;
       spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#caa472", 2, {
         shape: "square", gravity: 40, speedMin: 10, speedMax: 30, life: 0.25,
