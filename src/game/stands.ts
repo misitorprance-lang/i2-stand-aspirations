@@ -11,7 +11,8 @@ export type StandId =
   | "hanged_man"
   | "white_album"
   | "purple_haze"
-  | "moon_rabbit";
+  | "moon_rabbit"
+  | "harvest";
 
 export type AbilityKind =
   | "melee"
