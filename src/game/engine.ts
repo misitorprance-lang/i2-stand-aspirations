@@ -1810,12 +1810,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnParticles(w, target.pos, ab.color, 14, { speedMin: 30, speedMax: 110, life: 0.5 });
       break;
     }
-    // ---- Moon Rabbit: Moon Carrot (A2) — self-heal ----
-    case "moon_carrot": {
-      healPlayer(w, 8, "#ff6688");
+    // ---- Moon Rabbit: Lunar Veil (A2) — temporary invincibility ----
+    case "lunar_veil": {
+      (w as any).moonRabbitInvulnUntil = w.time + (ab.duration ?? 2.5);
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 28, color: ab.color, life: 0.5 });
+      spawnParticles(w, p, ab.color, 16, { shape: "spark", speedMin: 40, speedMax: 140, life: 0.6 });
+      w.bannerText = "Lunar Veil — invincible";
+      w.bannerUntil = w.time + 1.0;
       play("toggleOn");
       break;
     }
+    case "moon_carrot": {
     // ---- Moon Rabbit: Crash (A3) — drawn motorcycle that rams forward and explodes ----
     case "crash": {
       const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
