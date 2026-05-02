@@ -123,6 +123,11 @@ export interface Projectile {
   applyPoison?: { dps: number; durationSeconds: number };
   // textual rendering hint (Echoes/Purple Haze projectiles)
   textGlyph?: string;
+  // For prop-damage gating: which (stand, ability key) spawned this projectile.
+  sourceStandId?: StandId;
+  sourceAbilityKey?: string;
+  // Moon Rabbit Crash: explodes if it touches the player too.
+  hurtsPlayer?: boolean;
 }
 
 export interface Zone {
