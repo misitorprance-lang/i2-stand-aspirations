@@ -69,12 +69,16 @@ const STAND_TETHER = 360;
 // Stands that hold a weapon — punches with these spawn slash hit FX, not punch impacts.
 const WEAPON_STANDS = new Set<StandId>(["hanged_man", "ebony_devil"]);
 
-// Stands whose basic punches CAN damage houses. Anything else is no-op vs houses.
-// Houses are also damaged by explicitly "strong" abilities listed in HOUSE_STRONG_KINDS below.
-const HOUSE_BREAKERS = new Set<StandId>(["star_platinum"]);
-const HOUSE_STRONG_KINDS = new Set([
-  "aoe_target", "auto_aim", "knockback", "tesla", "lobbed", "brutal_slash",
-  "rage_mode", "time_stop", "pierce", "crash", "eternal_curse",
+// Strict prop-damage gating.
+// ONLY Star Platinum and Star Platinum: The World can damage props with anything.
+// Any OTHER stand may only damage props through one of these explicitly "deadly" moves.
+const PROP_BREAKERS_BY_STAND = new Set<StandId>(["star_platinum", "sptw"]);
+// Keys are `${standId}:${abilityKey}` (m1/a1/a2/a3/a4).
+const PROP_BREAKERS_BY_MOVE = new Set<string>([
+  "rhcp:a3",          // Ground Bomber
+  "rhcp:a4",          // Tesla Coil
+  "white_album:a4",   // Frost Expanse
+  "moon_rabbit:a4",   // Eternal Curse
 ]);
 
 // ---------- helpers ----------
