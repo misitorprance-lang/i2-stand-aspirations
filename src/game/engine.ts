@@ -1071,7 +1071,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
       // Melee chops at props in front of you (heavy stands break things faster).
-      damagePropsInRadius(w, tx, ty, (ab.radius ?? 14) + 4, dmg, { abilityKind: ab.kind, standId: w.standId });
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 14) + 4, dmg, { abilityKind: ab.kind, abilityKey: key, standId: w.standId });
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
       // trigger stand-punch animation
       w.standPunchUntil = w.time + 0.25;
@@ -1164,7 +1164,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - p.x, y: e.pos.y - p.y }), amount: 60 });
         }
       }
-      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage, { abilityKind: ab.kind, standId: w.standId });
+      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage, { abilityKind: ab.kind, abilityKey: key, standId: w.standId });
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: ab.radius!, color: ab.color, life: 0.45 });
       // arcing lightning to nearby targets
       for (const e of w.npcs) {
@@ -1193,7 +1193,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage);
         }
       }
-      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage, { abilityKind: ab.kind, standId: w.standId });
+      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage, { abilityKind: ab.kind, abilityKey: key, standId: w.standId });
       spawnVfx(w, { kind: "explosion_ring", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
       spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius! * 0.8, color: ab.color, life: 0.55 });
       if (ab.crater) {
@@ -1520,7 +1520,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       }
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
-      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage, { abilityKind: ab.kind, standId: w.standId });
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage, { abilityKind: ab.kind, abilityKey: key, standId: w.standId });
       play("brutal");
       break;
     }
