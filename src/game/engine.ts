@@ -2329,7 +2329,7 @@ export function update(w: World, input: InputState, dt: number) {
           damageEntity(w, e, 9);
         }
       }
-      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14, { abilityKind: "aoe_target", standId: w.standId });
+      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14, { abilityKind: "aoe_target", abilityKey: pr.sourceAbilityKey, standId: pr.sourceStandId ?? w.standId });
       w.zones.push({
         id: w.nextId++,
         pos: { ...pr.pos },
@@ -2355,7 +2355,7 @@ export function update(w: World, input: InputState, dt: number) {
     if (pr.pos.x < 0 || pr.pos.x > MAP_W || pr.pos.y < 0 || pr.pos.y > MAP_H) { pr.expireAt = 0; continue; }
     // hit props?
     for (const p of w.props) {
-      if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage, { abilityKind: "projectile", standId: w.standId }); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
+      if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage, { abilityKind: "projectile", abilityKey: pr.sourceAbilityKey, standId: pr.sourceStandId ?? w.standId }); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
     }
     if (pr.expireAt === 0) continue;
     // hit npcs
