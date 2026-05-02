@@ -1820,6 +1820,123 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       play("toggleOn");
       break;
     }
+    // ---- Star Platinum / SPTW: Star Rush — short dash + grab + 2 punches ----
+    case "star_rush": {
+      const target = nearestTarget(w, p, ab.range + 20);
+      if (target) {
+        // dash player to just shy of target
+        const toT = norm({ x: target.pos.x - p.x, y: target.pos.y - p.y });
+        const stopDist = (target.radius ?? 8) + 12;
+        const dx = (target.pos.x - p.x) - toT.x * stopDist;
+        const dy = (target.pos.y - p.y) - toT.y * stopDist;
+        tryMove(w.player, dx, dy, w.props);
+        target.stunUntil = Math.max(target.stunUntil, w.time + 0.6);
+        // two staggered hits
+        damageEntity(w, target, ab.damage);
+        spawnVfx(w, { kind: "punch_impact", pos: { ...target.pos }, color: ab.color, life: 0.2 });
+        // schedule second hit via curseStrikes-like? simpler: hit again now with bonus
+        damageEntity(w, target, ab.damage + 1);
+        spawnVfx(w, { kind: "slash_arc", pos: { ...target.pos }, angle: Math.atan2(toT.y, toT.x), radius: 18, color: ab.color, life: 0.25 });
+        spawnParticles(w, target.pos, ab.color, 14, { speedMin: 60, speedMax: 180, life: 0.4 });
+        w.standPunchUntil = w.time + 0.3;
+        w.standPunchDir = toT;
+        (w as any).lastHitEnemyId = target.id;
+        (w as any).lastHitEnemyAt = w.time;
+        w.shake = Math.max(w.shake, 5);
+      }
+      break;
+    }
+    // ---- Star Platinum / SPTW: The World — single tap = time stop, double tap = teleport-skip ----
+    case "time_stop_or_skip": {
+      const lastTap = (w as any).timeStopLastTapAt ?? 0;
+      const isDoubleTap = w.time - lastTap < 0.45;
+      (w as any).timeStopLastTapAt = w.time;
+      if (isDoubleTap) {
+        // Time Skip: teleport to last enemy you damaged within 5s
+        const lastId = (w as any).lastHitEnemyId;
+        const lastAt = (w as any).lastHitEnemyAt ?? 0;
+        const target = w.npcs.find((e) => e.alive && e.id === lastId);
+        if (target && w.time - lastAt < 5) {
+          // SPTW gets 2 charges per cooldown; SP only single
+          const charges = (w as any).timeSkipCharges ?? 0;
+          if (w.standId === "sptw" && charges < 2) {
+            (w as any).timeSkipCharges = charges + 1;
+            w.cdTimers[key] = 0; // refund until charges spent
+          } else {
+            (w as any).timeSkipCharges = 0;
+          }
+          const toT = norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+          w.player.pos.x = target.pos.x - toT.x * 16;
+          w.player.pos.y = target.pos.y - toT.y * 16;
+          pushOutOfProps(w.player, w.props);
+          target.stunUntil = Math.max(target.stunUntil, w.time + 1);
+          spawnVfx(w, { kind: "shard_flash", pos: { ...target.pos }, radius: 24, color: ab.color, life: 0.4 });
+          spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 36, color: ab.color, life: 0.4 });
+          w.bannerText = "Time Skip!";
+          w.bannerUntil = w.time + 1.2;
+          play("timeStop");
+          break;
+        }
+      }
+      // Single tap → Time Stop
+      (w as any).timeSkipCharges = 0;
+      const dur = ab.duration ?? 5;
+      w.timeStopUntil = w.time + dur;
+      w.timeStopStartedAt = w.time;
+      w.pendingPlayerDamage = [];
+      spawnVfx(w, { kind: "time_clock", pos: { x: w.player.pos.x, y: w.player.pos.y - 30 }, radius: 60, color: ab.color, life: 1.4 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 220, color: ab.color, life: 0.8 });
+      w.bannerText = "ZA WARUDO!";
+      w.bannerUntil = w.time + 1.6;
+      play("timeStop");
+      break;
+    }
+    // ---- SPTW: Triple Pebble — three small fast flicks at one enemy ----
+    case "triple_pebble": {
+      const target = nearestTarget(w, p, ab.range);
+      if (!target) break;
+      const baseDir = norm({ x: target.pos.x - p.x, y: target.pos.y - p.y });
+      for (let i = 0; i < 3; i++) {
+        const spread = (i - 1) * 0.05;
+        const dx = baseDir.x * Math.cos(spread) - baseDir.y * Math.sin(spread);
+        const dy = baseDir.x * Math.sin(spread) + baseDir.y * Math.cos(spread);
+        w.projectiles.push({
+          id: w.nextId++,
+          pos: { x: p.x, y: p.y },
+          vel: { x: dx * (ab.speed ?? 420), y: dy * (ab.speed ?? 420) },
+          radius: ab.radius ?? 4,
+          damage: ab.damage,
+          color: ab.color,
+          ownerKind: "player",
+          pierce: false,
+          hitSet: new Set(),
+          expireAt: w.time + ab.range / (ab.speed ?? 420),
+          homingTargetId: target.id,
+          homingStrength: 0.18,
+          speed: ab.speed,
+          sourceStandId: w.standId,
+          sourceAbilityKey: key,
+        });
+      }
+      spawnParticles(w, p, ab.color, 8, { speedMin: 60, speedMax: 160, life: 0.25 });
+      break;
+    }
+    // ---- SPTW: Rage activation (consumes meter) ----
+    case "sptw_rage": {
+      if (((w as any).sptwRage ?? 0) < 100) {
+        softBanner(w, "sptw_rage_low", "Rage meter not full", 0.8);
+        w.cdTimers[key] = 0;
+        break;
+      }
+      (w as any).sptwRage = 0;
+      w.rageUntil = w.time + 6;
+      w.bannerText = "RAGE";
+      w.bannerUntil = w.time + 1.2;
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 72, color: "#5fe8ff", life: 0.6 });
+      spawnParticles(w, p, "#5fe8ff", 22, { shape: "spark", speedMin: 80, speedMax: 200, life: 0.6 });
+      w.shake = Math.max(w.shake, 5);
+      break;
+    }
     // ---- Moon Rabbit: Crash (A3) — drawn motorcycle that rams forward and explodes ----
     case "crash": {
       const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
