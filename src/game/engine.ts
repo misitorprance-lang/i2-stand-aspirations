@@ -1820,7 +1820,6 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       play("toggleOn");
       break;
     }
-    case "moon_carrot": {
     // ---- Moon Rabbit: Crash (A3) — drawn motorcycle that rams forward and explodes ----
     case "crash": {
       const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
