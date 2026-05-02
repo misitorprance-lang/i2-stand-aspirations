@@ -4363,16 +4363,15 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
 const PROP_RESPAWN_DELAY = 30;
 // Routes all prop damage. If `kind` is "house" we require the source to be a house-breaker stand
 // or a strong ability. Otherwise the hit is ignored (the bonk lands but the wall holds).
-function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
+function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: string; abilityKey?: string; standId?: StandId }) {
   if (p.destructible !== true) return;
   if ((p.hp ?? 0) <= 0) return;
-  // Strict gate: trees, fences, rocks AND houses can ONLY be damaged by Star Platinum
-  // (HOUSE_BREAKERS) or by an ability flagged as strong (HOUSE_STRONG_KINDS).
-  // Everything else just bonks harmlessly.
+  // Strict gate: only Star Platinum / SPTW can damage props at all, OR a specific
+  // (stand, abilityKey) pair listed in PROP_BREAKERS_BY_MOVE.
   {
     const sid = source?.standId ?? w.standId;
-    const ak = source?.abilityKind ?? "";
-    const allowed = HOUSE_BREAKERS.has(sid) || HOUSE_STRONG_KINDS.has(ak);
+    const ak = source?.abilityKey ?? "";
+    const allowed = PROP_BREAKERS_BY_STAND.has(sid) || (ak && PROP_BREAKERS_BY_MOVE.has(`${sid}:${ak}`));
     if (!allowed) {
       p.hitFlashUntil = w.time + 0.06;
       spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#caa472", 2, {
@@ -4399,7 +4398,7 @@ function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: str
   }
 }
 
-function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
+function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number, source?: { abilityKind?: string; abilityKey?: string; standId?: StandId }) {
   for (const p of w.props) {
     if (!propSolid(p)) continue;
     if (circleRectOverlap(x, y, radius, p.rect)) damageProp(w, p, dmg, source);
