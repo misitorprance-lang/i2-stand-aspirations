@@ -69,12 +69,16 @@ const STAND_TETHER = 360;
 // Stands that hold a weapon — punches with these spawn slash hit FX, not punch impacts.
 const WEAPON_STANDS = new Set<StandId>(["hanged_man", "ebony_devil"]);
 
-// Stands whose basic punches CAN damage houses. Anything else is no-op vs houses.
-// Houses are also damaged by explicitly "strong" abilities listed in HOUSE_STRONG_KINDS below.
-const HOUSE_BREAKERS = new Set<StandId>(["star_platinum"]);
-const HOUSE_STRONG_KINDS = new Set([
-  "aoe_target", "auto_aim", "knockback", "tesla", "lobbed", "brutal_slash",
-  "rage_mode", "time_stop", "pierce", "crash", "eternal_curse",
+// Strict prop-damage gating.
+// ONLY Star Platinum and Star Platinum: The World can damage props with anything.
+// Any OTHER stand may only damage props through one of these explicitly "deadly" moves.
+const PROP_BREAKERS_BY_STAND = new Set<StandId>(["star_platinum", "sptw"]);
+// Keys are `${standId}:${abilityKey}` (m1/a1/a2/a3/a4).
+const PROP_BREAKERS_BY_MOVE = new Set<string>([
+  "rhcp:a3",          // Ground Bomber
+  "rhcp:a4",          // Tesla Coil
+  "white_album:a4",   // Frost Expanse
+  "moon_rabbit:a4",   // Eternal Curse
 ]);
 
 // ---------- helpers ----------
@@ -1067,7 +1071,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
       // Melee chops at props in front of you (heavy stands break things faster).
-      damagePropsInRadius(w, tx, ty, (ab.radius ?? 14) + 4, dmg, { abilityKind: ab.kind, standId: w.standId });
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 14) + 4, dmg, { abilityKind: ab.kind, abilityKey: key, standId: w.standId });
       spawnParticles(w, { x: tx, y: ty }, ab.color, 6);
       // trigger stand-punch animation
       w.standPunchUntil = w.time + 0.25;
@@ -1160,7 +1164,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage, { dir: norm({ x: e.pos.x - p.x, y: e.pos.y - p.y }), amount: 60 });
         }
       }
-      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage, { abilityKind: ab.kind, standId: w.standId });
+      damagePropsInRadius(w, p.x, p.y, ab.radius!, ab.damage, { abilityKind: ab.kind, abilityKey: key, standId: w.standId });
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: ab.radius!, color: ab.color, life: 0.45 });
       // arcing lightning to nearby targets
       for (const e of w.npcs) {
@@ -1189,7 +1193,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
           damageEntity(w, e, ab.damage);
         }
       }
-      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage, { abilityKind: ab.kind, standId: w.standId });
+      damagePropsInRadius(w, tx, ty, ab.radius!, ab.damage, { abilityKind: ab.kind, abilityKey: key, standId: w.standId });
       spawnVfx(w, { kind: "explosion_ring", pos: { x: tx, y: ty }, radius: ab.radius!, color: ab.color, life: 0.5 });
       spawnVfx(w, { kind: "fire_burst", pos: { x: tx, y: ty }, radius: ab.radius! * 0.8, color: ab.color, life: 0.55 });
       if (ab.crater) {
@@ -1516,7 +1520,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       }
       const tx = origin.x + dir.x * ab.range;
       const ty = origin.y + dir.y * ab.range;
-      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage, { abilityKind: ab.kind, standId: w.standId });
+      damagePropsInRadius(w, tx, ty, (ab.radius ?? 16) + 6, ab.damage, { abilityKind: ab.kind, abilityKey: key, standId: w.standId });
       play("brutal");
       break;
     }
@@ -1806,10 +1810,131 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnParticles(w, target.pos, ab.color, 14, { speedMin: 30, speedMax: 110, life: 0.5 });
       break;
     }
-    // ---- Moon Rabbit: Moon Carrot (A2) — self-heal ----
-    case "moon_carrot": {
-      healPlayer(w, 8, "#ff6688");
+    // ---- Moon Rabbit: Lunar Veil (A2) — temporary invincibility ----
+    case "lunar_veil": {
+      (w as any).moonRabbitInvulnUntil = w.time + (ab.duration ?? 2.5);
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 28, color: ab.color, life: 0.5 });
+      spawnParticles(w, p, ab.color, 16, { shape: "spark", speedMin: 40, speedMax: 140, life: 0.6 });
+      w.bannerText = "Lunar Veil — invincible";
+      w.bannerUntil = w.time + 1.0;
       play("toggleOn");
+      break;
+    }
+    // ---- Star Platinum / SPTW: Star Rush — short dash + grab + 2 punches ----
+    case "star_rush": {
+      const target = nearestTarget(w, p, ab.range + 20);
+      if (target) {
+        // dash player to just shy of target
+        const toT = norm({ x: target.pos.x - p.x, y: target.pos.y - p.y });
+        const stopDist = (target.radius ?? 8) + 12;
+        const dx = (target.pos.x - p.x) - toT.x * stopDist;
+        const dy = (target.pos.y - p.y) - toT.y * stopDist;
+        tryMove(w.player, dx, dy, w.props);
+        target.stunUntil = Math.max(target.stunUntil, w.time + 0.6);
+        // two staggered hits
+        damageEntity(w, target, ab.damage);
+        spawnVfx(w, { kind: "punch_impact", pos: { ...target.pos }, color: ab.color, life: 0.2 });
+        // schedule second hit via curseStrikes-like? simpler: hit again now with bonus
+        damageEntity(w, target, ab.damage + 1);
+        spawnVfx(w, { kind: "slash_arc", pos: { ...target.pos }, angle: Math.atan2(toT.y, toT.x), radius: 18, color: ab.color, life: 0.25 });
+        spawnParticles(w, target.pos, ab.color, 14, { speedMin: 60, speedMax: 180, life: 0.4 });
+        w.standPunchUntil = w.time + 0.3;
+        w.standPunchDir = toT;
+        (w as any).lastHitEnemyId = target.id;
+        (w as any).lastHitEnemyAt = w.time;
+        w.shake = Math.max(w.shake, 5);
+      }
+      break;
+    }
+    // ---- Star Platinum / SPTW: The World — single tap = time stop, double tap = teleport-skip ----
+    case "time_stop_or_skip": {
+      const lastTap = (w as any).timeStopLastTapAt ?? 0;
+      const isDoubleTap = w.time - lastTap < 0.45;
+      (w as any).timeStopLastTapAt = w.time;
+      if (isDoubleTap) {
+        // Time Skip: teleport to last enemy you damaged within 5s
+        const lastId = (w as any).lastHitEnemyId;
+        const lastAt = (w as any).lastHitEnemyAt ?? 0;
+        const target = w.npcs.find((e) => e.alive && e.id === lastId);
+        if (target && w.time - lastAt < 5) {
+          // SPTW gets 2 charges per cooldown; SP only single
+          const charges = (w as any).timeSkipCharges ?? 0;
+          if (w.standId === "sptw" && charges < 2) {
+            (w as any).timeSkipCharges = charges + 1;
+            w.cdTimers[key] = 0; // refund until charges spent
+          } else {
+            (w as any).timeSkipCharges = 0;
+          }
+          const toT = norm({ x: target.pos.x - w.player.pos.x, y: target.pos.y - w.player.pos.y });
+          w.player.pos.x = target.pos.x - toT.x * 16;
+          w.player.pos.y = target.pos.y - toT.y * 16;
+          pushOutOfProps(w.player, w.props);
+          target.stunUntil = Math.max(target.stunUntil, w.time + 1);
+          spawnVfx(w, { kind: "shard_flash", pos: { ...target.pos }, radius: 24, color: ab.color, life: 0.4 });
+          spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 36, color: ab.color, life: 0.4 });
+          w.bannerText = "Time Skip!";
+          w.bannerUntil = w.time + 1.2;
+          play("timeStop");
+          break;
+        }
+      }
+      // Single tap → Time Stop
+      (w as any).timeSkipCharges = 0;
+      const dur = ab.duration ?? 5;
+      w.timeStopUntil = w.time + dur;
+      w.timeStopStartedAt = w.time;
+      w.pendingPlayerDamage = [];
+      spawnVfx(w, { kind: "time_clock", pos: { x: w.player.pos.x, y: w.player.pos.y - 30 }, radius: 60, color: ab.color, life: 1.4 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 220, color: ab.color, life: 0.8 });
+      w.bannerText = "ZA WARUDO!";
+      w.bannerUntil = w.time + 1.6;
+      play("timeStop");
+      break;
+    }
+    // ---- SPTW: Triple Pebble — three small fast flicks at one enemy ----
+    case "triple_pebble": {
+      const target = nearestTarget(w, p, ab.range);
+      if (!target) break;
+      const baseDir = norm({ x: target.pos.x - p.x, y: target.pos.y - p.y });
+      for (let i = 0; i < 3; i++) {
+        const spread = (i - 1) * 0.05;
+        const dx = baseDir.x * Math.cos(spread) - baseDir.y * Math.sin(spread);
+        const dy = baseDir.x * Math.sin(spread) + baseDir.y * Math.cos(spread);
+        w.projectiles.push({
+          id: w.nextId++,
+          pos: { x: p.x, y: p.y },
+          vel: { x: dx * (ab.speed ?? 420), y: dy * (ab.speed ?? 420) },
+          radius: ab.radius ?? 4,
+          damage: ab.damage,
+          color: ab.color,
+          ownerKind: "player",
+          pierce: false,
+          hitSet: new Set(),
+          expireAt: w.time + ab.range / (ab.speed ?? 420),
+          homingTargetId: target.id,
+          homingStrength: 0.18,
+          speed: ab.speed,
+          sourceStandId: w.standId,
+          sourceAbilityKey: key,
+        });
+      }
+      spawnParticles(w, p, ab.color, 8, { speedMin: 60, speedMax: 160, life: 0.25 });
+      break;
+    }
+    // ---- SPTW: Rage activation (consumes meter) ----
+    case "sptw_rage": {
+      if (((w as any).sptwRage ?? 0) < 100) {
+        softBanner(w, "sptw_rage_low", "Rage meter not full", 0.8);
+        w.cdTimers[key] = 0;
+        break;
+      }
+      (w as any).sptwRage = 0;
+      w.rageUntil = w.time + 6;
+      w.bannerText = "RAGE";
+      w.bannerUntil = w.time + 1.2;
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 72, color: "#5fe8ff", life: 0.6 });
+      spawnParticles(w, p, "#5fe8ff", 22, { shape: "spark", speedMin: 80, speedMax: 200, life: 0.6 });
+      w.shake = Math.max(w.shake, 5);
       break;
     }
     // ---- Moon Rabbit: Crash (A3) — drawn motorcycle that rams forward and explodes ----
@@ -2321,7 +2446,7 @@ export function update(w: World, input: InputState, dt: number) {
           damageEntity(w, e, 9);
         }
       }
-      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14, { abilityKind: "aoe_target", standId: w.standId });
+      damagePropsInRadius(w, pr.pos.x, pr.pos.y, r, 14, { abilityKind: "aoe_target", abilityKey: pr.sourceAbilityKey, standId: pr.sourceStandId ?? w.standId });
       w.zones.push({
         id: w.nextId++,
         pos: { ...pr.pos },
@@ -2347,7 +2472,7 @@ export function update(w: World, input: InputState, dt: number) {
     if (pr.pos.x < 0 || pr.pos.x > MAP_W || pr.pos.y < 0 || pr.pos.y > MAP_H) { pr.expireAt = 0; continue; }
     // hit props?
     for (const p of w.props) {
-      if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage, { abilityKind: "projectile", standId: w.standId }); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
+      if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage, { abilityKind: "projectile", abilityKey: pr.sourceAbilityKey, standId: pr.sourceStandId ?? w.standId }); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
     }
     if (pr.expireAt === 0) continue;
     // hit npcs
@@ -4359,16 +4484,15 @@ function drawVfx(ctx: CanvasRenderingContext2D, v: Vfx, t: number, time: number)
 const PROP_RESPAWN_DELAY = 30;
 // Routes all prop damage. If `kind` is "house" we require the source to be a house-breaker stand
 // or a strong ability. Otherwise the hit is ignored (the bonk lands but the wall holds).
-function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
+function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: string; abilityKey?: string; standId?: StandId }) {
   if (p.destructible !== true) return;
   if ((p.hp ?? 0) <= 0) return;
-  // Strict gate: trees, fences, rocks AND houses can ONLY be damaged by Star Platinum
-  // (HOUSE_BREAKERS) or by an ability flagged as strong (HOUSE_STRONG_KINDS).
-  // Everything else just bonks harmlessly.
+  // Strict gate: only Star Platinum / SPTW can damage props at all, OR a specific
+  // (stand, abilityKey) pair listed in PROP_BREAKERS_BY_MOVE.
   {
     const sid = source?.standId ?? w.standId;
-    const ak = source?.abilityKind ?? "";
-    const allowed = HOUSE_BREAKERS.has(sid) || HOUSE_STRONG_KINDS.has(ak);
+    const ak = source?.abilityKey ?? "";
+    const allowed = PROP_BREAKERS_BY_STAND.has(sid) || (ak && PROP_BREAKERS_BY_MOVE.has(`${sid}:${ak}`));
     if (!allowed) {
       p.hitFlashUntil = w.time + 0.06;
       spawnParticles(w, { x: p.rect.x + p.rect.w / 2, y: p.rect.y + p.rect.h / 2 }, "#caa472", 2, {
@@ -4395,7 +4519,7 @@ function damageProp(w: World, p: Prop, dmg: number, source?: { abilityKind?: str
   }
 }
 
-function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number, source?: { abilityKind?: string; standId?: StandId }) {
+function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg: number, source?: { abilityKind?: string; abilityKey?: string; standId?: StandId }) {
   for (const p of w.props) {
     if (!propSolid(p)) continue;
     if (circleRectOverlap(x, y, radius, p.rect)) damageProp(w, p, dmg, source);

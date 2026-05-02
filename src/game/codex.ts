@@ -52,11 +52,26 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       auraColor: "#7c5cff",
     },
     moves: {
-      m1: moveOf("star_platinum", "m1", "Cone melee in front of player."),
-      a1: moveOf("star_platinum", "a1", "Forward stab pierce, hits multiple in line."),
-      a2: moveOf("star_platinum", "a2", "Straight-line projectile aimed at target."),
-      a3: moveOf("star_platinum", "a3", "Time stop — freezes the world for 5s; player can still attack and move."),
-      a4: moveOf("star_platinum", "a4", "Close knockback strike."),
+      m1: moveOf("star_platinum", "m1", "Quick punch, 15% crit. ORA-flurry on chain."),
+      a1: moveOf("star_platinum", "a1", "Star Rush — short dash, grab nearest enemy and deliver two punches."),
+      a2: moveOf("star_platinum", "a2", "Star Finger — narrow piercing stab; light knockback."),
+      a3: moveOf("star_platinum", "a3", "The World — single tap stops time 5s. Double tap = Time Skip: teleport to last enemy you hit and stun them."),
+      a4: moveOf("star_platinum", "a4", "Launch — short, brutal close-range knockback."),
+    },
+  },
+  sptw: {
+    id: "sptw",
+    model: {
+      description: "Cyan-and-purple humanoid with white loincloth/gloves, gold markings, black hair. Stronger evolution of Star Platinum.",
+      silhouette: ["cyan body w/ purple trim", "white waist + gloves", "gold accent markings"],
+      auraColor: "#5fe8ff",
+    },
+    moves: {
+      m1: moveOf("sptw", "m1", "7 dmg / 8 crit. Drops to 4 if held continuously."),
+      a1: moveOf("sptw", "a1", "Star Rush (same as SP)."),
+      a2: moveOf("sptw", "a2", "Triple Pebble — three small fast flicks at one enemy."),
+      a3: moveOf("sptw", "a3", "Time Stop 7s. Time Skip can be used twice per cooldown."),
+      a4: moveOf("sptw", "a4", "Launch — close-range knockback."),
     },
   },
   rhcp: {
@@ -177,10 +192,10 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
     },
     moves: {
       m1: moveOf("moon_rabbit", "m1", "Soft punch — 0.9 base, 3 on crits."),
-      a1: moveOf("moon_rabbit", "a1", "Wasps swarm the nearest target and sting every 3s for 6s."),
-      a2: moveOf("moon_rabbit", "a2", "Heals 8 HP."),
-      a3: moveOf("moon_rabbit", "a3", "Vehicle slams forward in a line, then explodes for 5 extra."),
-      a4: moveOf("moon_rabbit", "a4", "Lightning strikes every nearby target for 15."),
+      a1: moveOf("moon_rabbit", "a1", "Wasps swarm the nearest target and sting every ~2.5s for 6s."),
+      a2: moveOf("moon_rabbit", "a2", "Lunar Veil — short invincibility window (2.5s)."),
+      a3: moveOf("moon_rabbit", "a3", "Crash — drawn motorbike rams forward, explodes on contact (with target OR you)."),
+      a4: moveOf("moon_rabbit", "a4", "Lightning strikes every nearby target, then a Crash bike rams each one."),
     },
   },
   harvest: {
