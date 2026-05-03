@@ -1986,6 +1986,9 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         detonateColor: "#ff6b3a",
         detonateCrater: false,
         textGlyph: "CRASH_BIKE",
+        hurtsPlayer: true,
+        sourceStandId: w.standId,
+        sourceAbilityKey: key,
       });
       spawnParticles(w, p, "#cccccc", 10, { speedMin: 40, speedMax: 130, life: 0.4 });
       break;
