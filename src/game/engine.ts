@@ -763,6 +763,10 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   }
   // White Album suit armor: -1 damage to player while suit is active.
   if (e.kind === "player" && w.standId === "white_album" && w.whiteAlbumActive) dmg = Math.max(0.1, dmg - 1);
+  // Moon Rabbit Lunar Veil: brief invincibility window.
+  if (e.kind === "player" && w.standId === "moon_rabbit" && w.time < (w.moonRabbitInvulnUntil ?? 0)) dmg = 0;
+  // SPTW Rage: +35% damage dealt during rage window.
+  if (e.kind !== "player" && w.standId === "sptw" && w.time < w.rageUntil) dmg *= 1.35;
   e.hp -= dmg;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg, "#fff", crit);
@@ -773,10 +777,17 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
     w.shake = Math.max(w.shake, 3);
     play("crit");
   }
-  if (e.kind === "enemy") e.provoked = true;
+  if (e.kind === "enemy") {
+    e.provoked = true;
+    // SPTW Rage meter charges as you deal damage to enemies.
+    if (w.standId === "sptw") w.sptwRage = Math.min(100, w.sptwRage + dmg * 1.2);
+    // Track last hit enemy for Time Skip.
+    w.lastHitEnemyId = e.id;
+    w.lastHitEnemyAt = w.time;
+  }
   if (e.kind === "player") {
     w.rage = Math.min(100, w.rage + dmg * 3.5);
-    play("hurt");
+    if (dmg > 0) play("hurt");
   }
   if (knockback) {
     e.vel.x += knockback.dir.x * knockback.amount;
