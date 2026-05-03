@@ -909,6 +909,7 @@ export default function Game() {
                 count={ui.arrows}
                 desc="Roll a random stand. Need empty stand slot."
                 color="#caa14a"
+                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
                 onUse={() => { onUseArrow(); }}
               />
               <InvSlot
@@ -917,6 +918,7 @@ export default function Game() {
                 count={ui.discs}
                 desc="Remove your current stand."
                 color="#cfd2d8"
+                disabledReason={ui.standId === "none" ? "No stand equipped" : undefined}
                 onUse={() => { onUseDisc(); }}
               />
               <InvSlot
@@ -925,6 +927,7 @@ export default function Game() {
                 count={ui.requiemArrows}
                 desc="Broken golden relic. (Decorative)"
                 color="#ffd24a"
+                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
                 onUse={() => { onUseRequiem(); }}
               />
               <InvSlot
@@ -933,6 +936,7 @@ export default function Game() {
                 count={ui.bluePebbles}
                 desc="Grants Moon Rabbit. Need empty stand slot."
                 color="#4a86d6"
+                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
                 onUse={() => { onUsePebble(); }}
               />
               <InvSlot
@@ -943,6 +947,17 @@ export default function Game() {
                 color="#ba8cff"
                 onUse={() => { onUseTonth(); setInventoryOpen(false); }}
               />
+              {ui.strangeHats > 0 && (
+                <InvSlot
+                  icon={<span style={{ color: "#5fe8ff", fontSize: 18 }}>🎩</span>}
+                  name="Strange Black Hat"
+                  count={ui.strangeHats}
+                  desc="Awakens Star Platinum's true form."
+                  color="#5fe8ff"
+                  disabledReason={ui.standId !== "star_platinum" ? "Need Star Platinum equipped" : undefined}
+                  onUse={() => { onUseStrangeHat(); setInventoryOpen(false); }}
+                />
+              )}
             </div>
 
             <div className="px-4 py-2 border-t border-white/20 flex justify-end">
