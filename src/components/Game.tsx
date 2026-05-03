@@ -318,6 +318,22 @@ export default function Game() {
     if (!worldRef.current || worldRef.current.tonthCopyCount <= 0) return;
     setBoingoOpen(true); // Tonth Copy opens the book without Boingo speaking
   };
+  const onUseStrangeHat = () => {
+    if (!worldRef.current || worldRef.current.strangeHatCount <= 0) return;
+    useStrangeHat(worldRef.current);
+  };
+  const onPressRage = () => {
+    if (!worldRef.current) return;
+    inputRef.current.pressed.a4 = false;
+    // SPTW rage is bound to a4 with kind "sptw_rage" — but a4 is "Launch" in our table.
+    // Trigger a dedicated input flag instead by directly mutating state.
+    const w = worldRef.current;
+    if (w.standId !== "sptw" || w.sptwRage < 100) return;
+    w.sptwRage = 0;
+    w.rageUntil = w.time + 6;
+    w.bannerText = "RAGE";
+    w.bannerUntil = w.time + 1.2;
+  };
   const onTalkBoingo = () => {
     if (!worldRef.current) return;
     talkToBoingo(worldRef.current); // grants Tonth Copy + despawns Boingo
