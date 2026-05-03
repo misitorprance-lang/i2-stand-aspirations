@@ -2940,6 +2940,7 @@ export function tryPickupItems(w: World): { arrows: number; discs: number } {
       else if (it.kind === "disc") { d++; play("pickupDisc"); showToast(w, "Picked up DISC"); }
       else if (it.kind === "requiem_arrow") { w.requiemArrowCount++; play("pickupArrow"); showToast(w, "Picked up Requiem Arrow"); }
       else if (it.kind === "blue_pebble") { w.bluePebbleCount++; play("pickupArrow"); showToast(w, "Picked up Blue Pebble"); }
+      else if (it.kind === "strange_hat") { w.strangeHatCount++; play("pickupArrow"); showToast(w, "Picked up Strange Black Hat"); }
     } else remain.push(it);
   }
   w.items = remain;
