@@ -93,6 +93,8 @@ export default function Game() {
     requiemArrows: 0,
     bluePebbles: 0,
     tonthCopies: 0,
+    strangeHats: 0,
+    sptwRage: 0,
     toast: null,
   });
   const [boingoOpen, setBoingoOpen] = useState(false);
