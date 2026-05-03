@@ -832,42 +832,60 @@ export default function Game() {
                 <>
                   <div className="text-[10px] font-bold tracking-widest text-purple-200/80 mb-2">★ STAND CATALOG</div>
                   {(() => {
-                    const list = (Object.keys(STANDS) as (keyof typeof STANDS)[])
-                      .filter((id) => id !== "none")
-                      .map((id) => ({ id, s: STANDS[id] }));
-                    const totalWeight = list.reduce((acc, x) => acc + (x.s.rarityWeight || 0), 0) || 1;
+                    const tierOrder: { tier: StandRarity; label: string; subtitle: string }[] = [
+                      { tier: "common", label: "COMMON", subtitle: `${TIER_BASE_PCT.common}%` },
+                      { tier: "uncommon", label: "UNCOMMON", subtitle: `${TIER_BASE_PCT.uncommon}%` },
+                      { tier: "rare", label: "RARE", subtitle: `${TIER_BASE_PCT.rare}%` },
+                      { tier: "epic", label: "EPIC", subtitle: `${TIER_BASE_PCT.epic}%` },
+                      { tier: "pebble", label: "PEBBLE-EXCLUSIVE", subtitle: "guaranteed" },
+                      { tier: "legendary", label: "LEGENDARY (HAT)", subtitle: "guaranteed" },
+                    ];
                     return (
-                      <ul className="space-y-1">
-                        {list.map(({ id, s }) => {
-                          const w = s.rarityWeight || 0;
-                          const pct = w > 0 ? ((w / totalWeight) * 100).toFixed(1) + "%" : "—";
+                      <div className="space-y-3">
+                        {tierOrder.map(({ tier, label, subtitle }) => {
+                          const stands = (Object.keys(STANDS) as (keyof typeof STANDS)[])
+                            .filter((id) => id !== "none" && STANDS[id].rarity === tier);
+                          if (stands.length === 0) return null;
                           return (
-                            <li
-                              key={id}
-                              className="flex items-center gap-2 rounded px-2 py-1"
-                              style={{ background: "rgba(0,0,0,0.3)", border: `1px solid ${s.color}55` }}
-                            >
-                              {/* mini model = colored dot w/ aura */}
-                              <span
-                                className="inline-block rounded-full shrink-0"
-                                style={{
-                                  width: 14, height: 14,
-                                  background: s.color,
-                                  boxShadow: `0 0 6px ${s.color}, 0 0 12px ${s.color}66`,
-                                  border: "1px solid rgba(255,255,255,0.4)",
-                                }}
-                              />
-                              <span className="font-bold flex-1" style={{ color: s.color }}>{s.name}</span>
-                              <span className="text-[10px] text-purple-200/80">w {w}</span>
-                              <span className="text-[10px] text-purple-200/60 w-12 text-right">{pct}</span>
-                            </li>
+                            <div key={tier}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold tracking-widest text-purple-200">{label}</span>
+                                <span className="text-[10px] text-purple-200/70">{subtitle}</span>
+                              </div>
+                              <ul className="space-y-1">
+                                {stands.map((id) => {
+                                  const s = STANDS[id];
+                                  const pct = standRollPct(id);
+                                  const pctStr = pct > 0 ? pct.toFixed(1) + "%" : (tier === "pebble" || tier === "legendary" ? "100%" : "—");
+                                  return (
+                                    <li
+                                      key={id}
+                                      className="flex items-center gap-2 rounded px-2 py-1"
+                                      style={{ background: "rgba(0,0,0,0.3)", border: `1px solid ${s.color}55` }}
+                                    >
+                                      <span
+                                        className="inline-block rounded-full shrink-0"
+                                        style={{
+                                          width: 14, height: 14,
+                                          background: s.color,
+                                          boxShadow: `0 0 6px ${s.color}, 0 0 12px ${s.color}66`,
+                                          border: "1px solid rgba(255,255,255,0.4)",
+                                        }}
+                                      />
+                                      <span className="font-bold flex-1" style={{ color: s.color }}>{s.name}</span>
+                                      <span className="text-[10px] text-purple-200/70 w-14 text-right">{pctStr}</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
                           );
                         })}
-                      </ul>
+                      </div>
                     );
                   })()}
                   <div className="mt-2 text-[9px] text-purple-200/60 italic">
-                    Higher weight = more common from Arrows. Moon Rabbit is Pebble-only (weight 0).
+                    Arrow rolls split 100% across tiers. Pebble & Legendary are exclusive — granted by their dedicated items.
                   </div>
                 </>
               )}
