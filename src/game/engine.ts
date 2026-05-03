@@ -3604,11 +3604,58 @@ function computeStandPos(w: World): Vec2 {
 function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   const id = w.standId;
   if (id === "star_platinum") drawStarPlatinum(ctx, w, pos);
+  else if (id === "sptw") drawSptw(ctx, w, pos);
   else if (id === "rhcp") drawRhcp(ctx, w, pos);
   else if (id === "echoes") drawEchoes(ctx, w, pos);
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
   else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
   else if (id === "white_album") drawWhiteAlbum(ctx, w, pos);
+}
+
+function drawSptw(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  const bob = Math.sin(w.time * 4) * 0.6;
+  const raging = w.time < w.rageUntil;
+  // aura — cyan with purple trim
+  ctx.fillStyle = raging ? "rgba(95,232,255,0.45)" : "rgba(95,232,255,0.28)";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y + bob, raging ? 16 : 13, 0, Math.PI * 2); ctx.fill();
+  // body — purple with cyan trim
+  ctx.fillStyle = "#5a3fbf";
+  ctx.fillRect(pos.x - 5, pos.y - 2 + bob, 10, 11);
+  ctx.fillStyle = "#a06bff";
+  ctx.fillRect(pos.x - 4, pos.y - 1 + bob, 8, 4);
+  // gold markings
+  ctx.fillStyle = "#f5d36b";
+  ctx.fillRect(pos.x - 1, pos.y + 1 + bob, 2, 2);
+  // head — cyan-tinted
+  ctx.fillStyle = "#cfe9ff";
+  ctx.fillRect(pos.x - 4, pos.y - 10 + bob, 8, 8);
+  // hair (black)
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(pos.x - 4, pos.y - 11 + bob, 8, 2);
+  // headband (white)
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(pos.x - 4, pos.y - 7 + bob, 8, 1);
+  // eyes — cyan glow when raging
+  ctx.fillStyle = raging ? "#5fe8ff" : "#fff";
+  ctx.fillRect(pos.x - 3, pos.y - 5 + bob, 2, 2);
+  ctx.fillRect(pos.x + 1, pos.y - 5 + bob, 2, 2);
+  // arms / punch
+  if (punching) {
+    const d = w.standPunchDir;
+    // ghost arms (3 staggered)
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = `rgba(95,232,255,${0.25 + i * 0.2})`;
+      ctx.fillRect(pos.x - 1 + d.x * (4 + i * 2), pos.y - 1 + d.y * (4 + i * 2) + bob, 5, 4);
+    }
+    // gold sparkle
+    ctx.fillStyle = "#f5d36b";
+    ctx.fillRect(pos.x + d.x * 8 + ((w.time * 60) % 3) - 1, pos.y + d.y * 8 + bob - 2, 1, 1);
+  } else {
+    ctx.fillStyle = "#a06bff";
+    ctx.fillRect(pos.x - 7, pos.y + bob, 3, 5);
+    ctx.fillRect(pos.x + 4, pos.y + bob, 3, 5);
+  }
 }
 
 function drawGoldExperience(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
