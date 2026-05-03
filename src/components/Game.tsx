@@ -54,6 +54,8 @@ interface UIData {
   requiemArrows: number;
   bluePebbles: number;
   tonthCopies: number;
+  strangeHats: number;
+  sptwRage: number;
   toast: string | null;
 }
 
