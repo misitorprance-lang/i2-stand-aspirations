@@ -231,7 +231,7 @@ export interface Vfx {
 
 export interface ItemPickup {
   id: number;
-  kind: "arrow" | "disc" | "requiem_arrow" | "blue_pebble";
+  kind: "arrow" | "disc" | "requiem_arrow" | "blue_pebble" | "strange_hat";
   pos: Vec2;
   bornAt: number;
 }
@@ -242,6 +242,7 @@ export interface Inventory {
   requiemArrows: number;
   bluePebbles: number;
   tonthCopies: number;
+  strangeHats: number;
   hasMoonRabbitUnlocked: boolean;
 }
 
