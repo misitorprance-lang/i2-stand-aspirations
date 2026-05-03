@@ -1026,7 +1026,7 @@ function AbilityBtn({
 }
 
 function InvSlot({
-  icon, name, count, desc, color, onUse,
+  icon, name, count, desc, color, onUse, disabledReason,
 }: {
   icon: ReactNode;
   name: string;
@@ -1034,18 +1034,22 @@ function InvSlot({
   desc: string;
   color: string;
   onUse: () => void;
+  disabledReason?: string;
 }) {
   const empty = count <= 0;
+  const locked = !!disabledReason;
+  const disabled = empty || locked;
   return (
     <button
       onClick={onUse}
-      disabled={empty}
+      disabled={disabled}
+      title={disabledReason}
       className="flex flex-col items-start text-left rounded p-2 gap-1"
       style={{
-        background: empty ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.45)",
-        border: `1px solid ${empty ? "rgba(255,255,255,0.15)" : color + "88"}`,
-        opacity: empty ? 0.45 : 1,
-        cursor: empty ? "not-allowed" : "pointer",
+        background: disabled ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.45)",
+        border: `1px solid ${disabled ? "rgba(255,255,255,0.15)" : color + "88"}`,
+        opacity: disabled ? 0.45 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
       }}
     >
       <div className="flex items-center justify-between w-full">
@@ -1055,7 +1059,7 @@ function InvSlot({
         </div>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10">×{count}</span>
       </div>
-      <div className="text-[9px] text-white/70 leading-tight">{desc}</div>
+      <div className="text-[9px] text-white/70 leading-tight">{locked ? disabledReason : desc}</div>
     </button>
   );
 }
