@@ -257,6 +257,7 @@ interface World {
   sptwM1HoldStart?: number;
   // Moon Rabbit Lunar Veil window
   moonRabbitInvulnUntil?: number;
+}
 
 function makeProps(): Prop[] {
   const props: Prop[] = [];
