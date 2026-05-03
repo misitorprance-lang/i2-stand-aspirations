@@ -3230,6 +3230,16 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(-1.5, -1.5, 1.5, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
+    } else if (it.kind === "strange_hat") {
+      // Strange Black Hat — bowler-ish silhouette with cyan glow.
+      const pulse = 0.4 + 0.4 * Math.sin(w.time * 4);
+      ctx.fillStyle = `rgba(95,232,255,${0.45 * pulse})`;
+      ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fillRect(cx - 7, cy + 1, 14, 2);   // brim
+      ctx.fillRect(cx - 4, cy - 5, 8, 6);    // crown
+      ctx.fillStyle = "#5fe8ff";
+      ctx.fillRect(cx - 4, cy, 8, 1);        // band
     } else {
       ctx.save();
       ctx.translate(cx, cy);
