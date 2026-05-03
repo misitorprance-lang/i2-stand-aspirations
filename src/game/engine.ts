@@ -1005,9 +1005,9 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   // Range-gate ALL damaging abilities: don't burn cooldown on a cast that has nothing to hit.
   // Self-buffs, heals, summons, toggles, and pure utility are exempt.
   const SELF_OR_UTILITY = new Set<string>([
-    "aoe_self", "ice_heal", "moon_carrot", "rage_mode", "tree_zone", "time_stop",
+    "ice_heal", "rage_mode", "tree_zone", "time_stop", "time_stop_or_skip",
     "pilot_toggle", "ph_pilot_toggle", "puppet_toggle", "mirror_shard",
-    "shard_teleport", "frog_summon", "cleansly_violence",
+    "shard_teleport", "frog_summon", "cleansly_violence", "lunar_veil", "sptw_rage",
     // Harvest utility toggles (no damage, just QoL)
     "harvest_gather", "harvest_carry",
   ]);
