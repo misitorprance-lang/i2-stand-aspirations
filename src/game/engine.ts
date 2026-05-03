@@ -591,6 +591,10 @@ export function createWorld(): World {
     harvestCarryActive: false,
     harvestBeetles: [],
     bannerSuppressCounts: {},
+    strangeHatCount: 0,
+    strangeHatSpawned: false,
+    sptwUnlocked: false,
+    sptwRage: 0,
   };
 
   // Pre-seed a starter pool of arrows and discs scattered across the (now larger) map
