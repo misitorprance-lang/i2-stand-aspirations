@@ -2505,6 +2505,16 @@ export function update(w: World, input: InputState, dt: number) {
       if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage, { abilityKind: "projectile", abilityKey: pr.sourceAbilityKey, standId: pr.sourceStandId ?? w.standId }); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
     }
     if (pr.expireAt === 0) continue;
+    // hit player (Moon Rabbit Crash bike loops back / clips player)
+    if (pr.hurtsPlayer && w.player.alive && !pr.hitSet.has(-1)) {
+      if (dist2(w.player.pos, pr.pos) < (pr.radius + w.player.radius) ** 2) {
+        damageEntity(w, w.player, 3);
+        pr.hitSet.add(-1);
+        pr.expireAt = 0;
+        spawnVfx(w, { kind: "explosion_ring", pos: { ...pr.pos }, radius: 28, color: "#ff6b3a", life: 0.4 });
+        continue;
+      }
+    }
     // hit npcs
     for (const e of w.npcs) {
       if (!e.alive || pr.hitSet.has(e.id)) continue;
