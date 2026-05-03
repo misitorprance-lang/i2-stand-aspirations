@@ -169,6 +169,8 @@ export default function Game() {
           requiemArrows: w.requiemArrowCount,
           bluePebbles: w.bluePebbleCount,
           tonthCopies: w.tonthCopyCount,
+          strangeHats: w.strangeHatCount,
+          sptwRage: Math.round(w.sptwRage),
           toast: w.toastText,
         });
       }
