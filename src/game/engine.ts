@@ -245,6 +245,18 @@ interface World {
   // Soft-banner suppression so repeat hints ("Out of range", "Resummon stand", etc.)
   // stop spamming the player after a few times.
   bannerSuppressCounts: Record<string, number>;
+  // Strange Hat (one-shot SPTW unlock)
+  strangeHatCount: number;
+  strangeHatSpawned: boolean;
+  sptwUnlocked: boolean;
+  sptwRage: number;
+  // Track last hit enemy id for Time Skip
+  lastHitEnemyId?: number;
+  lastHitEnemyAt?: number;
+  // SPTW M1 hold tracking
+  sptwM1HoldStart?: number;
+  // Moon Rabbit Lunar Veil window
+  moonRabbitInvulnUntil?: number;
 }
 
 function makeProps(): Prop[] {
@@ -579,6 +591,10 @@ export function createWorld(): World {
     harvestCarryActive: false,
     harvestBeetles: [],
     bannerSuppressCounts: {},
+    strangeHatCount: 0,
+    strangeHatSpawned: false,
+    sptwUnlocked: false,
+    sptwRage: 0,
   };
 
   // Pre-seed a starter pool of arrows and discs scattered across the (now larger) map
@@ -747,6 +763,10 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
   }
   // White Album suit armor: -1 damage to player while suit is active.
   if (e.kind === "player" && w.standId === "white_album" && w.whiteAlbumActive) dmg = Math.max(0.1, dmg - 1);
+  // Moon Rabbit Lunar Veil: brief invincibility window.
+  if (e.kind === "player" && w.standId === "moon_rabbit" && w.time < (w.moonRabbitInvulnUntil ?? 0)) dmg = 0;
+  // SPTW Rage: +35% damage dealt during rage window.
+  if (e.kind !== "player" && w.standId === "sptw" && w.time < w.rageUntil) dmg *= 1.35;
   e.hp -= dmg;
   e.hitFlashUntil = w.time + 0.12;
   spawnDmg(w, e.pos, dmg, "#fff", crit);
@@ -757,10 +777,17 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
     w.shake = Math.max(w.shake, 3);
     play("crit");
   }
-  if (e.kind === "enemy") e.provoked = true;
+  if (e.kind === "enemy") {
+    e.provoked = true;
+    // SPTW Rage meter charges as you deal damage to enemies.
+    if (w.standId === "sptw") w.sptwRage = Math.min(100, w.sptwRage + dmg * 1.2);
+    // Track last hit enemy for Time Skip.
+    w.lastHitEnemyId = e.id;
+    w.lastHitEnemyAt = w.time;
+  }
   if (e.kind === "player") {
     w.rage = Math.min(100, w.rage + dmg * 3.5);
-    play("hurt");
+    if (dmg > 0) play("hurt");
   }
   if (knockback) {
     e.vel.x += knockback.dir.x * knockback.amount;
@@ -989,9 +1016,9 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   // Range-gate ALL damaging abilities: don't burn cooldown on a cast that has nothing to hit.
   // Self-buffs, heals, summons, toggles, and pure utility are exempt.
   const SELF_OR_UTILITY = new Set<string>([
-    "aoe_self", "ice_heal", "moon_carrot", "rage_mode", "tree_zone", "time_stop",
+    "ice_heal", "rage_mode", "tree_zone", "time_stop", "time_stop_or_skip",
     "pilot_toggle", "ph_pilot_toggle", "puppet_toggle", "mirror_shard",
-    "shard_teleport", "frog_summon", "cleansly_violence",
+    "shard_teleport", "frog_summon", "cleansly_violence", "lunar_veil", "sptw_rage",
     // Harvest utility toggles (no damage, just QoL)
     "harvest_gather", "harvest_carry",
   ]);
@@ -1959,6 +1986,9 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         detonateColor: "#ff6b3a",
         detonateCrater: false,
         textGlyph: "CRASH_BIKE",
+        hurtsPlayer: true,
+        sourceStandId: w.standId,
+        sourceAbilityKey: key,
       });
       spawnParticles(w, p, "#cccccc", 10, { speedMin: 40, speedMax: 130, life: 0.4 });
       break;
@@ -2475,6 +2505,16 @@ export function update(w: World, input: InputState, dt: number) {
       if (propSolid(p) && circleRectOverlap(pr.pos.x, pr.pos.y, pr.radius, p.rect)) { damageProp(w, p, pr.damage, { abilityKind: "projectile", abilityKey: pr.sourceAbilityKey, standId: pr.sourceStandId ?? w.standId }); pr.expireAt = 0; spawnParticles(w, pr.pos, pr.color, 4); break; }
     }
     if (pr.expireAt === 0) continue;
+    // hit player (Moon Rabbit Crash bike loops back / clips player)
+    if (pr.hurtsPlayer && w.player.alive && !pr.hitSet.has(-1)) {
+      if (dist2(w.player.pos, pr.pos) < (pr.radius + w.player.radius) ** 2) {
+        damageEntity(w, w.player, 3);
+        pr.hitSet.add(-1);
+        pr.expireAt = 0;
+        spawnVfx(w, { kind: "explosion_ring", pos: { ...pr.pos }, radius: 28, color: "#ff6b3a", life: 0.4 });
+        continue;
+      }
+    }
     // hit npcs
     for (const e of w.npcs) {
       if (!e.alive || pr.hitSet.has(e.id)) continue;
@@ -2900,6 +2940,7 @@ export function tryPickupItems(w: World): { arrows: number; discs: number } {
       else if (it.kind === "disc") { d++; play("pickupDisc"); showToast(w, "Picked up DISC"); }
       else if (it.kind === "requiem_arrow") { w.requiemArrowCount++; play("pickupArrow"); showToast(w, "Picked up Requiem Arrow"); }
       else if (it.kind === "blue_pebble") { w.bluePebbleCount++; play("pickupArrow"); showToast(w, "Picked up Blue Pebble"); }
+      else if (it.kind === "strange_hat") { w.strangeHatCount++; play("pickupArrow"); showToast(w, "Picked up Strange Black Hat"); }
     } else remain.push(it);
   }
   w.items = remain;
@@ -2963,6 +3004,42 @@ export function useArrow(w: World): boolean {
   if (id === "white_album") (w as any).whiteAlbumActive = false;
   const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
   w.bannerText = "Got Stand: " + name + " — tap Stand to summon";
+  w.bannerUntil = w.time + 3;
+  play("rollStand");
+  // First time the player rolls Star Platinum, spawn a Strange Black Hat near a house.
+  maybeSpawnStrangeHat(w);
+  return true;
+}
+
+function maybeSpawnStrangeHat(w: World) {
+  if (w.standId !== "star_platinum") return;
+  if (w.sptwUnlocked) return;
+  if (w.strangeHatSpawned) return;
+  // Pick a random house and drop the hat just outside it.
+  const houses = w.props.filter((p) => p.rect.w === 110 && p.rect.h === 84);
+  if (houses.length === 0) return;
+  const house = houses[Math.floor(Math.random() * houses.length)];
+  const hx = house.rect.x + house.rect.w / 2;
+  const hy = house.rect.y + house.rect.h + 20;
+  w.items.push({ id: w.nextId++, kind: "strange_hat", pos: { x: hx, y: Math.min(MAP_H - 30, hy) }, bornAt: w.time });
+  w.strangeHatSpawned = true;
+  showToast(w, "A strange hat has appeared near a house...");
+}
+
+export function useStrangeHat(w: World): boolean {
+  if (w.strangeHatCount <= 0) return false;
+  if (w.standId !== "star_platinum") {
+    showToast(w, "Need Star Platinum equipped");
+    return false;
+  }
+  w.strangeHatCount--;
+  resetStandRuntime(w);
+  w.standId = "sptw";
+  w.shitVariant = false;
+  w.standActive = false;
+  w.sptwUnlocked = true;
+  w.sptwRage = 0;
+  w.bannerText = "Star Platinum: THE WORLD";
   w.bannerUntil = w.time + 3;
   play("rollStand");
   return true;
@@ -3153,6 +3230,16 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(-1.5, -1.5, 1.5, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
+    } else if (it.kind === "strange_hat") {
+      // Strange Black Hat — bowler-ish silhouette with cyan glow.
+      const pulse = 0.4 + 0.4 * Math.sin(w.time * 4);
+      ctx.fillStyle = `rgba(95,232,255,${0.45 * pulse})`;
+      ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fillRect(cx - 7, cy + 1, 14, 2);   // brim
+      ctx.fillRect(cx - 4, cy - 5, 8, 6);    // crown
+      ctx.fillStyle = "#5fe8ff";
+      ctx.fillRect(cx - 4, cy, 8, 1);        // band
     } else {
       ctx.save();
       ctx.translate(cx, cy);
@@ -3527,11 +3614,58 @@ function computeStandPos(w: World): Vec2 {
 function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   const id = w.standId;
   if (id === "star_platinum") drawStarPlatinum(ctx, w, pos);
+  else if (id === "sptw") drawSptw(ctx, w, pos);
   else if (id === "rhcp") drawRhcp(ctx, w, pos);
   else if (id === "echoes") drawEchoes(ctx, w, pos);
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
   else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
   else if (id === "white_album") drawWhiteAlbum(ctx, w, pos);
+}
+
+function drawSptw(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  const bob = Math.sin(w.time * 4) * 0.6;
+  const raging = w.time < w.rageUntil;
+  // aura — cyan with purple trim
+  ctx.fillStyle = raging ? "rgba(95,232,255,0.45)" : "rgba(95,232,255,0.28)";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y + bob, raging ? 16 : 13, 0, Math.PI * 2); ctx.fill();
+  // body — purple with cyan trim
+  ctx.fillStyle = "#5a3fbf";
+  ctx.fillRect(pos.x - 5, pos.y - 2 + bob, 10, 11);
+  ctx.fillStyle = "#a06bff";
+  ctx.fillRect(pos.x - 4, pos.y - 1 + bob, 8, 4);
+  // gold markings
+  ctx.fillStyle = "#f5d36b";
+  ctx.fillRect(pos.x - 1, pos.y + 1 + bob, 2, 2);
+  // head — cyan-tinted
+  ctx.fillStyle = "#cfe9ff";
+  ctx.fillRect(pos.x - 4, pos.y - 10 + bob, 8, 8);
+  // hair (black)
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(pos.x - 4, pos.y - 11 + bob, 8, 2);
+  // headband (white)
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(pos.x - 4, pos.y - 7 + bob, 8, 1);
+  // eyes — cyan glow when raging
+  ctx.fillStyle = raging ? "#5fe8ff" : "#fff";
+  ctx.fillRect(pos.x - 3, pos.y - 5 + bob, 2, 2);
+  ctx.fillRect(pos.x + 1, pos.y - 5 + bob, 2, 2);
+  // arms / punch
+  if (punching) {
+    const d = w.standPunchDir;
+    // ghost arms (3 staggered)
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = `rgba(95,232,255,${0.25 + i * 0.2})`;
+      ctx.fillRect(pos.x - 1 + d.x * (4 + i * 2), pos.y - 1 + d.y * (4 + i * 2) + bob, 5, 4);
+    }
+    // gold sparkle
+    ctx.fillStyle = "#f5d36b";
+    ctx.fillRect(pos.x + d.x * 8 + ((w.time * 60) % 3) - 1, pos.y + d.y * 8 + bob - 2, 1, 1);
+  } else {
+    ctx.fillStyle = "#a06bff";
+    ctx.fillRect(pos.x - 7, pos.y + bob, 3, 5);
+    ctx.fillRect(pos.x + 4, pos.y + bob, 3, 5);
+  }
 }
 
 function drawGoldExperience(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {

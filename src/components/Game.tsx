@@ -11,6 +11,7 @@ import {
   useDisc,
   useRequiemArrow,
   useBluePebble,
+  useStrangeHat,
   toggleStandActive,
   tryUseDisc,
   teleportToShard,
@@ -20,7 +21,7 @@ import {
   talkToBoingo,
   type InputState,
 } from "@/game/engine";
-import { STANDS, SHIT_ABILITY } from "@/game/stands";
+import { STANDS, SHIT_ABILITY, TIER_BASE_PCT, standRollPct, type StandRarity } from "@/game/stands";
 import { STAND_CODEX } from "@/game/codex";
 import { unlockAudio, isSoundEnabled, setSoundEnabled } from "@/game/sound";
 import { startMusic, applyMusicSetting } from "@/game/music";
@@ -53,6 +54,8 @@ interface UIData {
   requiemArrows: number;
   bluePebbles: number;
   tonthCopies: number;
+  strangeHats: number;
+  sptwRage: number;
   toast: string | null;
 }
 
@@ -90,6 +93,8 @@ export default function Game() {
     requiemArrows: 0,
     bluePebbles: 0,
     tonthCopies: 0,
+    strangeHats: 0,
+    sptwRage: 0,
     toast: null,
   });
   const [boingoOpen, setBoingoOpen] = useState(false);
@@ -164,6 +169,8 @@ export default function Game() {
           requiemArrows: w.requiemArrowCount,
           bluePebbles: w.bluePebbleCount,
           tonthCopies: w.tonthCopyCount,
+          strangeHats: w.strangeHatCount,
+          sptwRage: Math.round(w.sptwRage),
           toast: w.toastText,
         });
       }
@@ -310,6 +317,22 @@ export default function Game() {
   const onUseTonth = () => {
     if (!worldRef.current || worldRef.current.tonthCopyCount <= 0) return;
     setBoingoOpen(true); // Tonth Copy opens the book without Boingo speaking
+  };
+  const onUseStrangeHat = () => {
+    if (!worldRef.current || worldRef.current.strangeHatCount <= 0) return;
+    useStrangeHat(worldRef.current);
+  };
+  const onPressRage = () => {
+    if (!worldRef.current) return;
+    inputRef.current.pressed.a4 = false;
+    // SPTW rage is bound to a4 with kind "sptw_rage" — but a4 is "Launch" in our table.
+    // Trigger a dedicated input flag instead by directly mutating state.
+    const w = worldRef.current;
+    if (w.standId !== "sptw" || w.sptwRage < 100) return;
+    w.sptwRage = 0;
+    w.rageUntil = w.time + 6;
+    w.bannerText = "RAGE";
+    w.bannerUntil = w.time + 1.2;
   };
   const onTalkBoingo = () => {
     if (!worldRef.current) return;
@@ -569,6 +592,26 @@ export default function Game() {
           <AbilityBtn label="4" name={abilities.a4.name} damage={abilities.a4.damage} color={abilities.a4.color} cdFrac={cdFrac("a4")} disabled={ui.standId === "none" || abilities.a4.name === "-" || (ui.standId === "ebony_devil" && ui.rage < 100 && !ui.rageActive)} onPress={press("a4")} />
         </div>
         <AbilityBtn label="M1" name={abilities.m1.name} damage={abilities.m1.damage} color={abilities.m1.color} cdFrac={cdFrac("m1")} big onPress={press("m1")} onHoldStart={m1HoldStart} onHoldEnd={m1HoldEnd} />
+        {ui.standId === "sptw" && ui.sptwRage >= 100 && (
+          <button
+            onClick={onPressRage}
+            className="pointer-events-auto rounded-full font-bold text-white animate-pulse"
+            style={{
+              padding: "8px 14px",
+              background: "linear-gradient(135deg,#5fe8ff,#a06bff)",
+              border: "2px solid #5fe8ff",
+              boxShadow: "0 0 12px #5fe8ff",
+              fontSize: 12,
+            }}
+          >
+            ⚡ RAGE
+          </button>
+        )}
+        {ui.standId === "sptw" && ui.sptwRage < 100 && ui.sptwRage > 0 && (
+          <div className="pointer-events-none bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-20">
+            <div className="h-full" style={{ width: `${ui.sptwRage}%`, background: "#5fe8ff" }} />
+          </div>
+        )}
         {ui.standId !== "none" && (
           <button
             onClick={onToggleStand}
@@ -789,42 +832,60 @@ export default function Game() {
                 <>
                   <div className="text-[10px] font-bold tracking-widest text-purple-200/80 mb-2">★ STAND CATALOG</div>
                   {(() => {
-                    const list = (Object.keys(STANDS) as (keyof typeof STANDS)[])
-                      .filter((id) => id !== "none")
-                      .map((id) => ({ id, s: STANDS[id] }));
-                    const totalWeight = list.reduce((acc, x) => acc + (x.s.rarityWeight || 0), 0) || 1;
+                    const tierOrder: { tier: StandRarity; label: string; subtitle: string }[] = [
+                      { tier: "common", label: "COMMON", subtitle: `${TIER_BASE_PCT.common}%` },
+                      { tier: "uncommon", label: "UNCOMMON", subtitle: `${TIER_BASE_PCT.uncommon}%` },
+                      { tier: "rare", label: "RARE", subtitle: `${TIER_BASE_PCT.rare}%` },
+                      { tier: "epic", label: "EPIC", subtitle: `${TIER_BASE_PCT.epic}%` },
+                      { tier: "pebble", label: "PEBBLE-EXCLUSIVE", subtitle: "guaranteed" },
+                      { tier: "legendary", label: "LEGENDARY (HAT)", subtitle: "guaranteed" },
+                    ];
                     return (
-                      <ul className="space-y-1">
-                        {list.map(({ id, s }) => {
-                          const w = s.rarityWeight || 0;
-                          const pct = w > 0 ? ((w / totalWeight) * 100).toFixed(1) + "%" : "—";
+                      <div className="space-y-3">
+                        {tierOrder.map(({ tier, label, subtitle }) => {
+                          const stands = (Object.keys(STANDS) as (keyof typeof STANDS)[])
+                            .filter((id) => id !== "none" && STANDS[id].rarity === tier);
+                          if (stands.length === 0) return null;
                           return (
-                            <li
-                              key={id}
-                              className="flex items-center gap-2 rounded px-2 py-1"
-                              style={{ background: "rgba(0,0,0,0.3)", border: `1px solid ${s.color}55` }}
-                            >
-                              {/* mini model = colored dot w/ aura */}
-                              <span
-                                className="inline-block rounded-full shrink-0"
-                                style={{
-                                  width: 14, height: 14,
-                                  background: s.color,
-                                  boxShadow: `0 0 6px ${s.color}, 0 0 12px ${s.color}66`,
-                                  border: "1px solid rgba(255,255,255,0.4)",
-                                }}
-                              />
-                              <span className="font-bold flex-1" style={{ color: s.color }}>{s.name}</span>
-                              <span className="text-[10px] text-purple-200/80">w {w}</span>
-                              <span className="text-[10px] text-purple-200/60 w-12 text-right">{pct}</span>
-                            </li>
+                            <div key={tier}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold tracking-widest text-purple-200">{label}</span>
+                                <span className="text-[10px] text-purple-200/70">{subtitle}</span>
+                              </div>
+                              <ul className="space-y-1">
+                                {stands.map((id) => {
+                                  const s = STANDS[id];
+                                  const pct = standRollPct(id);
+                                  const pctStr = pct > 0 ? pct.toFixed(1) + "%" : (tier === "pebble" || tier === "legendary" ? "100%" : "—");
+                                  return (
+                                    <li
+                                      key={id}
+                                      className="flex items-center gap-2 rounded px-2 py-1"
+                                      style={{ background: "rgba(0,0,0,0.3)", border: `1px solid ${s.color}55` }}
+                                    >
+                                      <span
+                                        className="inline-block rounded-full shrink-0"
+                                        style={{
+                                          width: 14, height: 14,
+                                          background: s.color,
+                                          boxShadow: `0 0 6px ${s.color}, 0 0 12px ${s.color}66`,
+                                          border: "1px solid rgba(255,255,255,0.4)",
+                                        }}
+                                      />
+                                      <span className="font-bold flex-1" style={{ color: s.color }}>{s.name}</span>
+                                      <span className="text-[10px] text-purple-200/70 w-14 text-right">{pctStr}</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
                           );
                         })}
-                      </ul>
+                      </div>
                     );
                   })()}
                   <div className="mt-2 text-[9px] text-purple-200/60 italic">
-                    Higher weight = more common from Arrows. Moon Rabbit is Pebble-only (weight 0).
+                    Arrow rolls split 100% across tiers. Pebble & Legendary are exclusive — granted by their dedicated items.
                   </div>
                 </>
               )}
@@ -886,6 +947,7 @@ export default function Game() {
                 count={ui.arrows}
                 desc="Roll a random stand. Need empty stand slot."
                 color="#caa14a"
+                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
                 onUse={() => { onUseArrow(); }}
               />
               <InvSlot
@@ -894,6 +956,7 @@ export default function Game() {
                 count={ui.discs}
                 desc="Remove your current stand."
                 color="#cfd2d8"
+                disabledReason={ui.standId === "none" ? "No stand equipped" : undefined}
                 onUse={() => { onUseDisc(); }}
               />
               <InvSlot
@@ -902,6 +965,7 @@ export default function Game() {
                 count={ui.requiemArrows}
                 desc="Broken golden relic. (Decorative)"
                 color="#ffd24a"
+                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
                 onUse={() => { onUseRequiem(); }}
               />
               <InvSlot
@@ -910,6 +974,7 @@ export default function Game() {
                 count={ui.bluePebbles}
                 desc="Grants Moon Rabbit. Need empty stand slot."
                 color="#4a86d6"
+                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
                 onUse={() => { onUsePebble(); }}
               />
               <InvSlot
@@ -920,6 +985,17 @@ export default function Game() {
                 color="#ba8cff"
                 onUse={() => { onUseTonth(); setInventoryOpen(false); }}
               />
+              {ui.strangeHats > 0 && (
+                <InvSlot
+                  icon={<span style={{ color: "#5fe8ff", fontSize: 18 }}>🎩</span>}
+                  name="Strange Black Hat"
+                  count={ui.strangeHats}
+                  desc="Awakens Star Platinum's true form."
+                  color="#5fe8ff"
+                  disabledReason={ui.standId !== "star_platinum" ? "Need Star Platinum equipped" : undefined}
+                  onUse={() => { onUseStrangeHat(); setInventoryOpen(false); }}
+                />
+              )}
             </div>
 
             <div className="px-4 py-2 border-t border-white/20 flex justify-end">
@@ -988,7 +1064,7 @@ function AbilityBtn({
 }
 
 function InvSlot({
-  icon, name, count, desc, color, onUse,
+  icon, name, count, desc, color, onUse, disabledReason,
 }: {
   icon: ReactNode;
   name: string;
@@ -996,18 +1072,22 @@ function InvSlot({
   desc: string;
   color: string;
   onUse: () => void;
+  disabledReason?: string;
 }) {
   const empty = count <= 0;
+  const locked = !!disabledReason;
+  const disabled = empty || locked;
   return (
     <button
       onClick={onUse}
-      disabled={empty}
+      disabled={disabled}
+      title={disabledReason}
       className="flex flex-col items-start text-left rounded p-2 gap-1"
       style={{
-        background: empty ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.45)",
-        border: `1px solid ${empty ? "rgba(255,255,255,0.15)" : color + "88"}`,
-        opacity: empty ? 0.45 : 1,
-        cursor: empty ? "not-allowed" : "pointer",
+        background: disabled ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.45)",
+        border: `1px solid ${disabled ? "rgba(255,255,255,0.15)" : color + "88"}`,
+        opacity: disabled ? 0.45 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
       }}
     >
       <div className="flex items-center justify-between w-full">
@@ -1017,7 +1097,7 @@ function InvSlot({
         </div>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10">×{count}</span>
       </div>
-      <div className="text-[9px] text-white/70 leading-tight">{desc}</div>
+      <div className="text-[9px] text-white/70 leading-tight">{locked ? disabledReason : desc}</div>
     </button>
   );
 }
