@@ -592,6 +592,26 @@ export default function Game() {
           <AbilityBtn label="4" name={abilities.a4.name} damage={abilities.a4.damage} color={abilities.a4.color} cdFrac={cdFrac("a4")} disabled={ui.standId === "none" || abilities.a4.name === "-" || (ui.standId === "ebony_devil" && ui.rage < 100 && !ui.rageActive)} onPress={press("a4")} />
         </div>
         <AbilityBtn label="M1" name={abilities.m1.name} damage={abilities.m1.damage} color={abilities.m1.color} cdFrac={cdFrac("m1")} big onPress={press("m1")} onHoldStart={m1HoldStart} onHoldEnd={m1HoldEnd} />
+        {ui.standId === "sptw" && ui.sptwRage >= 100 && (
+          <button
+            onClick={onPressRage}
+            className="pointer-events-auto rounded-full font-bold text-white animate-pulse"
+            style={{
+              padding: "8px 14px",
+              background: "linear-gradient(135deg,#5fe8ff,#a06bff)",
+              border: "2px solid #5fe8ff",
+              boxShadow: "0 0 12px #5fe8ff",
+              fontSize: 12,
+            }}
+          >
+            ⚡ RAGE
+          </button>
+        )}
+        {ui.standId === "sptw" && ui.sptwRage < 100 && ui.sptwRage > 0 && (
+          <div className="pointer-events-none bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-20">
+            <div className="h-full" style={{ width: `${ui.sptwRage}%`, background: "#5fe8ff" }} />
+          </div>
+        )}
         {ui.standId !== "none" && (
           <button
             onClick={onToggleStand}
