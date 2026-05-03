@@ -245,7 +245,18 @@ interface World {
   // Soft-banner suppression so repeat hints ("Out of range", "Resummon stand", etc.)
   // stop spamming the player after a few times.
   bannerSuppressCounts: Record<string, number>;
-}
+  // Strange Hat (one-shot SPTW unlock)
+  strangeHatCount: number;
+  strangeHatSpawned: boolean;
+  sptwUnlocked: boolean;
+  sptwRage: number;
+  // Track last hit enemy id for Time Skip
+  lastHitEnemyId?: number;
+  lastHitEnemyAt?: number;
+  // SPTW M1 hold tracking
+  sptwM1HoldStart?: number;
+  // Moon Rabbit Lunar Veil window
+  moonRabbitInvulnUntil?: number;
 
 function makeProps(): Prop[] {
   const props: Prop[] = [];
