@@ -3005,6 +3005,42 @@ export function useArrow(w: World): boolean {
   w.bannerText = "Got Stand: " + name + " — tap Stand to summon";
   w.bannerUntil = w.time + 3;
   play("rollStand");
+  // First time the player rolls Star Platinum, spawn a Strange Black Hat near a house.
+  maybeSpawnStrangeHat(w);
+  return true;
+}
+
+function maybeSpawnStrangeHat(w: World) {
+  if (w.standId !== "star_platinum") return;
+  if (w.sptwUnlocked) return;
+  if (w.strangeHatSpawned) return;
+  // Pick a random house and drop the hat just outside it.
+  const houses = w.props.filter((p) => p.rect.w === 110 && p.rect.h === 84);
+  if (houses.length === 0) return;
+  const house = houses[Math.floor(Math.random() * houses.length)];
+  const hx = house.rect.x + house.rect.w / 2;
+  const hy = house.rect.y + house.rect.h + 20;
+  w.items.push({ id: w.nextId++, kind: "strange_hat", pos: { x: hx, y: Math.min(MAP_H - 30, hy) }, bornAt: w.time });
+  w.strangeHatSpawned = true;
+  showToast(w, "A strange hat has appeared near a house...");
+}
+
+export function useStrangeHat(w: World): boolean {
+  if (w.strangeHatCount <= 0) return false;
+  if (w.standId !== "star_platinum") {
+    showToast(w, "Need Star Platinum equipped");
+    return false;
+  }
+  w.strangeHatCount--;
+  resetStandRuntime(w);
+  w.standId = "sptw";
+  w.shitVariant = false;
+  w.standActive = false;
+  w.sptwUnlocked = true;
+  w.sptwRage = 0;
+  w.bannerText = "Star Platinum: THE WORLD";
+  w.bannerUntil = w.time + 3;
+  play("rollStand");
   return true;
 }
 
