@@ -11,6 +11,7 @@ import {
   useDisc,
   useRequiemArrow,
   useBluePebble,
+  useStrangeHat,
   toggleStandActive,
   tryUseDisc,
   teleportToShard,
@@ -20,7 +21,7 @@ import {
   talkToBoingo,
   type InputState,
 } from "@/game/engine";
-import { STANDS, SHIT_ABILITY } from "@/game/stands";
+import { STANDS, SHIT_ABILITY, TIER_BASE_PCT, standRollPct, type StandRarity } from "@/game/stands";
 import { STAND_CODEX } from "@/game/codex";
 import { unlockAudio, isSoundEnabled, setSoundEnabled } from "@/game/sound";
 import { startMusic, applyMusicSetting } from "@/game/music";
