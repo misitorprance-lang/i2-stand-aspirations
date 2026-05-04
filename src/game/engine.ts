@@ -2171,7 +2171,7 @@ export function update(w: World, input: InputState, dt: number) {
     }
     // Player regen — disabled while piloting (HP shared with puppet/Hanged Man).
     const recentlyHurt = w.time - pl.hitFlashUntil < 4.0;
-    if (!piloting && !recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
+    if (!(w.puppet.active || w.pilotActive || w.hangedManActive || w.purpleHazeActive) && !recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
 
     if (pl.hp < pl.maxHp * 0.5 && Math.random() < dt * 5) {
       spawnParticles(w, { x: pl.pos.x + rand(-3, 3), y: pl.pos.y - 2 }, "#b21717", 1, {
@@ -2866,9 +2866,8 @@ export function update(w: World, input: InputState, dt: number) {
           else if (b.carryingKind === "requiem_arrow") { w.requiemArrowCount++; showToast(w, "Harvest delivered Requiem Arrow"); }
           else if (b.carryingKind === "blue_pebble") { w.bluePebbleCount++; showToast(w, "Harvest delivered Blue Pebble"); }
           else if (b.carryingKind === "strange_hat") { w.strangeHatCount++; showToast(w, "Harvest delivered Strange Hat"); }
-          if (b.carryingKind === "arrow" || b.carryingKind === "disc") {
-            w.items.push({ id: w.nextId++, kind: b.carryingKind, pos: { ...w.player.pos }, bornAt: w.time - 99 });
-          }
+          if (b.carryingKind === "arrow") w.harvestDeliveredArrows = (w.harvestDeliveredArrows ?? 0) + 1;
+          if (b.carryingKind === "disc") w.harvestDeliveredDiscs = (w.harvestDeliveredDiscs ?? 0) + 1;
               spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 14, color: "#ffd24a", life: 0.25 });
             }
             b.carryingKind = undefined;
