@@ -4748,6 +4748,11 @@ function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg
 // ---- public toggles for UI ----
 export function toggleStandActive(w: World): boolean {
   if (w.standId === "none") return w.standActive;
+  if ((w.standId === "ebony_devil" && w.puppet.active) || (w.standId === "hanged_man" && w.hangedManActive) || (w.standId === "purple_haze" && w.purpleHazeActive)) {
+    w.bannerText = "Exit pilot mode first";
+    w.bannerUntil = w.time + 1.2;
+    return w.standActive;
+  }
   // White Album: manual toggle, but blocked while bar empty / cooling.
   if (w.standId === "white_album") {
     if (w.whiteAlbumActive) {
@@ -4784,10 +4789,10 @@ export function toggleStandActive(w: World): boolean {
 
 export function tryUseDisc(w: World): { ok: boolean; reason?: string } {
   if (w.standId === "none") return { ok: false, reason: "No stand to discard" };
-  if (w.standId === "ebony_devil" && w.puppet.active) {
-    w.bannerText = "Desummon puppet first (tap 1)";
+  if ((w.standId === "ebony_devil" && w.puppet.active) || (w.standId === "hanged_man" && w.hangedManActive) || (w.standId === "purple_haze" && w.purpleHazeActive)) {
+    w.bannerText = "Exit pilot mode first";
     w.bannerUntil = w.time + 1.4;
-    return { ok: false, reason: "puppet" };
+    return { ok: false, reason: "pilot" };
   }
   return { ok: true };
 }
