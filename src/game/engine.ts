@@ -1568,10 +1568,16 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "ice_heal": {
-      // Restore HP and drain a hefty chunk of the bar.
-      healPlayer(w, 28, "#9be7ff");
-      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 45);
-      spawnVfx(w, { kind: "ice_burst", pos: { ...p }, radius: 30, color: ab.color, life: 0.5 });
+      // Restore HP AND repair the suit bar. This must always feel like a real heal.
+      const hpGot = healPlayer(w, 32, "#9be7ff");
+      const beforeBar = w.whiteAlbumBar;
+      w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 42);
+      w.whiteAlbumActive = true;
+      w.standActive = true;
+      showToast(w, `Ice Heal +${Math.round(w.whiteAlbumBar - beforeBar)}% suit${hpGot > 0 ? `, +${Math.round(hpGot)} HP` : ""}`);
+      spawnVfx(w, { kind: "ice_burst", pos: { ...p }, radius: 34, color: ab.color, life: 0.6 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 48, color: ab.color, life: 0.45 });
+      spawnParticles(w, p, ab.color, 22, { shape: "spark", speedMin: 35, speedMax: 130, life: 0.7 });
       play("standSummon");
       break;
     }
@@ -1811,6 +1817,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     case "ph_pilot_toggle": {
       const turningOn = !w.purpleHazeActive;
       w.purpleHazeActive = turningOn;
+      w.standActive = true;
       if (turningOn) {
         w.purpleHaze.pos = { x: w.player.pos.x + 18, y: w.player.pos.y };
         pushOutOfProps({ ...w.player, pos: w.purpleHaze.pos, radius: 9 } as Entity, w.props);
@@ -1855,9 +1862,10 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     }
     // ---- Moon Rabbit: Lunar Veil (A2) — temporary invincibility ----
     case "lunar_veil": {
-      (w as any).moonRabbitInvulnUntil = w.time + (ab.duration ?? 2.5);
-      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 28, color: ab.color, life: 0.5 });
-      spawnParticles(w, p, ab.color, 16, { shape: "spark", speedMin: 40, speedMax: 140, life: 0.6 });
+      w.moonRabbitInvulnUntil = w.time + (ab.duration ?? 3);
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 34, color: ab.color, life: 0.7 });
+      spawnVfx(w, { kind: "time_clock", pos: { x: w.player.pos.x, y: w.player.pos.y - 24 }, radius: 34, color: ab.color, life: ab.duration ?? 3 });
+      spawnParticles(w, w.player.pos, ab.color, 22, { shape: "spark", speedMin: 40, speedMax: 150, life: 0.8 });
       w.bannerText = "Lunar Veil — invincible";
       w.bannerUntil = w.time + 1.0;
       play("toggleOn");
