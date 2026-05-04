@@ -1041,7 +1041,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   if (!input.aim && !SELF_OR_UTILITY.has(ab.kind) && ab.kind !== "melee") {
     // Use ability range, or a generous fallback for big AoEs that fire from the player.
     const checkRange = ab.range > 0 ? ab.range : (ab.radius ?? 60) + 20;
-    const t = nearestTarget(w, w.player.pos, checkRange);
+    const t = nearestTarget(w, abilityOrigin(w), checkRange);
     if (!t) {
       softBanner(w, "out_of_range", "No target in range", 0.6);
       return;
@@ -1059,7 +1059,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   // Non-M1 melee abilities (Star Finger, Freeze Punch, Brutal Slash, Echoes Act 1 touch...) need a target too.
   if (key !== "m1" && ab.kind === "melee" && !input.aim) {
     const reach = ab.range + (ab.radius ?? 14);
-    const t = nearestAnyNpc(w, w.player.pos, reach + 8);
+      const t = nearestAnyNpc(w, abilityOrigin(w), reach + 8);
     if (!t) {
       softBanner(w, "out_of_range", "No target in range", 0.6);
       return;
