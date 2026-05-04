@@ -242,6 +242,8 @@ interface World {
     carryingKind?: ItemPickup["kind"];
     phase: number;                  // for orbit bobbing
   }[];
+  harvestDeliveredArrows: number;
+  harvestDeliveredDiscs: number;
   // Soft-banner suppression so repeat hints ("Out of range", "Resummon stand", etc.)
   // stop spamming the player after a few times.
   bannerSuppressCounts: Record<string, number>;
@@ -590,6 +592,8 @@ export function createWorld(): World {
     harvestGatherActive: false,
     harvestCarryActive: false,
     harvestBeetles: [],
+    harvestDeliveredArrows: 0,
+    harvestDeliveredDiscs: 0,
     bannerSuppressCounts: {},
     strangeHatCount: 0,
     strangeHatSpawned: false,
