@@ -252,9 +252,9 @@ export const STANDS: Record<StandId, Stand> = {
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 0.9, range: 22, radius: 14, cooldown: 0.3, color: "#ffd1d1" },
       a1: { name: "Wasp Swarm", kind: "wasp_swarm", damage: 4, range: 220, radius: 36, cooldown: 9, duration: 6, tickEvery: 2.5, color: "#ffd24a" },
-      a2: { name: "Lunar Veil", kind: "lunar_veil", damage: 0, range: 0, cooldown: 12, duration: 2.5, color: "#ffe2ee" },
-      a3: { name: "Crash", kind: "crash", damage: 3, range: 260, radius: 26, cooldown: 10, speed: 360, color: "#5a2a1a" },
-      a4: { name: "Eternal Curse", kind: "eternal_curse", damage: 15, range: 160, radius: 160, cooldown: 22, color: "#cfd6ff" },
+      a2: { name: "Lunar Veil", kind: "lunar_veil", damage: 0, range: 0, cooldown: 12, duration: 3, color: "#ffe2ee" },
+      a3: { name: "Crash", kind: "crash", damage: 9, range: 300, radius: 26, cooldown: 10, speed: 420, color: "#5a2a1a" },
+      a4: { name: "Lightning Strike", kind: "eternal_curse", damage: 12, range: 180, radius: 180, cooldown: 22, duration: 10, color: "#cfd6ff" },
     },
   },
   harvest: {

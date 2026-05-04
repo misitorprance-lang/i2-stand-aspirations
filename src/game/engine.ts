@@ -242,6 +242,8 @@ interface World {
     carryingKind?: ItemPickup["kind"];
     phase: number;                  // for orbit bobbing
   }[];
+  harvestDeliveredArrows: number;
+  harvestDeliveredDiscs: number;
   // Soft-banner suppression so repeat hints ("Out of range", "Resummon stand", etc.)
   // stop spamming the player after a few times.
   bannerSuppressCounts: Record<string, number>;
@@ -590,6 +592,8 @@ export function createWorld(): World {
     harvestGatherActive: false,
     harvestCarryActive: false,
     harvestBeetles: [],
+    harvestDeliveredArrows: 0,
+    harvestDeliveredDiscs: 0,
     bannerSuppressCounts: {},
     strangeHatCount: 0,
     strangeHatSpawned: false,
@@ -833,19 +837,22 @@ function getAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): Ability {
   return a;
 }
 
-function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, preferEnemy = true): Entity | null {
+function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, _preferEnemy = true): Entity | null {
   let target: Entity | null = null;
   let best = range * range;
-  const scan = (enemyOnly: boolean) => {
-    for (const e of w.npcs) {
-      if (!e.alive || (enemyOnly && e.kind !== "enemy")) continue;
-      const d = dist2(e.pos, from);
-      if (d < best) { best = d; target = e; }
-    }
-  };
-  if (preferEnemy) scan(true);
-  if (!target) scan(false);
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    const d = dist2(e.pos, from);
+    if (d < best) { best = d; target = e; }
+  }
   return target;
+}
+
+function abilityOrigin(w: World): Vec2 {
+  if (w.standId === "ebony_devil" && w.puppet.active) return w.puppet.pos;
+  if (w.standId === "hanged_man" && w.hangedManActive) return w.hangedMan.pos;
+  if (w.standId === "purple_haze" && w.purpleHazeActive) return w.purpleHaze.pos;
+  return w.player.pos;
 }
 
 // "any NPC" target — used for M1 punches which should hit closest NPC regardless of faction.
@@ -868,6 +875,7 @@ function aimDir(w: World, input: InputState, ab?: Ability, key?: "m1" | "a1" | "
   const body =
     (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos :
     (w.standId === "hanged_man" && w.hangedManActive) ? w.hangedMan.pos :
+    (w.standId === "purple_haze" && w.purpleHazeActive) ? w.purpleHaze.pos :
     w.player.pos;
   if (key === "m1") {
     const t = nearestAnyNpc(w, body, AIM_ASSIST_RANGE);
@@ -882,6 +890,7 @@ function aimDir(w: World, input: InputState, ab?: Ability, key?: "m1" | "a1" | "
   // Use the stand body's facing if it has one
   if (w.standId === "ebony_devil" && w.puppet.active) return w.puppet.facing;
   if (w.standId === "hanged_man" && w.hangedManActive) return w.hangedMan.facing;
+  if (w.standId === "purple_haze" && w.purpleHazeActive) return w.purpleHaze.facing;
   return w.player.facing;
 }
 
@@ -968,10 +977,15 @@ function m1DamageRoll(w: World, puppetSwing: boolean): { dmg: number; crit: bool
     if (w.echoesAct === 2) return { dmg: crit ? 1.5 : 0.9, crit };
     return { dmg: crit ? 3 : 1.5, crit };
   }
-  if (sid === "star_platinum")  return { dmg: crit ? 5   : 3,   crit };
+  if (sid === "star_platinum")  return { dmg: crit ? 8   : 5,   crit };
+  if (sid === "sptw")           return { dmg: crit ? 10  : 7,   crit };
   if (sid === "gold_experience")return { dmg: crit ? 4   : 2.5, crit };
   if (sid === "rhcp")           return { dmg: crit ? 3   : 1.4, crit };
   if (sid === "hanged_man")     return { dmg: 1.2, crit: false };
+  if (sid === "white_album")    return { dmg: crit ? 2.8 : 1.4, crit };
+  if (sid === "purple_haze")    return { dmg: crit ? 3   : 1.5, crit };
+  if (sid === "moon_rabbit")    return { dmg: crit ? 3   : 0.9, crit };
+  if (sid === "harvest")        return { dmg: crit ? 1.2 : 0.6, crit };
   return { dmg: 1, crit: false };
 }
 
@@ -984,7 +998,13 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     return;
   }
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone", "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop", "ph_pilot_toggle", "cleansly_violence", "explosion_text"].includes(ab.kind)) return;
+  const ZERO_DAMAGE_ALLOWED = new Set<string>([
+    "stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone",
+    "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop", "time_stop_or_skip",
+    "ph_pilot_toggle", "cleansly_violence", "explosion_text", "ice_heal", "lunar_veil",
+    "harvest_gather", "harvest_carry", "sptw_rage",
+  ]);
+  if (ab.damage === 0 && !ZERO_DAMAGE_ALLOWED.has(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
   // Hanged Man: A2/A3/A4 require the stand to be summoned first.
   if (w.standId === "hanged_man" && key !== "m1" && ab.kind !== "pilot_toggle" && !w.hangedManActive) {
@@ -1025,7 +1045,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   if (!input.aim && !SELF_OR_UTILITY.has(ab.kind) && ab.kind !== "melee") {
     // Use ability range, or a generous fallback for big AoEs that fire from the player.
     const checkRange = ab.range > 0 ? ab.range : (ab.radius ?? 60) + 20;
-    const t = nearestTarget(w, w.player.pos, checkRange);
+    const t = nearestTarget(w, abilityOrigin(w), checkRange);
     if (!t) {
       softBanner(w, "out_of_range", "No target in range", 0.6);
       return;
@@ -1043,7 +1063,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   // Non-M1 melee abilities (Star Finger, Freeze Punch, Brutal Slash, Echoes Act 1 touch...) need a target too.
   if (key !== "m1" && ab.kind === "melee" && !input.aim) {
     const reach = ab.range + (ab.radius ?? 14);
-    const t = nearestAnyNpc(w, w.player.pos, reach + 8);
+      const t = nearestAnyNpc(w, abilityOrigin(w), reach + 8);
     if (!t) {
       softBanner(w, "out_of_range", "No target in range", 0.6);
       return;
@@ -1067,7 +1087,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   w.cdTimers[key] = ab.cooldown * cdMul;
 
   const dir = aimDir(w, input, ab, key);
-  const p = w.player.pos;
+  const p = abilityOrigin(w);
   const sfx = sfxFor(w, key);
 
   // Generic cast cue (sound) — channel handles its own ticks
@@ -1552,10 +1572,16 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       break;
     }
     case "ice_heal": {
-      // Restore HP and drain a hefty chunk of the bar.
-      healPlayer(w, 28, "#9be7ff");
-      w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - 45);
-      spawnVfx(w, { kind: "ice_burst", pos: { ...p }, radius: 30, color: ab.color, life: 0.5 });
+      // Restore HP AND repair the suit bar. This must always feel like a real heal.
+      const hpGot = healPlayer(w, 32, "#9be7ff");
+      const beforeBar = w.whiteAlbumBar;
+      w.whiteAlbumBar = Math.min(100, w.whiteAlbumBar + 42);
+      w.whiteAlbumActive = true;
+      w.standActive = true;
+      showToast(w, `Ice Heal +${Math.round(w.whiteAlbumBar - beforeBar)}% suit${hpGot > 0 ? `, +${Math.round(hpGot)} HP` : ""}`);
+      spawnVfx(w, { kind: "ice_burst", pos: { ...p }, radius: 34, color: ab.color, life: 0.6 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 48, color: ab.color, life: 0.45 });
+      spawnParticles(w, p, ab.color, 22, { shape: "spark", speedMin: 35, speedMax: 130, life: 0.7 });
       play("standSummon");
       break;
     }
@@ -1795,6 +1821,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     case "ph_pilot_toggle": {
       const turningOn = !w.purpleHazeActive;
       w.purpleHazeActive = turningOn;
+      w.standActive = true;
       if (turningOn) {
         w.purpleHaze.pos = { x: w.player.pos.x + 18, y: w.player.pos.y };
         pushOutOfProps({ ...w.player, pos: w.purpleHaze.pos, radius: 9 } as Entity, w.props);
@@ -1839,9 +1866,10 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     }
     // ---- Moon Rabbit: Lunar Veil (A2) — temporary invincibility ----
     case "lunar_veil": {
-      (w as any).moonRabbitInvulnUntil = w.time + (ab.duration ?? 2.5);
-      spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 28, color: ab.color, life: 0.5 });
-      spawnParticles(w, p, ab.color, 16, { shape: "spark", speedMin: 40, speedMax: 140, life: 0.6 });
+      w.moonRabbitInvulnUntil = w.time + (ab.duration ?? 3);
+      spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 34, color: ab.color, life: 0.7 });
+      spawnVfx(w, { kind: "time_clock", pos: { x: w.player.pos.x, y: w.player.pos.y - 24 }, radius: 34, color: ab.color, life: ab.duration ?? 3 });
+      spawnParticles(w, w.player.pos, ab.color, 22, { shape: "spark", speedMin: 40, speedMax: 150, life: 0.8 });
       w.bannerText = "Lunar Veil — invincible";
       w.bannerUntil = w.time + 1.0;
       play("toggleOn");
@@ -1878,10 +1906,10 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       const lastTap = (w as any).timeStopLastTapAt ?? 0;
       const isDoubleTap = w.time - lastTap < 0.45;
       (w as any).timeStopLastTapAt = w.time;
-      if (isDoubleTap) {
+      if (isDoubleTap && w.lastHitEnemyId != null) {
         // Time Skip: teleport to last enemy you damaged within 5s
-        const lastId = (w as any).lastHitEnemyId;
-        const lastAt = (w as any).lastHitEnemyAt ?? 0;
+        const lastId = w.lastHitEnemyId;
+        const lastAt = w.lastHitEnemyAt ?? 0;
         const target = w.npcs.find((e) => e.alive && e.id === lastId);
         if (target && w.time - lastAt < 5) {
           // SPTW gets 2 charges per cooldown; SP only single
@@ -1966,13 +1994,19 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     }
     // ---- Moon Rabbit: Crash (A3) — drawn motorcycle that rams forward and explodes ----
     case "crash": {
-      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
-      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      const target = nearestTarget(w, w.player.pos, Math.max(ab.range, AIM_ASSIST_RANGE));
+      if (!target) { w.cdTimers[key] = 0; softBanner(w, "no_targets", "No target in range", 0.7); break; }
+      const fromLeft = target.pos.x < w.player.pos.x;
+      const start = {
+        x: Math.max(18, Math.min(MAP_W - 18, target.pos.x + (fromLeft ? -180 : 180))),
+        y: Math.max(18, Math.min(MAP_H - 18, target.pos.y + rand(-70, 70))),
+      };
+      const shootDir = norm({ x: target.pos.x - start.x, y: target.pos.y - start.y });
       const speed = ab.speed ?? 360;
-      const life = ab.range / speed;
+      const life = Math.min(1.4, Math.max(0.45, dist(start, target.pos) / speed + 0.35));
       w.projectiles.push({
         id: w.nextId++,
-        pos: { x: p.x, y: p.y },
+        pos: start,
         vel: { x: shootDir.x * speed, y: shootDir.y * speed },
         radius: 10,
         damage: ab.damage,
@@ -1986,14 +2020,15 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         detonateColor: "#ff6b3a",
         detonateCrater: false,
         textGlyph: "CRASH_BIKE",
-        hurtsPlayer: true,
+        hurtsPlayer: false,
         sourceStandId: w.standId,
         sourceAbilityKey: key,
       });
-      spawnParticles(w, p, "#cccccc", 10, { speedMin: 40, speedMax: 130, life: 0.4 });
+      spawnVfx(w, { kind: "stab_line", pos: start, to: { ...target.pos }, color: ab.color, life: 0.45 });
+      spawnParticles(w, start, "#cccccc", 10, { speedMin: 40, speedMax: 130, life: 0.4 });
       break;
     }
-    // ---- Moon Rabbit: Eternal Curse (A4) — lightning RAINS DOWN from above on every nearby target ----
+    // ---- Moon Rabbit: Lightning Strike (A4) — three random sky bolts across 10 seconds ----
     case "eternal_curse": {
       const radius = ab.radius ?? 160;
       const targets = w.npcs.filter((e) => e.alive && dist2(e.pos, p) < radius * radius);
@@ -2002,17 +2037,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.6 });
         break;
       }
-      // Stagger strikes by 0.08s each so it feels like a downpour, not a single zap.
-      targets.forEach((t, i) => {
+      for (let i = 0; i < 3; i++) {
+        const t = targets[Math.floor(Math.random() * targets.length)];
         w.curseStrikes.push({
           targetId: t.id,
-          hitAt: w.time + 0.25 + i * 0.08,
+          hitAt: w.time + rand(0.35, 10),
           dmg: ab.damage,
           color: ab.color,
         });
-      });
+      }
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.5 });
-      w.bannerText = "Eternal Curse!";
+      w.bannerText = "Lightning Strike!";
       w.bannerUntil = w.time + 1.0;
       break;
     }
@@ -2089,7 +2124,7 @@ export function update(w: World, input: InputState, dt: number) {
 
   // Pilot mode: joystick drives the puppet (Ebony Devil) or Hanged Man instead of the player.
   // The player stops moving while piloting; HP is shared.
-  const piloting = w.puppet.active || w.pilotActive || w.hangedManActive;
+  const piloting = w.puppet.active || w.pilotActive || w.hangedManActive || w.purpleHazeActive;
 
   // Player movement
   const pl = w.player;
@@ -2097,7 +2132,7 @@ export function update(w: World, input: InputState, dt: number) {
     const j = input.joy;
     const len = Math.hypot(j.x, j.y);
     w.lastJoyMag = len;
-    if (!piloting && len > 0.05) {
+    if ((!piloting || (w.standId === "harvest" && w.harvestCarryActive && w.standActive)) && len > 0.05) {
       const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
       let baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
       // White Album: ice skating boost while suit is active.
@@ -2140,7 +2175,7 @@ export function update(w: World, input: InputState, dt: number) {
     }
     // Player regen — disabled while piloting (HP shared with puppet/Hanged Man).
     const recentlyHurt = w.time - pl.hitFlashUntil < 4.0;
-    if (!piloting && !recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
+    if (!(w.puppet.active || w.pilotActive || w.hangedManActive || w.purpleHazeActive) && !recentlyHurt && pl.hp < pl.maxHp) pl.hp = Math.min(pl.maxHp, pl.hp + 1.2 * dt);
 
     if (pl.hp < pl.maxHp * 0.5 && Math.random() < dt * 5) {
       spawnParticles(w, { x: pl.pos.x + rand(-3, 3), y: pl.pos.y - 2 }, "#b21717", 1, {
@@ -2828,15 +2863,15 @@ export function update(w: World, input: InputState, dt: number) {
         } else if (b.state === "return") {
           const d = goHome(w.player.pos, beetleSpeed);
           if (d < HOME_RADIUS) {
-            // Drop the item AT the player as a fresh pickup so existing pickup logic
-            // handles inventory increment & sound.
+        // Hand the item directly to the user so Gather cannot drop/re-loop/fail pickup.
             if (b.carryingKind) {
-              w.items.push({
-                id: w.nextId++,
-                kind: b.carryingKind,
-                pos: { x: w.player.pos.x, y: w.player.pos.y },
-                bornAt: w.time,
-              });
+          if (b.carryingKind === "arrow") showToast(w, "Harvest delivered Arrow");
+          else if (b.carryingKind === "disc") showToast(w, "Harvest delivered DISC");
+          else if (b.carryingKind === "requiem_arrow") { w.requiemArrowCount++; showToast(w, "Harvest delivered Requiem Arrow"); }
+          else if (b.carryingKind === "blue_pebble") { w.bluePebbleCount++; showToast(w, "Harvest delivered Blue Pebble"); }
+          else if (b.carryingKind === "strange_hat") { w.strangeHatCount++; showToast(w, "Harvest delivered Strange Hat"); }
+          if (b.carryingKind === "arrow") w.harvestDeliveredArrows = (w.harvestDeliveredArrows ?? 0) + 1;
+          if (b.carryingKind === "disc") w.harvestDeliveredDiscs = (w.harvestDeliveredDiscs ?? 0) + 1;
               spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 14, color: "#ffd24a", life: 0.25 });
             }
             b.carryingKind = undefined;
@@ -2932,7 +2967,10 @@ function showToast(w: World, text: string, seconds = 1.6) {
 
 // API for UI side
 export function tryPickupItems(w: World): { arrows: number; discs: number } {
-  let a = 0, d = 0;
+  let a = w.harvestDeliveredArrows ?? 0;
+  let d = w.harvestDeliveredDiscs ?? 0;
+  w.harvestDeliveredArrows = 0;
+  w.harvestDeliveredDiscs = 0;
   const remain: ItemPickup[] = [];
   for (const it of w.items) {
     if (dist2(it.pos, w.player.pos) < (PICKUP_RADIUS + w.player.radius) ** 2) {
@@ -2989,6 +3027,8 @@ function resetStandRuntime(w: World) {
   w.harvestGatherActive = false;
   w.harvestCarryActive = false;
   w.harvestBeetles = [];
+  w.harvestDeliveredArrows = 0;
+  w.harvestDeliveredDiscs = 0;
 }
 
 export function useArrow(w: World): boolean {
@@ -3298,6 +3338,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
+  if (w.purpleHazeActive) drawables.push({ y: w.purpleHaze.pos.y, draw: () => drawPurpleHazePilot(ctx, w) });
   if (w.boingo.alive || w.time < w.boingo.fadeUntil) {
     drawables.push({ y: w.boingo.pos.y, draw: () => drawBoingo(ctx, w) });
   }
@@ -3510,7 +3551,7 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   const wearingOverlay = wearingWhiteAlbum || wearingMoonRabbit;
   // Stand drawn UNDER player when behind, OVER when in front. Hidden entirely if standActive=false
   // OR when an overlay (White Album / Moon Rabbit) is worn.
-  const standVisible = w.standId !== "none" && w.standActive && !wearingOverlay;
+  const standVisible = w.standId !== "none" && w.standActive && !wearingOverlay && !w.purpleHazeActive;
   const standPos = computeStandPos(w);
   const standInFront = standPos.y >= pl.pos.y;
   if (standVisible && !standInFront) drawStand(ctx, w, standPos);
@@ -3620,6 +3661,7 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
   else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
   else if (id === "white_album") drawWhiteAlbum(ctx, w, pos);
+  else if (id === "purple_haze") drawPurpleHaze(ctx, w, pos);
 }
 
 function drawSptw(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
@@ -3987,6 +4029,49 @@ function drawWhiteAlbum(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2); ctx.stroke();
   }
+}
+
+function drawPurpleHaze(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil || w.time < w.standAimUntil;
+  const bob = Math.sin(w.time * 6) * 1.2;
+  ctx.fillStyle = `rgba(160,107,255,${0.22 + Math.sin(w.time * 5) * 0.06})`;
+  ctx.beginPath(); ctx.arc(pos.x, pos.y + bob, 16, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#5b2a8f";
+  ctx.fillRect(pos.x - 7, pos.y - 3 + bob, 14, 13);
+  ctx.fillStyle = "#a06bff";
+  ctx.fillRect(pos.x - 6, pos.y - 1 + bob, 12, 4);
+  ctx.fillStyle = "#d8c2ff";
+  ctx.fillRect(pos.x - 5, pos.y - 12 + bob, 10, 9);
+  ctx.fillStyle = "#2a123f";
+  ctx.fillRect(pos.x - 4, pos.y - 9 + bob, 8, 2);
+  ctx.fillStyle = "#ff4040";
+  ctx.fillRect(pos.x - 3, pos.y - 7 + bob, 2, 2);
+  ctx.fillRect(pos.x + 1, pos.y - 7 + bob, 2, 2);
+  ctx.fillStyle = "#f2d24a";
+  const d = w.standPunchDir;
+  const reach = punching ? 8 : 0;
+  ctx.fillRect(pos.x - 11 + d.x * reach, pos.y + bob, 5, 6);
+  ctx.fillRect(pos.x + 6 + d.x * reach, pos.y + bob, 5, 6);
+  ctx.fillStyle = "#b494ff";
+  ctx.fillRect(pos.x - 10 + d.x * reach, pos.y + 1 + bob, 3, 2);
+  ctx.fillRect(pos.x + 7 + d.x * reach, pos.y + 1 + bob, 3, 2);
+  if (punching) spawnPurpleHazeGasDots(ctx, w, pos, bob);
+}
+
+function spawnPurpleHazeGasDots(ctx: CanvasRenderingContext2D, w: World, pos: Vec2, bob = 0) {
+  ctx.fillStyle = "rgba(190,120,255,0.6)";
+  for (let i = 0; i < 5; i++) {
+    const a = w.time * 3 + i * 1.2;
+    ctx.beginPath(); ctx.arc(pos.x + Math.cos(a) * 14, pos.y + bob + Math.sin(a) * 8, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawPurpleHazePilot(ctx: CanvasRenderingContext2D, w: World) {
+  const ph = w.purpleHaze;
+  drawPurpleHaze(ctx, w, ph.pos);
+  ctx.strokeStyle = "rgba(160,107,255,0.65)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(ph.pos.x, ph.pos.y, 19 + Math.sin(w.time * 8) * 2, 0, Math.PI * 2); ctx.stroke();
 }
 
 function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
@@ -4663,6 +4748,11 @@ function damagePropsInRadius(w: World, x: number, y: number, radius: number, dmg
 // ---- public toggles for UI ----
 export function toggleStandActive(w: World): boolean {
   if (w.standId === "none") return w.standActive;
+  if ((w.standId === "ebony_devil" && w.puppet.active) || (w.standId === "hanged_man" && w.hangedManActive) || (w.standId === "purple_haze" && w.purpleHazeActive)) {
+    w.bannerText = "Exit pilot mode first";
+    w.bannerUntil = w.time + 1.2;
+    return w.standActive;
+  }
   // White Album: manual toggle, but blocked while bar empty / cooling.
   if (w.standId === "white_album") {
     if (w.whiteAlbumActive) {
@@ -4699,10 +4789,10 @@ export function toggleStandActive(w: World): boolean {
 
 export function tryUseDisc(w: World): { ok: boolean; reason?: string } {
   if (w.standId === "none") return { ok: false, reason: "No stand to discard" };
-  if (w.standId === "ebony_devil" && w.puppet.active) {
-    w.bannerText = "Desummon puppet first (tap 1)";
+  if ((w.standId === "ebony_devil" && w.puppet.active) || (w.standId === "hanged_man" && w.hangedManActive) || (w.standId === "purple_haze" && w.purpleHazeActive)) {
+    w.bannerText = "Exit pilot mode first";
     w.bannerUntil = w.time + 1.4;
-    return { ok: false, reason: "puppet" };
+    return { ok: false, reason: "pilot" };
   }
   return { ok: true };
 }

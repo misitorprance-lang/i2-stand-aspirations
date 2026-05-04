@@ -593,19 +593,7 @@ export default function Game() {
         </div>
         <AbilityBtn label="M1" name={abilities.m1.name} damage={abilities.m1.damage} color={abilities.m1.color} cdFrac={cdFrac("m1")} big onPress={press("m1")} onHoldStart={m1HoldStart} onHoldEnd={m1HoldEnd} />
         {ui.standId === "sptw" && ui.sptwRage >= 100 && (
-          <button
-            onClick={onPressRage}
-            className="pointer-events-auto rounded-full font-bold text-white animate-pulse"
-            style={{
-              padding: "8px 14px",
-              background: "linear-gradient(135deg,#5fe8ff,#a06bff)",
-              border: "2px solid #5fe8ff",
-              boxShadow: "0 0 12px #5fe8ff",
-              fontSize: 12,
-            }}
-          >
-            ⚡ RAGE
-          </button>
+          <AbilityBtn label="⚡" name="Rage" damage={0} color="#5fe8ff" cdFrac={0} onPress={onPressRage} />
         )}
         {ui.standId === "sptw" && ui.sptwRage < 100 && ui.sptwRage > 0 && (
           <div className="pointer-events-none bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-20">
@@ -1028,6 +1016,7 @@ function AbilityBtn({
   onHoldEnd?: () => void;
 }) {
   const size = big ? 76 : 56;
+  const tag = damage > 0 ? `${damage}` : name.toLowerCase().includes("heal") ? "HEAL" : name.toLowerCase().includes("rage") ? "BUFF" : name.toLowerCase().includes("veil") ? "BUFF" : name.toLowerCase().includes("pilot") || name.toLowerCase().includes("carry") || name.toLowerCase().includes("gather") ? "TOG" : "UTIL";
   return (
     <button
       onPointerDown={(e) => { e.preventDefault(); if (disabled) return; onPress(); onHoldStart?.(); }}
@@ -1047,7 +1036,7 @@ function AbilityBtn({
     >
       <span style={{ fontSize: big ? 16 : 14 }}>{label}</span>
       <span style={{ fontSize: 8, opacity: 0.85, lineHeight: 1, marginTop: 2, maxWidth: size - 8, textAlign: "center" }}>
-        {disabled ? "—" : `${damage}`}
+        {disabled ? "—" : tag}
       </span>
       {/* Cooldown overlay */}
       {cdFrac > 0 && (
