@@ -2120,7 +2120,7 @@ export function update(w: World, input: InputState, dt: number) {
 
   // Pilot mode: joystick drives the puppet (Ebony Devil) or Hanged Man instead of the player.
   // The player stops moving while piloting; HP is shared.
-  const piloting = w.puppet.active || w.pilotActive || w.hangedManActive;
+  const piloting = w.puppet.active || w.pilotActive || w.hangedManActive || w.purpleHazeActive;
 
   // Player movement
   const pl = w.player;
@@ -2128,7 +2128,7 @@ export function update(w: World, input: InputState, dt: number) {
     const j = input.joy;
     const len = Math.hypot(j.x, j.y);
     w.lastJoyMag = len;
-    if (!piloting && len > 0.05) {
+    if ((!piloting || (w.standId === "harvest" && w.harvestCarryActive && w.standActive)) && len > 0.05) {
       const nx = j.x / Math.max(1, len), ny = j.y / Math.max(1, len);
       let baseSpeed = input.sprint || w.time < w.rageUntil ? PLAYER_SPRINT_SPEED : PLAYER_SPEED;
       // White Album: ice skating boost while suit is active.
@@ -2859,15 +2859,16 @@ export function update(w: World, input: InputState, dt: number) {
         } else if (b.state === "return") {
           const d = goHome(w.player.pos, beetleSpeed);
           if (d < HOME_RADIUS) {
-            // Drop the item AT the player as a fresh pickup so existing pickup logic
-            // handles inventory increment & sound.
+        // Hand the item directly to the user so Gather cannot drop/re-loop/fail pickup.
             if (b.carryingKind) {
-              w.items.push({
-                id: w.nextId++,
-                kind: b.carryingKind,
-                pos: { x: w.player.pos.x, y: w.player.pos.y },
-                bornAt: w.time,
-              });
+          if (b.carryingKind === "arrow") showToast(w, "Harvest delivered Arrow");
+          else if (b.carryingKind === "disc") showToast(w, "Harvest delivered DISC");
+          else if (b.carryingKind === "requiem_arrow") { w.requiemArrowCount++; showToast(w, "Harvest delivered Requiem Arrow"); }
+          else if (b.carryingKind === "blue_pebble") { w.bluePebbleCount++; showToast(w, "Harvest delivered Blue Pebble"); }
+          else if (b.carryingKind === "strange_hat") { w.strangeHatCount++; showToast(w, "Harvest delivered Strange Hat"); }
+          if (b.carryingKind === "arrow" || b.carryingKind === "disc") {
+            w.items.push({ id: w.nextId++, kind: b.carryingKind, pos: { ...w.player.pos }, bornAt: w.time - 99 });
+          }
               spawnVfx(w, { kind: "shockwave", pos: { ...w.player.pos }, radius: 14, color: "#ffd24a", life: 0.25 });
             }
             b.carryingKind = undefined;
