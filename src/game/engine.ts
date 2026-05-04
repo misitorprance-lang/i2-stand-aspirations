@@ -973,10 +973,15 @@ function m1DamageRoll(w: World, puppetSwing: boolean): { dmg: number; crit: bool
     if (w.echoesAct === 2) return { dmg: crit ? 1.5 : 0.9, crit };
     return { dmg: crit ? 3 : 1.5, crit };
   }
-  if (sid === "star_platinum")  return { dmg: crit ? 5   : 3,   crit };
+  if (sid === "star_platinum")  return { dmg: crit ? 8   : 5,   crit };
+  if (sid === "sptw")           return { dmg: crit ? 10  : 7,   crit };
   if (sid === "gold_experience")return { dmg: crit ? 4   : 2.5, crit };
   if (sid === "rhcp")           return { dmg: crit ? 3   : 1.4, crit };
   if (sid === "hanged_man")     return { dmg: 1.2, crit: false };
+  if (sid === "white_album")    return { dmg: crit ? 2.8 : 1.4, crit };
+  if (sid === "purple_haze")    return { dmg: crit ? 3   : 1.5, crit };
+  if (sid === "moon_rabbit")    return { dmg: crit ? 3   : 0.9, crit };
+  if (sid === "harvest")        return { dmg: crit ? 1.2 : 0.6, crit };
   return { dmg: 1, crit: false };
 }
 
@@ -989,7 +994,13 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     return;
   }
   const ab = getAbility(w, key);
-  if (ab.damage === 0 && !["stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone", "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop", "ph_pilot_toggle", "cleansly_violence", "explosion_text"].includes(ab.kind)) return;
+  const ZERO_DAMAGE_ALLOWED = new Set<string>([
+    "stun_touch", "puppet_toggle", "rage_mode", "frog_summon", "tree_zone",
+    "pilot_toggle", "mirror_shard", "shard_teleport", "time_stop", "time_stop_or_skip",
+    "ph_pilot_toggle", "cleansly_violence", "explosion_text", "ice_heal", "lunar_veil",
+    "harvest_gather", "harvest_carry", "sptw_rage",
+  ]);
+  if (ab.damage === 0 && !ZERO_DAMAGE_ALLOWED.has(ab.kind)) return;
   if (w.cdTimers[key] > 0) return;
   // Hanged Man: A2/A3/A4 require the stand to be summoned first.
   if (w.standId === "hanged_man" && key !== "m1" && ab.kind !== "pilot_toggle" && !w.hangedManActive) {
@@ -1072,7 +1083,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
   w.cdTimers[key] = ab.cooldown * cdMul;
 
   const dir = aimDir(w, input, ab, key);
-  const p = w.player.pos;
+  const p = abilityOrigin(w);
   const sfx = sfxFor(w, key);
 
   // Generic cast cue (sound) — channel handles its own ticks
