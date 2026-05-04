@@ -3551,7 +3551,7 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
   const wearingOverlay = wearingWhiteAlbum || wearingMoonRabbit;
   // Stand drawn UNDER player when behind, OVER when in front. Hidden entirely if standActive=false
   // OR when an overlay (White Album / Moon Rabbit) is worn.
-  const standVisible = w.standId !== "none" && w.standActive && !wearingOverlay;
+  const standVisible = w.standId !== "none" && w.standActive && !wearingOverlay && !w.purpleHazeActive;
   const standPos = computeStandPos(w);
   const standInFront = standPos.y >= pl.pos.y;
   if (standVisible && !standInFront) drawStand(ctx, w, standPos);
