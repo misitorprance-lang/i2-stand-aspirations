@@ -2967,7 +2967,10 @@ function showToast(w: World, text: string, seconds = 1.6) {
 
 // API for UI side
 export function tryPickupItems(w: World): { arrows: number; discs: number } {
-  let a = 0, d = 0;
+  let a = w.harvestDeliveredArrows ?? 0;
+  let d = w.harvestDeliveredDiscs ?? 0;
+  w.harvestDeliveredArrows = 0;
+  w.harvestDeliveredDiscs = 0;
   const remain: ItemPickup[] = [];
   for (const it of w.items) {
     if (dist2(it.pos, w.player.pos) < (PICKUP_RADIUS + w.player.radius) ** 2) {
