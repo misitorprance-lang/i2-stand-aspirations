@@ -3027,6 +3027,8 @@ function resetStandRuntime(w: World) {
   w.harvestGatherActive = false;
   w.harvestCarryActive = false;
   w.harvestBeetles = [];
+  w.harvestDeliveredArrows = 0;
+  w.harvestDeliveredDiscs = 0;
 }
 
 export function useArrow(w: World): boolean {
