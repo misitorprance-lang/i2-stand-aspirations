@@ -4023,6 +4023,49 @@ function drawWhiteAlbum(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   }
 }
 
+function drawPurpleHaze(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil || w.time < w.standAimUntil;
+  const bob = Math.sin(w.time * 6) * 1.2;
+  ctx.fillStyle = `rgba(160,107,255,${0.22 + Math.sin(w.time * 5) * 0.06})`;
+  ctx.beginPath(); ctx.arc(pos.x, pos.y + bob, 16, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#5b2a8f";
+  ctx.fillRect(pos.x - 7, pos.y - 3 + bob, 14, 13);
+  ctx.fillStyle = "#a06bff";
+  ctx.fillRect(pos.x - 6, pos.y - 1 + bob, 12, 4);
+  ctx.fillStyle = "#d8c2ff";
+  ctx.fillRect(pos.x - 5, pos.y - 12 + bob, 10, 9);
+  ctx.fillStyle = "#2a123f";
+  ctx.fillRect(pos.x - 4, pos.y - 9 + bob, 8, 2);
+  ctx.fillStyle = "#ff4040";
+  ctx.fillRect(pos.x - 3, pos.y - 7 + bob, 2, 2);
+  ctx.fillRect(pos.x + 1, pos.y - 7 + bob, 2, 2);
+  ctx.fillStyle = "#f2d24a";
+  const d = w.standPunchDir;
+  const reach = punching ? 8 : 0;
+  ctx.fillRect(pos.x - 11 + d.x * reach, pos.y + bob, 5, 6);
+  ctx.fillRect(pos.x + 6 + d.x * reach, pos.y + bob, 5, 6);
+  ctx.fillStyle = "#b494ff";
+  ctx.fillRect(pos.x - 10 + d.x * reach, pos.y + 1 + bob, 3, 2);
+  ctx.fillRect(pos.x + 7 + d.x * reach, pos.y + 1 + bob, 3, 2);
+  if (punching) spawnPurpleHazeGasDots(ctx, w, pos, bob);
+}
+
+function spawnPurpleHazeGasDots(ctx: CanvasRenderingContext2D, w: World, pos: Vec2, bob = 0) {
+  ctx.fillStyle = "rgba(190,120,255,0.6)";
+  for (let i = 0; i < 5; i++) {
+    const a = w.time * 3 + i * 1.2;
+    ctx.beginPath(); ctx.arc(pos.x + Math.cos(a) * 14, pos.y + bob + Math.sin(a) * 8, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawPurpleHazePilot(ctx: CanvasRenderingContext2D, w: World) {
+  const ph = w.purpleHaze;
+  drawPurpleHaze(ctx, w, ph.pos);
+  ctx.strokeStyle = "rgba(160,107,255,0.65)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(ph.pos.x, ph.pos.y, 19 + Math.sin(w.time * 8) * 2, 0, Math.PI * 2); ctx.stroke();
+}
+
 function drawHangedMan(ctx: CanvasRenderingContext2D, w: World) {
   const h = w.hangedMan;
   const attacking = w.time < h.attackUntil;
