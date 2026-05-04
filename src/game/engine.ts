@@ -1902,10 +1902,10 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       const lastTap = (w as any).timeStopLastTapAt ?? 0;
       const isDoubleTap = w.time - lastTap < 0.45;
       (w as any).timeStopLastTapAt = w.time;
-      if (isDoubleTap) {
+      if (isDoubleTap && w.lastHitEnemyId != null) {
         // Time Skip: teleport to last enemy you damaged within 5s
-        const lastId = (w as any).lastHitEnemyId;
-        const lastAt = (w as any).lastHitEnemyAt ?? 0;
+        const lastId = w.lastHitEnemyId;
+        const lastAt = w.lastHitEnemyAt ?? 0;
         const target = w.npcs.find((e) => e.alive && e.id === lastId);
         if (target && w.time - lastAt < 5) {
           // SPTW gets 2 charges per cooldown; SP only single
@@ -1990,13 +1990,19 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
     }
     // ---- Moon Rabbit: Crash (A3) — drawn motorcycle that rams forward and explodes ----
     case "crash": {
-      const target = nearestTarget(w, p, Math.max(ab.range, AIM_ASSIST_RANGE));
-      const shootDir = target ? norm({ x: target.pos.x - p.x, y: target.pos.y - p.y }) : dir;
+      const target = nearestTarget(w, w.player.pos, Math.max(ab.range, AIM_ASSIST_RANGE));
+      if (!target) { w.cdTimers[key] = 0; softBanner(w, "no_targets", "No target in range", 0.7); break; }
+      const fromLeft = target.pos.x < w.player.pos.x;
+      const start = {
+        x: Math.max(18, Math.min(MAP_W - 18, target.pos.x + (fromLeft ? -180 : 180))),
+        y: Math.max(18, Math.min(MAP_H - 18, target.pos.y + rand(-70, 70))),
+      };
+      const shootDir = norm({ x: target.pos.x - start.x, y: target.pos.y - start.y });
       const speed = ab.speed ?? 360;
-      const life = ab.range / speed;
+      const life = Math.min(1.4, Math.max(0.45, dist(start, target.pos) / speed + 0.35));
       w.projectiles.push({
         id: w.nextId++,
-        pos: { x: p.x, y: p.y },
+        pos: start,
         vel: { x: shootDir.x * speed, y: shootDir.y * speed },
         radius: 10,
         damage: ab.damage,
@@ -2010,14 +2016,15 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         detonateColor: "#ff6b3a",
         detonateCrater: false,
         textGlyph: "CRASH_BIKE",
-        hurtsPlayer: true,
+        hurtsPlayer: false,
         sourceStandId: w.standId,
         sourceAbilityKey: key,
       });
-      spawnParticles(w, p, "#cccccc", 10, { speedMin: 40, speedMax: 130, life: 0.4 });
+      spawnVfx(w, { kind: "stab_line", pos: start, to: { ...target.pos }, color: ab.color, life: 0.45 });
+      spawnParticles(w, start, "#cccccc", 10, { speedMin: 40, speedMax: 130, life: 0.4 });
       break;
     }
-    // ---- Moon Rabbit: Eternal Curse (A4) — lightning RAINS DOWN from above on every nearby target ----
+    // ---- Moon Rabbit: Lightning Strike (A4) — three random sky bolts across 10 seconds ----
     case "eternal_curse": {
       const radius = ab.radius ?? 160;
       const targets = w.npcs.filter((e) => e.alive && dist2(e.pos, p) < radius * radius);
@@ -2026,17 +2033,17 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.6 });
         break;
       }
-      // Stagger strikes by 0.08s each so it feels like a downpour, not a single zap.
-      targets.forEach((t, i) => {
+      for (let i = 0; i < 3; i++) {
+        const t = targets[Math.floor(Math.random() * targets.length)];
         w.curseStrikes.push({
           targetId: t.id,
-          hitAt: w.time + 0.25 + i * 0.08,
+          hitAt: w.time + rand(0.35, 10),
           dmg: ab.damage,
           color: ab.color,
         });
-      });
+      }
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius, color: ab.color, life: 0.5 });
-      w.bannerText = "Eternal Curse!";
+      w.bannerText = "Lightning Strike!";
       w.bannerUntil = w.time + 1.0;
       break;
     }
