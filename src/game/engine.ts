@@ -833,19 +833,22 @@ function getAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4"): Ability {
   return a;
 }
 
-function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, preferEnemy = true): Entity | null {
+function nearestTarget(w: World, from: Vec2, range = AIM_ASSIST_RANGE, _preferEnemy = true): Entity | null {
   let target: Entity | null = null;
   let best = range * range;
-  const scan = (enemyOnly: boolean) => {
-    for (const e of w.npcs) {
-      if (!e.alive || (enemyOnly && e.kind !== "enemy")) continue;
-      const d = dist2(e.pos, from);
-      if (d < best) { best = d; target = e; }
-    }
-  };
-  if (preferEnemy) scan(true);
-  if (!target) scan(false);
+  for (const e of w.npcs) {
+    if (!e.alive) continue;
+    const d = dist2(e.pos, from);
+    if (d < best) { best = d; target = e; }
+  }
   return target;
+}
+
+function abilityOrigin(w: World): Vec2 {
+  if (w.standId === "ebony_devil" && w.puppet.active) return w.puppet.pos;
+  if (w.standId === "hanged_man" && w.hangedManActive) return w.hangedMan.pos;
+  if (w.standId === "purple_haze" && w.purpleHazeActive) return w.purpleHaze.pos;
+  return w.player.pos;
 }
 
 // "any NPC" target — used for M1 punches which should hit closest NPC regardless of faction.
@@ -868,6 +871,7 @@ function aimDir(w: World, input: InputState, ab?: Ability, key?: "m1" | "a1" | "
   const body =
     (w.standId === "ebony_devil" && w.puppet.active) ? w.puppet.pos :
     (w.standId === "hanged_man" && w.hangedManActive) ? w.hangedMan.pos :
+    (w.standId === "purple_haze" && w.purpleHazeActive) ? w.purpleHaze.pos :
     w.player.pos;
   if (key === "m1") {
     const t = nearestAnyNpc(w, body, AIM_ASSIST_RANGE);
@@ -882,6 +886,7 @@ function aimDir(w: World, input: InputState, ab?: Ability, key?: "m1" | "a1" | "
   // Use the stand body's facing if it has one
   if (w.standId === "ebony_devil" && w.puppet.active) return w.puppet.facing;
   if (w.standId === "hanged_man" && w.hangedManActive) return w.hangedMan.facing;
+  if (w.standId === "purple_haze" && w.purpleHazeActive) return w.purpleHaze.facing;
   return w.player.facing;
 }
 
