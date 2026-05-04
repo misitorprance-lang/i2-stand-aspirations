@@ -194,8 +194,8 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       m1: moveOf("moon_rabbit", "m1", "Soft punch — 0.9 base, 3 on crits."),
       a1: moveOf("moon_rabbit", "a1", "Wasps swarm the nearest target and sting every ~2.5s for 6s."),
       a2: moveOf("moon_rabbit", "a2", "Lunar Veil — short invincibility window (2.5s)."),
-      a3: moveOf("moon_rabbit", "a3", "Crash — drawn motorbike rams forward, explodes on contact (with target OR you)."),
-      a4: moveOf("moon_rabbit", "a4", "Lightning strikes every nearby target, then a Crash bike rams each one."),
+      a3: moveOf("moon_rabbit", "a3", "Crash — a motorbike rushes in from off-screen and attacks the closest target. It does not hurt you."),
+      a4: moveOf("moon_rabbit", "a4", "Lightning Strike — one nearby target is struck three random times across 10 seconds."),
     },
   },
   harvest: {
