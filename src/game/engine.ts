@@ -3330,6 +3330,7 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
   }
   if (w.puppet.active) drawables.push({ y: w.puppet.pos.y, draw: () => drawPuppet(ctx, w) });
   if (w.hangedManActive) drawables.push({ y: w.hangedMan.pos.y, draw: () => drawHangedMan(ctx, w) });
+  if (w.purpleHazeActive) drawables.push({ y: w.purpleHaze.pos.y, draw: () => drawPurpleHazePilot(ctx, w) });
   if (w.boingo.alive || w.time < w.boingo.fadeUntil) {
     drawables.push({ y: w.boingo.pos.y, draw: () => drawBoingo(ctx, w) });
   }
@@ -3652,6 +3653,7 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
   else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
   else if (id === "white_album") drawWhiteAlbum(ctx, w, pos);
+  else if (id === "purple_haze") drawPurpleHaze(ctx, w, pos);
 }
 
 function drawSptw(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
