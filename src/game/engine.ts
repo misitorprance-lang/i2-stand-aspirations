@@ -2074,11 +2074,123 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 22, color: "#ffd24a", life: 0.3 });
       break;
     }
+    // ---- RHCP A2 — Cable Dash: blitz through nearest target ----
+    case "rhcp_dash": {
+      const target = nearestTarget(w, p, ab.range);
+      if (!target) break;
+      const dx = target.pos.x - p.x, dy = target.pos.y - p.y;
+      const m = Math.hypot(dx, dy) || 1;
+      const nx = dx / m, ny = dy / m;
+      const past = m + 24;
+      tryMove(w.player, nx * past, ny * past, w.props);
+      pushOutOfProps(w.player, w.props);
+      damageEntity(w, target, ab.damage, { dir: { x: nx, y: ny }, amount: 80 }, false);
+      spawnVfx(w, { kind: "stab_line", pos: { ...p }, to: { ...w.player.pos }, color: ab.color, life: 0.3 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...target.pos }, radius: 18, color: ab.color, life: 0.35 });
+      w.shake = Math.max(w.shake, 5);
+      break;
+    }
+    // ---- Echoes A3 — single-target freeze ----
+    case "echoes_freeze_target": {
+      const target = nearestTarget(w, p, ab.range);
+      if (!target) break;
+      damageEntity(w, target, ab.damage);
+      target.stunUntil = Math.max(target.stunUntil, w.time + (ab.duration ?? 4));
+      target.slowUntil = Math.max(target.slowUntil ?? 0, w.time + (ab.duration ?? 4));
+      spawnVfx(w, { kind: "ice_burst", pos: { ...target.pos }, radius: 18, color: ab.color, life: 0.6 });
+      ctx_drawTextOver(w, target.pos, "ピピピ", ab.color);
+      break;
+    }
+    // ---- Echoes A4 — close-range amplify mark ----
+    case "echoes_amplify": {
+      const target = nearestTarget(w, p, ab.range + 16);
+      if (!target) break;
+      damageEntity(w, target, ab.damage);
+      target.slowUntil = Math.max(target.slowUntil ?? 0, w.time + (ab.duration ?? 5));
+      target.bleedUntil = w.time + (ab.duration ?? 5);
+      target.bleedNextTickAt = w.time + 0.5;
+      spawnVfx(w, { kind: "slash_arc", pos: { ...target.pos }, angle: Math.atan2(dir.y, dir.x), radius: 18, color: ab.color, life: 0.3 });
+      ctx_drawTextOver(w, target.pos, "ズキューン", ab.color);
+      break;
+    }
+    // ---- GER A1 — Life Beam ----
+    case "ger_life_beam": {
+      const target = nearestTarget(w, p, ab.range) ?? null;
+      const tx = target ? target.pos.x : p.x + dir.x * ab.range;
+      const ty = target ? target.pos.y : p.y + dir.y * ab.range;
+      const beamDir = norm({ x: tx - p.x, y: ty - p.y });
+      const steps = 20;
+      const hit = new Set<number>();
+      for (let s = 1; s <= steps; s++) {
+        const f = s / steps;
+        const x = p.x + (tx - p.x) * f, y = p.y + (ty - p.y) * f;
+        for (const e of w.npcs) {
+          if (!e.alive || hit.has(e.id)) continue;
+          if (dist2(e.pos, { x, y }) < (8 + e.radius) ** 2) {
+            damageEntity(w, e, ab.damage, { dir: beamDir, amount: 40 });
+            hit.add(e.id);
+          }
+        }
+      }
+      spawnVfx(w, { kind: "beam", pos: { ...p }, to: { x: tx, y: ty }, color: "#ffd6e0", life: 0.4 });
+      spawnVfx(w, { kind: "stab_line", pos: { ...p }, to: { x: tx, y: ty }, color: "#fff", life: 0.3 });
+      w.shake = Math.max(w.shake, 4);
+      break;
+    }
+    // ---- GER A2 — punch + ghost copies ----
+    case "ger_truth_punch": {
+      const target = nearestTarget(w, p, ab.range);
+      if (!target) break;
+      damageEntity(w, target, ab.damage);
+      // Schedule staged damage ticks
+      for (let i = 1; i <= 6; i++) {
+        w.curseStrikes.push({ targetId: target.id, hitAt: w.time + i * 0.55, dmg: 5, color: "#ffd6e0" });
+      }
+      for (let i = 0; i < 4; i++) {
+        spawnVfx(w, { kind: "ge_hologram", pos: { x: target.pos.x + (i - 1.5) * 6, y: target.pos.y }, color: "#ffd6e0", life: 1.0 });
+      }
+      spawnVfx(w, { kind: "punch_impact", pos: { ...target.pos }, color: "#ffd6e0", life: 0.3 });
+      break;
+    }
+    // ---- GER A3 — triple loop ----
+    case "ger_triple_loop": {
+      const target = nearestTarget(w, p, ab.range + 60);
+      if (!target) break;
+      target.stunUntil = w.time + 5;
+      // Lightning
+      w.curseStrikes.push({ targetId: target.id, hitAt: w.time + 1.0, dmg: 14, color: "#cfd6ff" });
+      // Poison stage
+      target.poisonUntil = w.time + 5;
+      target.poisonNextTickAt = w.time + 1.8;
+      target.poisonDps = 5;
+      // Pebble barrage
+      for (let i = 0; i < 4; i++) {
+        w.curseStrikes.push({ targetId: target.id, hitAt: w.time + 3.5 + i * 0.2, dmg: 5, color: "#ffd6e0" });
+      }
+      spawnVfx(w, { kind: "shockwave", pos: { ...target.pos }, radius: 30, color: "#ffd6e0", life: 0.5 });
+      w.bannerText = "Triple Loop";
+      w.bannerUntil = w.time + 1.4;
+      break;
+    }
   }
   if (w.standId === "white_album" && w.whiteAlbumActive && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
     const drain = key === "m1" ? 3 : 12;
     w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - drain);
   }
+}
+
+// Floating text VFX helper for Echoes
+function ctx_drawTextOver(w: World, pos: Vec2, text: string, color: string) {
+  w.damageNumbers.push({
+    id: w.nextId++,
+    pos: { ...pos, y: pos.y - 10 },
+    text,
+    color,
+    size: 14,
+    vy: -16,
+    bornAt: w.time,
+    expireAt: w.time + 1.2,
+  });
 }
 
 function trySpawnItem(w: World, kind: ItemPickup["kind"]) {
