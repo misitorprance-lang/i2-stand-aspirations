@@ -68,7 +68,16 @@ export type AbilityKind =
   | "eternal_curse"
   // Harvest
   | "harvest_gather"
-  | "harvest_carry";
+  | "harvest_carry"
+  // RHCP rework
+  | "rhcp_dash"
+  // Echoes Japanese-text reworks
+  | "echoes_freeze_target"
+  | "echoes_amplify"
+  // Gold Experience Requiem
+  | "ger_life_beam"
+  | "ger_truth_punch"
+  | "ger_triple_loop";
 
 export interface Ability {
   name: string;
