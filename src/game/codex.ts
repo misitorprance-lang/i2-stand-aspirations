@@ -138,6 +138,21 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       a4: moveOf("gold_experience", "a4", "Tree of Life zone: roots enemies, heals you, buffs frog/eagle spam. Despawns on expire."),
     },
   },
+  ger: {
+    id: "ger",
+    model: {
+      description: "Gold Experience Requiem — porcelain-pale humanoid with rosy-gold trim and ladybug emblems on shoulders/forehead/knees; long pink-tipped hair.",
+      silhouette: ["ladybug emblems", "porcelain face", "pink-tipped hair"],
+      auraColor: "#ffd6e0",
+    },
+    moves: {
+      m1: moveOf("ger", "m1", "Crisp punch — 6 dmg / 7 crit. Passive: Return to Zero rewinds attackers 5s back when they hit you (20s ICD)."),
+      a1: moveOf("ger", "a1", "Life Beam — flicked pebble becomes a piercing beam, 13 dmg."),
+      a2: moveOf("ger", "a2", "You'll Never Reach the Truth — punch + ghost copies of the target stack damage until they die."),
+      a3: moveOf("ger", "a3", "Triple Loop — target frozen, then killed by lightning → poison → pebbles in sequence."),
+      a4: moveOf("ger", "a4", "—"),
+    },
+  },
   hanged_man: {
     id: "hanged_man",
     model: {
