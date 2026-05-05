@@ -9,6 +9,7 @@ export type StandId =
   | "echoes"
   | "ebony_devil"
   | "gold_experience"
+  | "ger"
   | "hanged_man"
   | "white_album"
   | "purple_haze"
