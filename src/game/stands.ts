@@ -211,6 +211,20 @@ export const STANDS: Record<StandId, Stand> = {
       a4: { name: "Tree of Life", kind: "tree_zone", damage: 0, range: 70, radius: 90, cooldown: 30, duration: 14, color: "#5fd16a" },
     },
   },
+  ger: {
+    id: "ger",
+    name: "Gold Experience Requiem",
+    color: "#ffd6e0",
+    rarity: "legendary",
+    rarityWeight: 0,
+    abilities: {
+      m1: { name: "Punch", kind: "melee", damage: 6, range: 22, radius: 16, cooldown: 0.3, color: "#ffd6e0" },
+      a1: { name: "Life Beam", kind: "ger_life_beam", damage: 13, range: 320, radius: 4, cooldown: 5, color: "#ffd6e0" },
+      a2: { name: "You'll Never Reach Truth", kind: "ger_truth_punch", damage: 4, range: 28, radius: 16, cooldown: 12, duration: 4, color: "#ffd6e0" },
+      a3: { name: "Triple Loop", kind: "ger_triple_loop", damage: 24, range: 60, radius: 0, cooldown: 18, duration: 5, color: "#ffd6e0" },
+      a4: { name: "-", kind: "melee", damage: 0, range: 0, cooldown: 999, color: "#888" },
+    },
+  },
   hanged_man: {
     id: "hanged_man",
     name: "Hanged Man",
