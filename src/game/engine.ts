@@ -3208,22 +3208,20 @@ export function useDisc(w: World) {
   play("pickupDisc");
 }
 
-// Requiem Arrow: decorative-only (kept for back-compat; UI no longer offers a use button).
+// Requiem Arrow: ONLY Gold Experience can use it — evolves into GER.
 export function useRequiemArrow(w: World): boolean {
-  if (w.standId !== "none") {
-    showToast(w, "Use a DISC to drop your stand first");
+  if (w.requiemArrowCount <= 0) return false;
+  if (w.standId !== "gold_experience") {
+    showToast(w, "Only Gold Experience can use this");
     return false;
   }
-  if (w.requiemArrowCount <= 0) return false;
   w.requiemArrowCount--;
-  const { id, shitVariant } = rollStand();
   resetStandRuntime(w);
-  w.standId = id;
-  w.shitVariant = shitVariant;
+  w.standId = "ger";
+  w.shitVariant = false;
   w.standActive = false;
-  if (id === "white_album") (w as any).whiteAlbumActive = false;
-  const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
-  showToast(w, "Requiem Arrow → " + name);
+  w.bannerText = "Gold Experience REQUIEM";
+  w.bannerUntil = w.time + 3;
   play("rollStand");
   return true;
 }
