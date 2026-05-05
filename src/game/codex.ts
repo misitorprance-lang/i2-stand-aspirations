@@ -84,8 +84,8 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
     moves: {
       m1: moveOf("rhcp", "m1", "Cone melee."),
       a1: moveOf("rhcp", "a1", "Fast electric projectile, applies electrocute status."),
-      a2: moveOf("rhcp", "a2", "Ring AOE around player with knockback."),
-      a3: moveOf("rhcp", "a3", "Targeted explosion at point, leaves crater."),
+      a2: moveOf("rhcp", "a2", "Cable Dash — blitz through the nearest NPC, dealing damage on the pass."),
+      a3: moveOf("rhcp", "a3", "Targeted explosion at point with knockback. Crater fades after a few seconds."),
       a4: moveOf("rhcp", "a4", "Stationary tesla zone ticking damage."),
     },
   },
