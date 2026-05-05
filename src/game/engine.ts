@@ -980,6 +980,7 @@ function m1DamageRoll(w: World, puppetSwing: boolean): { dmg: number; crit: bool
   if (sid === "star_platinum")  return { dmg: crit ? 8   : 5,   crit };
   if (sid === "sptw")           return { dmg: crit ? 10  : 7,   crit };
   if (sid === "gold_experience")return { dmg: crit ? 4   : 2.5, crit };
+  if (sid === "ger")            return { dmg: crit ? 7   : 6,   crit };
   if (sid === "rhcp")           return { dmg: crit ? 3   : 1.4, crit };
   if (sid === "hanged_man")     return { dmg: 1.2, crit: false };
   if (sid === "white_album")    return { dmg: crit ? 2.8 : 1.4, crit };
