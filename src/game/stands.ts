@@ -150,7 +150,7 @@ export const STANDS: Record<StandId, Stand> = {
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 7, range: 22, radius: 16, cooldown: 0.28, color: "#5fe8ff" },
       a1: { name: "Star Rush", kind: "star_rush", damage: 8, range: 42, radius: 14, cooldown: 3.5, color: "#5fe8ff" },
-      a2: { name: "Triple Pebble", kind: "triple_pebble", damage: 4, range: 240, radius: 4, cooldown: 2.0, speed: 420, color: "#5fe8ff" },
+      a2: { name: "Triple Pebble", kind: "triple_pebble", damage: 3, range: 240, radius: 3, cooldown: 2.0, speed: 480, color: "#5fe8ff" },
       a3: { name: "The World", kind: "time_stop_or_skip", damage: 0, range: 0, cooldown: 16, duration: 7, color: "#dcd6ff" },
       a4: { name: "Launch", kind: "knockback", damage: 20, range: 18, radius: 16, cooldown: 5.5, knockback: 340, color: "#a06bff" },
     },
