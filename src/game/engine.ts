@@ -47,19 +47,19 @@ const ENEMY_ATTACK_DMG_CRIT = 3;
 const ENEMY_CRIT_CHANCE = 0.18;
 const ENEMY_ATTACK_CD = 1.3;
 const PLAYER_MAX_HP = 100;
-const NPC_MAX_HP = 30;
-const ENEMY_MAX_HP = 45;
+const NPC_MAX_HP = 60;
+const ENEMY_MAX_HP = 90;
 const RESPAWN_DELAY = 6;
 const FRIENDLY_COUNT = 14;
 const ENEMY_COUNT = 14;
 // Faster respawn + bigger ground pool — map is 1.5x bigger now, so finding items
 // shouldn't feel like a chore. Initial world also pre-seeds a starter pool.
 const ARROW_INTERVAL = [3, 6] as const;
-const DISC_INTERVAL = [7, 12] as const;
+const DISC_INTERVAL = [3, 6] as const;
 const MAX_ARROWS_ON_GROUND = 14;
-const MAX_DISCS_ON_GROUND = 9;
+const MAX_DISCS_ON_GROUND = 14;
 const INITIAL_ARROW_COUNT = 8;
-const INITIAL_DISC_COUNT = 5;
+const INITIAL_DISC_COUNT = 8;
 const MAX_BLUE_PEBBLES_ON_GROUND = 2;
 const PICKUP_RADIUS = 18;
 const AIM_ASSIST_RANGE = 220;
@@ -980,6 +980,7 @@ function m1DamageRoll(w: World, puppetSwing: boolean): { dmg: number; crit: bool
   if (sid === "star_platinum")  return { dmg: crit ? 8   : 5,   crit };
   if (sid === "sptw")           return { dmg: crit ? 10  : 7,   crit };
   if (sid === "gold_experience")return { dmg: crit ? 4   : 2.5, crit };
+  if (sid === "ger")            return { dmg: crit ? 7   : 6,   crit };
   if (sid === "rhcp")           return { dmg: crit ? 3   : 1.4, crit };
   if (sid === "hanged_man")     return { dmg: 1.2, crit: false };
   if (sid === "white_album")    return { dmg: crit ? 2.8 : 1.4, crit };
@@ -2073,11 +2074,123 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 22, color: "#ffd24a", life: 0.3 });
       break;
     }
+    // ---- RHCP A2 — Cable Dash: blitz through nearest target ----
+    case "rhcp_dash": {
+      const target = nearestTarget(w, p, ab.range);
+      if (!target) break;
+      const dx = target.pos.x - p.x, dy = target.pos.y - p.y;
+      const m = Math.hypot(dx, dy) || 1;
+      const nx = dx / m, ny = dy / m;
+      const past = m + 24;
+      tryMove(w.player, nx * past, ny * past, w.props);
+      pushOutOfProps(w.player, w.props);
+      damageEntity(w, target, ab.damage, { dir: { x: nx, y: ny }, amount: 80 }, false);
+      spawnVfx(w, { kind: "stab_line", pos: { ...p }, to: { ...w.player.pos }, color: ab.color, life: 0.3 });
+      spawnVfx(w, { kind: "shockwave", pos: { ...target.pos }, radius: 18, color: ab.color, life: 0.35 });
+      w.shake = Math.max(w.shake, 5);
+      break;
+    }
+    // ---- Echoes A3 — single-target freeze ----
+    case "echoes_freeze_target": {
+      const target = nearestTarget(w, p, ab.range);
+      if (!target) break;
+      damageEntity(w, target, ab.damage);
+      target.stunUntil = Math.max(target.stunUntil, w.time + (ab.duration ?? 4));
+      target.slowUntil = Math.max(target.slowUntil ?? 0, w.time + (ab.duration ?? 4));
+      spawnVfx(w, { kind: "ice_burst", pos: { ...target.pos }, radius: 18, color: ab.color, life: 0.6 });
+      ctx_drawTextOver(w, target.pos, "ピピピ", ab.color);
+      break;
+    }
+    // ---- Echoes A4 — close-range amplify mark ----
+    case "echoes_amplify": {
+      const target = nearestTarget(w, p, ab.range + 16);
+      if (!target) break;
+      damageEntity(w, target, ab.damage);
+      target.slowUntil = Math.max(target.slowUntil ?? 0, w.time + (ab.duration ?? 5));
+      target.bleedUntil = w.time + (ab.duration ?? 5);
+      target.bleedNextTickAt = w.time + 0.5;
+      spawnVfx(w, { kind: "slash_arc", pos: { ...target.pos }, angle: Math.atan2(dir.y, dir.x), radius: 18, color: ab.color, life: 0.3 });
+      ctx_drawTextOver(w, target.pos, "ズキューン", ab.color);
+      break;
+    }
+    // ---- GER A1 — Life Beam ----
+    case "ger_life_beam": {
+      const target = nearestTarget(w, p, ab.range) ?? null;
+      const tx = target ? target.pos.x : p.x + dir.x * ab.range;
+      const ty = target ? target.pos.y : p.y + dir.y * ab.range;
+      const beamDir = norm({ x: tx - p.x, y: ty - p.y });
+      const steps = 20;
+      const hit = new Set<number>();
+      for (let s = 1; s <= steps; s++) {
+        const f = s / steps;
+        const x = p.x + (tx - p.x) * f, y = p.y + (ty - p.y) * f;
+        for (const e of w.npcs) {
+          if (!e.alive || hit.has(e.id)) continue;
+          if (dist2(e.pos, { x, y }) < (8 + e.radius) ** 2) {
+            damageEntity(w, e, ab.damage, { dir: beamDir, amount: 40 });
+            hit.add(e.id);
+          }
+        }
+      }
+      spawnVfx(w, { kind: "beam", pos: { ...p }, to: { x: tx, y: ty }, color: "#ffd6e0", life: 0.4 });
+      spawnVfx(w, { kind: "stab_line", pos: { ...p }, to: { x: tx, y: ty }, color: "#fff", life: 0.3 });
+      w.shake = Math.max(w.shake, 4);
+      break;
+    }
+    // ---- GER A2 — punch + ghost copies ----
+    case "ger_truth_punch": {
+      const target = nearestTarget(w, p, ab.range);
+      if (!target) break;
+      damageEntity(w, target, ab.damage);
+      // Schedule staged damage ticks
+      for (let i = 1; i <= 6; i++) {
+        w.curseStrikes.push({ targetId: target.id, hitAt: w.time + i * 0.55, dmg: 5, color: "#ffd6e0" });
+      }
+      for (let i = 0; i < 4; i++) {
+        spawnVfx(w, { kind: "ge_hologram", pos: { x: target.pos.x + (i - 1.5) * 6, y: target.pos.y }, color: "#ffd6e0", life: 1.0 });
+      }
+      spawnVfx(w, { kind: "punch_impact", pos: { ...target.pos }, color: "#ffd6e0", life: 0.3 });
+      break;
+    }
+    // ---- GER A3 — triple loop ----
+    case "ger_triple_loop": {
+      const target = nearestTarget(w, p, ab.range + 60);
+      if (!target) break;
+      target.stunUntil = w.time + 5;
+      // Lightning
+      w.curseStrikes.push({ targetId: target.id, hitAt: w.time + 1.0, dmg: 14, color: "#cfd6ff" });
+      // Poison stage
+      target.poisonUntil = w.time + 5;
+      target.poisonNextTickAt = w.time + 1.8;
+      target.poisonDps = 5;
+      // Pebble barrage
+      for (let i = 0; i < 4; i++) {
+        w.curseStrikes.push({ targetId: target.id, hitAt: w.time + 3.5 + i * 0.2, dmg: 5, color: "#ffd6e0" });
+      }
+      spawnVfx(w, { kind: "shockwave", pos: { ...target.pos }, radius: 30, color: "#ffd6e0", life: 0.5 });
+      w.bannerText = "Triple Loop";
+      w.bannerUntil = w.time + 1.4;
+      break;
+    }
   }
   if (w.standId === "white_album" && w.whiteAlbumActive && ab.kind !== "ice_heal" && ab.kind !== "ice_stomp") {
     const drain = key === "m1" ? 3 : 12;
     w.whiteAlbumBar = Math.max(0, w.whiteAlbumBar - drain);
   }
+}
+
+// Floating text VFX helper for Echoes
+function ctx_drawTextOver(w: World, pos: Vec2, text: string, color: string) {
+  w.damageNumbers.push({
+    id: w.nextId++,
+    pos: { ...pos, y: pos.y - 10 },
+    text,
+    color,
+    size: 14,
+    vy: -16,
+    bornAt: w.time,
+    expireAt: w.time + 1.2,
+  });
 }
 
 function trySpawnItem(w: World, kind: ItemPickup["kind"]) {
@@ -3095,22 +3208,20 @@ export function useDisc(w: World) {
   play("pickupDisc");
 }
 
-// Requiem Arrow: decorative-only (kept for back-compat; UI no longer offers a use button).
+// Requiem Arrow: ONLY Gold Experience can use it — evolves into GER.
 export function useRequiemArrow(w: World): boolean {
-  if (w.standId !== "none") {
-    showToast(w, "Use a DISC to drop your stand first");
+  if (w.requiemArrowCount <= 0) return false;
+  if (w.standId !== "gold_experience") {
+    showToast(w, "Only Gold Experience can use this");
     return false;
   }
-  if (w.requiemArrowCount <= 0) return false;
   w.requiemArrowCount--;
-  const { id, shitVariant } = rollStand();
   resetStandRuntime(w);
-  w.standId = id;
-  w.shitVariant = shitVariant;
+  w.standId = "ger";
+  w.shitVariant = false;
   w.standActive = false;
-  if (id === "white_album") (w as any).whiteAlbumActive = false;
-  const name = STANDS[id].name + (shitVariant ? " (S.H.I.T.!)" : "");
-  showToast(w, "Requiem Arrow → " + name);
+  w.bannerText = "Gold Experience REQUIEM";
+  w.bannerUntil = w.time + 3;
   play("rollStand");
   return true;
 }

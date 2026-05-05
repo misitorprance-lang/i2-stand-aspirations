@@ -9,6 +9,7 @@ export type StandId =
   | "echoes"
   | "ebony_devil"
   | "gold_experience"
+  | "ger"
   | "hanged_man"
   | "white_album"
   | "purple_haze"
@@ -67,7 +68,16 @@ export type AbilityKind =
   | "eternal_curse"
   // Harvest
   | "harvest_gather"
-  | "harvest_carry";
+  | "harvest_carry"
+  // RHCP rework
+  | "rhcp_dash"
+  // Echoes Japanese-text reworks
+  | "echoes_freeze_target"
+  | "echoes_amplify"
+  // Gold Experience Requiem
+  | "ger_life_beam"
+  | "ger_truth_punch"
+  | "ger_triple_loop";
 
 export interface Ability {
   name: string;
@@ -140,7 +150,7 @@ export const STANDS: Record<StandId, Stand> = {
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 7, range: 22, radius: 16, cooldown: 0.28, color: "#5fe8ff" },
       a1: { name: "Star Rush", kind: "star_rush", damage: 8, range: 42, radius: 14, cooldown: 3.5, color: "#5fe8ff" },
-      a2: { name: "Triple Pebble", kind: "triple_pebble", damage: 4, range: 240, radius: 4, cooldown: 2.0, speed: 420, color: "#5fe8ff" },
+      a2: { name: "Triple Pebble", kind: "triple_pebble", damage: 3, range: 240, radius: 3, cooldown: 2.0, speed: 480, color: "#5fe8ff" },
       a3: { name: "The World", kind: "time_stop_or_skip", damage: 0, range: 0, cooldown: 16, duration: 7, color: "#dcd6ff" },
       a4: { name: "Launch", kind: "knockback", damage: 20, range: 18, radius: 16, cooldown: 5.5, knockback: 340, color: "#a06bff" },
     },
@@ -154,8 +164,8 @@ export const STANDS: Record<StandId, Stand> = {
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 1.4, range: 20, radius: 14, cooldown: 0.32, color: "#ffd0a8" },
       a1: { name: "Electric Shot", kind: "projectile", damage: 4, range: 220, radius: 6, cooldown: 1.2, speed: 380, color: "#fff36b" },
-      a2: { name: "Electric Discharge", kind: "aoe_self", damage: 5, range: 0, radius: 70, cooldown: 4, color: "#fff36b" },
-      a3: { name: "Ground Bomber", kind: "aoe_target", damage: 9, range: 120, radius: 50, cooldown: 6, crater: true, color: "#ff8a3a" },
+      a2: { name: "Cable Dash", kind: "rhcp_dash", damage: 7, range: 220, radius: 14, cooldown: 5, speed: 720, color: "#fff36b" },
+      a3: { name: "Ground Bomber", kind: "aoe_target", damage: 9, range: 120, radius: 50, cooldown: 6, knockback: 240, crater: true, color: "#ff8a3a" },
       a4: { name: "Tesla Coil", kind: "tesla", damage: 1.8, range: 0, radius: 90, cooldown: 12, duration: 3, tickEvery: 0.4, color: "#9be7ff" },
     },
   },
@@ -167,10 +177,10 @@ export const STANDS: Record<StandId, Stand> = {
     rarityWeight: 6,
     abilities: {
       m1: { name: "Act 1 Touch", kind: "melee", damage: 0.5, range: 14, radius: 10, cooldown: 0.35, color: "#bff5da" },
-      a1: { name: "Sent Bleed", kind: "bleed_text", damage: 2, range: 220, radius: 7, cooldown: 3.2, speed: 360, duration: 6, color: "#ff4d4d" },
-      a2: { name: "Explosion", kind: "explosion_text", damage: 6, range: 0, radius: 26, cooldown: 7, duration: 6, knockback: 220, color: "#ffb84d" },
-      a3: { name: "Ground Text", kind: "frost_text", damage: 0.8, range: 110, radius: 44, cooldown: 5, duration: 4, tickEvery: 0.45, color: "#a8e8ff" },
-      a4: { name: "Three Freeze", kind: "three_freeze_pressure", damage: 0.9, range: 240, radius: 22, cooldown: 9, duration: 4.5, tickEvery: 0.5, color: "#5fd1a0" },
+      a1: { name: "ゴゴゴ Bleed", kind: "bleed_text", damage: 2, range: 30, radius: 8, cooldown: 3.2, speed: 1, duration: 6, color: "#ff4d4d" },
+      a2: { name: "ドドド Bomb", kind: "explosion_text", damage: 3, range: 110, radius: 30, cooldown: 6, duration: 14, knockback: 220, color: "#ffb84d" },
+      a3: { name: "ピピピ Freeze", kind: "echoes_freeze_target", damage: 1, range: 220, radius: 0, cooldown: 5, duration: 4, color: "#a8e8ff" },
+      a4: { name: "ズキューン Mark", kind: "echoes_amplify", damage: 4, range: 28, radius: 14, cooldown: 9, duration: 5, color: "#5fd1a0" },
     },
   },
   ebony_devil: {
@@ -199,6 +209,20 @@ export const STANDS: Record<StandId, Stand> = {
       a2: { name: "Frog Summon", kind: "frog_summon", damage: 0, range: 0, cooldown: 4.5, color: "#7fc97f" },
       a3: { name: "Out of Body", kind: "hologram_stun", damage: 5, range: 36, radius: 18, cooldown: 12, stunSeconds: 3.5, color: "#bff5da" },
       a4: { name: "Tree of Life", kind: "tree_zone", damage: 0, range: 70, radius: 90, cooldown: 30, duration: 14, color: "#5fd16a" },
+    },
+  },
+  ger: {
+    id: "ger",
+    name: "Gold Experience Requiem",
+    color: "#ffd6e0",
+    rarity: "legendary",
+    rarityWeight: 0,
+    abilities: {
+      m1: { name: "Punch", kind: "melee", damage: 6, range: 22, radius: 16, cooldown: 0.3, color: "#ffd6e0" },
+      a1: { name: "Life Beam", kind: "ger_life_beam", damage: 13, range: 320, radius: 4, cooldown: 5, color: "#ffd6e0" },
+      a2: { name: "You'll Never Reach Truth", kind: "ger_truth_punch", damage: 4, range: 28, radius: 16, cooldown: 12, duration: 4, color: "#ffd6e0" },
+      a3: { name: "Triple Loop", kind: "ger_triple_loop", damage: 24, range: 60, radius: 0, cooldown: 18, duration: 5, color: "#ffd6e0" },
+      a4: { name: "-", kind: "melee", damage: 0, range: 0, cooldown: 999, color: "#888" },
     },
   },
   hanged_man: {

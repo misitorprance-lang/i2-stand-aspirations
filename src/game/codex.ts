@@ -84,8 +84,8 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
     moves: {
       m1: moveOf("rhcp", "m1", "Cone melee."),
       a1: moveOf("rhcp", "a1", "Fast electric projectile, applies electrocute status."),
-      a2: moveOf("rhcp", "a2", "Ring AOE around player with knockback."),
-      a3: moveOf("rhcp", "a3", "Targeted explosion at point, leaves crater."),
+      a2: moveOf("rhcp", "a2", "Cable Dash — blitz through the nearest NPC, dealing damage on the pass."),
+      a3: moveOf("rhcp", "a3", "Targeted explosion at point with knockback. Crater fades after a few seconds."),
       a4: moveOf("rhcp", "a4", "Stationary tesla zone ticking damage."),
     },
   },
@@ -102,10 +102,10 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
     },
     moves: {
       m1: moveOf("echoes", "m1", "Tiny melee tick."),
-      a1: moveOf("echoes", "a1", "Sent Bleed: red text projectile that infects an NPC with bleed."),
-      a2: moveOf("echoes", "a2", "Explosion: tags YOU; attackers get blown back on hit."),
-      a3: moveOf("echoes", "a3", "Drops a Frost or Burn ground text. Frost slows + chip; Burn faster chip, no stun."),
-      a4: moveOf("echoes", "a4", "Three Freeze: pressures the 3 nearest enemies — chip, heavy slow, can't fight."),
+      a1: moveOf("echoes", "a1", "ゴゴゴ — close-range; tag the NPC with bleed."),
+      a2: moveOf("echoes", "a2", "ドドド — drop a bomb-text on the ground that detonates only when an NPC walks over it."),
+      a3: moveOf("echoes", "a3", "ピピピ — single-target freeze: lock one NPC in place + heavy slow."),
+      a4: moveOf("echoes", "a4", "ズキューン — close-range mark: hit one NPC, slows heavily and amps your damage to it for 5s."),
     },
   },
   ebony_devil: {
@@ -136,6 +136,21 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
       a2: moveOf("gold_experience", "a2", "Frog protectors follow you (max 3); they leap to block hits and reflect 50%."),
       a3: moveOf("gold_experience", "a3", "Long single-target stun; a hologram of GE shoots out from behind the target."),
       a4: moveOf("gold_experience", "a4", "Tree of Life zone: roots enemies, heals you, buffs frog/eagle spam. Despawns on expire."),
+    },
+  },
+  ger: {
+    id: "ger",
+    model: {
+      description: "Gold Experience Requiem — porcelain-pale humanoid with rosy-gold trim and ladybug emblems on shoulders/forehead/knees; long pink-tipped hair.",
+      silhouette: ["ladybug emblems", "porcelain face", "pink-tipped hair"],
+      auraColor: "#ffd6e0",
+    },
+    moves: {
+      m1: moveOf("ger", "m1", "Crisp punch — 6 dmg / 7 crit. Passive: Return to Zero rewinds attackers 5s back when they hit you (20s ICD)."),
+      a1: moveOf("ger", "a1", "Life Beam — flicked pebble becomes a piercing beam, 13 dmg."),
+      a2: moveOf("ger", "a2", "You'll Never Reach the Truth — punch + ghost copies of the target stack damage until they die."),
+      a3: moveOf("ger", "a3", "Triple Loop — target frozen, then killed by lightning → poison → pebbles in sequence."),
+      a4: moveOf("ger", "a4", "—"),
     },
   },
   hanged_man: {
