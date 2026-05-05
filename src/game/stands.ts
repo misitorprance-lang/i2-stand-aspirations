@@ -164,8 +164,8 @@ export const STANDS: Record<StandId, Stand> = {
     abilities: {
       m1: { name: "Punch", kind: "melee", damage: 1.4, range: 20, radius: 14, cooldown: 0.32, color: "#ffd0a8" },
       a1: { name: "Electric Shot", kind: "projectile", damage: 4, range: 220, radius: 6, cooldown: 1.2, speed: 380, color: "#fff36b" },
-      a2: { name: "Electric Discharge", kind: "aoe_self", damage: 5, range: 0, radius: 70, cooldown: 4, color: "#fff36b" },
-      a3: { name: "Ground Bomber", kind: "aoe_target", damage: 9, range: 120, radius: 50, cooldown: 6, crater: true, color: "#ff8a3a" },
+      a2: { name: "Cable Dash", kind: "rhcp_dash", damage: 7, range: 220, radius: 14, cooldown: 5, speed: 720, color: "#fff36b" },
+      a3: { name: "Ground Bomber", kind: "aoe_target", damage: 9, range: 120, radius: 50, cooldown: 6, knockback: 240, crater: true, color: "#ff8a3a" },
       a4: { name: "Tesla Coil", kind: "tesla", damage: 1.8, range: 0, radius: 90, cooldown: 12, duration: 3, tickEvery: 0.4, color: "#9be7ff" },
     },
   },
