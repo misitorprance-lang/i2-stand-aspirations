@@ -102,10 +102,10 @@ export const STAND_CODEX: Record<Exclude<StandId, "none">, StandCodexEntry> = {
     },
     moves: {
       m1: moveOf("echoes", "m1", "Tiny melee tick."),
-      a1: moveOf("echoes", "a1", "Sent Bleed: red text projectile that infects an NPC with bleed."),
-      a2: moveOf("echoes", "a2", "Explosion: tags YOU; attackers get blown back on hit."),
-      a3: moveOf("echoes", "a3", "Drops a Frost or Burn ground text. Frost slows + chip; Burn faster chip, no stun."),
-      a4: moveOf("echoes", "a4", "Three Freeze: pressures the 3 nearest enemies — chip, heavy slow, can't fight."),
+      a1: moveOf("echoes", "a1", "ゴゴゴ — close-range; tag the NPC with bleed."),
+      a2: moveOf("echoes", "a2", "ドドド — drop a bomb-text on the ground that detonates only when an NPC walks over it."),
+      a3: moveOf("echoes", "a3", "ピピピ — single-target freeze: lock one NPC in place + heavy slow."),
+      a4: moveOf("echoes", "a4", "ズキューン — close-range mark: hit one NPC, slows heavily and amps your damage to it for 5s."),
     },
   },
   ebony_devil: {
