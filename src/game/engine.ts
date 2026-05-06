@@ -1985,7 +1985,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         break;
       }
       (w as any).sptwRage = 0;
-      w.rageUntil = w.time + 6;
+      w.rageUntil = w.time + 10;
       w.bannerText = "RAGE";
       w.bannerUntil = w.time + 1.2;
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 72, color: "#5fe8ff", life: 0.6 });
