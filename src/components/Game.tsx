@@ -583,18 +583,29 @@ export default function Game() {
 
       {/* Ability buttons (right side) */}
       <div className="absolute right-2 bottom-3 flex flex-col items-end gap-2 pointer-events-none z-20">
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative">
           <AbilityBtn label="1" name={abilities.a1.name} damage={abilities.a1.damage} color={abilities.a1.color} cdFrac={cdFrac("a1")} disabled={ui.standId === "none" || abilities.a1.name === "-"} onPress={press("a1")} />
           <AbilityBtn label="2" name={abilities.a2.name} damage={abilities.a2.damage} color={abilities.a2.color} cdFrac={cdFrac("a2")} disabled={ui.standId === "none" || abilities.a2.name === "-"} onPress={press("a2")} />
+          {ui.standId === "sptw" && ui.sptwRage >= 100 && (
+            <button
+              onClick={onPressRage}
+              className="absolute inset-0 rounded-md font-bold text-black pointer-events-auto"
+              style={{
+                background: "linear-gradient(135deg,#5fe8ff,#a06bff)",
+                border: "2px solid #fff",
+                boxShadow: "0 0 14px rgba(95,232,255,0.8)",
+                animation: "pulse 1s infinite",
+              }}
+            >
+              ⚡ RAGE
+            </button>
+          )}
         </div>
         <div className="flex gap-2">
           <AbilityBtn label="3" name={abilities.a3.name} damage={abilities.a3.damage} color={abilities.a3.color} cdFrac={cdFrac("a3")} disabled={ui.standId === "none" || abilities.a3.name === "-"} onPress={press("a3")} />
           <AbilityBtn label="4" name={abilities.a4.name} damage={abilities.a4.damage} color={abilities.a4.color} cdFrac={cdFrac("a4")} disabled={ui.standId === "none" || abilities.a4.name === "-" || (ui.standId === "ebony_devil" && ui.rage < 100 && !ui.rageActive)} onPress={press("a4")} />
         </div>
         <AbilityBtn label="M1" name={abilities.m1.name} damage={abilities.m1.damage} color={abilities.m1.color} cdFrac={cdFrac("m1")} big onPress={press("m1")} onHoldStart={m1HoldStart} onHoldEnd={m1HoldEnd} />
-        {ui.standId === "sptw" && ui.sptwRage >= 100 && (
-          <AbilityBtn label="⚡" name="Rage" damage={0} color="#5fe8ff" cdFrac={0} onPress={onPressRage} />
-        )}
         {ui.standId === "sptw" && ui.sptwRage < 100 && ui.sptwRage > 0 && (
           <div className="pointer-events-none bg-black/60 border border-white/30 rounded h-2 overflow-hidden w-20">
             <div className="h-full" style={{ width: `${ui.sptwRage}%`, background: "#5fe8ff" }} />
@@ -611,11 +622,11 @@ export default function Game() {
         )}
       </div>
 
-      {/* Time Stop chip (Piloting label is now under the stand name in the top-left HUD). */}
+      {/* Time Stop banner — top center */}
       {ui.timeStopActive && (
-        <div className="absolute top-24 left-3 flex flex-col gap-1 z-30 pointer-events-none">
-          <div className="px-2 py-0.5 rounded text-[10px] font-bold"
-               style={{ background: "rgba(0,0,0,0.7)", color: "#dcd6ff", border: "1px solid #dcd6ff" }}>
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+          <div className="px-3 py-1 rounded text-xs font-bold"
+               style={{ background: "rgba(0,0,0,0.78)", color: "#dcd6ff", border: "1px solid #dcd6ff" }}>
             ⏱ TIME STOPPED
           </div>
         </div>

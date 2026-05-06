@@ -55,7 +55,7 @@ const ENEMY_COUNT = 14;
 // Faster respawn + bigger ground pool — map is 1.5x bigger now, so finding items
 // shouldn't feel like a chore. Initial world also pre-seeds a starter pool.
 const ARROW_INTERVAL = [3, 6] as const;
-const DISC_INTERVAL = [3, 6] as const;
+const DISC_INTERVAL = [2, 4] as const;
 const MAX_ARROWS_ON_GROUND = 14;
 const MAX_DISCS_ON_GROUND = 14;
 const INITIAL_ARROW_COUNT = 8;
@@ -1985,7 +1985,7 @@ function castAbility(w: World, key: "m1" | "a1" | "a2" | "a3" | "a4", input: Inp
         break;
       }
       (w as any).sptwRage = 0;
-      w.rageUntil = w.time + 6;
+      w.rageUntil = w.time + 10;
       w.bannerText = "RAGE";
       w.bannerUntil = w.time + 1.2;
       spawnVfx(w, { kind: "shockwave", pos: { ...p }, radius: 72, color: "#5fe8ff", life: 0.6 });
@@ -3382,15 +3382,32 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
       ctx.beginPath(); ctx.arc(-1.5, -1.5, 1.5, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     } else if (it.kind === "strange_hat") {
-      // Strange Black Hat — bowler-ish silhouette with cyan glow.
+      // Strange Black Cap (with hair tuft at back) + small gold box w/ palm outline.
       const pulse = 0.4 + 0.4 * Math.sin(w.time * 4);
-      ctx.fillStyle = `rgba(95,232,255,${0.45 * pulse})`;
-      ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(95,232,255,${0.35 * pulse})`;
+      ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2); ctx.fill();
+      // hair tuft (back)
       ctx.fillStyle = "#1a1a1a";
-      ctx.fillRect(cx - 7, cy + 1, 14, 2);   // brim
-      ctx.fillRect(cx - 4, cy - 5, 8, 6);    // crown
-      ctx.fillStyle = "#5fe8ff";
-      ctx.fillRect(cx - 4, cy, 8, 1);        // band
+      ctx.fillRect(cx - 2, cy + 2, 5, 3);
+      // flat-brim cap crown
+      ctx.fillStyle = "#0a0a0a";
+      ctx.beginPath(); ctx.ellipse(cx - 2, cy - 2, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+      // visor
+      ctx.fillStyle = "#0a0a0a";
+      ctx.fillRect(cx - 7, cy - 1, 8, 2);
+      // small gold box beside
+      ctx.fillStyle = "#f5d36b";
+      ctx.fillRect(cx + 5, cy - 2, 5, 5);
+      ctx.strokeStyle = "#1a1a1a";
+      ctx.lineWidth = 0.6;
+      ctx.strokeRect(cx + 5, cy - 2, 5, 5);
+      // black palm outline (5 little fingers as dots)
+      ctx.fillStyle = "#0a0a0a";
+      ctx.fillRect(cx + 7, cy + 0, 1, 1);
+      ctx.fillRect(cx + 6, cy - 1, 1, 1);
+      ctx.fillRect(cx + 8, cy - 1, 1, 1);
+      ctx.fillRect(cx + 5, cy, 1, 1);
+      ctx.fillRect(cx + 9, cy, 1, 1);
     } else {
       ctx.save();
       ctx.translate(cx, cy);
@@ -3726,9 +3743,22 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fillStyle = flash ? "#ffffff" : pl.color;
     ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
     const fx = pl.facing.x, fy = pl.facing.y;
-    ctx.fillStyle = "#222";
+    const sptwRaging = w.standId === "sptw" && w.time < w.rageUntil;
+    ctx.fillStyle = sptwRaging ? "#5fe8ff" : "#222";
     ctx.fillRect(pl.pos.x - 3 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
     ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+    if (sptwRaging) {
+      // upward flowing cyan trail off the eyes
+      const t = w.time * 6;
+      for (let i = 0; i < 4; i++) {
+        const ph = (t + i * 0.7) % 2;
+        const a = Math.max(0, 1 - ph / 2);
+        ctx.fillStyle = `rgba(95,232,255,${0.6 * a})`;
+        ctx.fillRect(pl.pos.x - 3, pl.pos.y - 7 - ph * 5, 2, 2);
+        ctx.fillStyle = `rgba(95,232,255,${0.6 * a})`;
+        ctx.fillRect(pl.pos.x + 1, pl.pos.y - 7 - ph * 5, 2, 2);
+      }
+    }
   }
   if (pl.hp < pl.maxHp) drawHpBar(ctx, pl.pos.x, pl.pos.y - 16, pl.hp / pl.maxHp);
   if (standVisible && standInFront) drawStand(ctx, w, standPos);
@@ -3771,8 +3801,55 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   else if (id === "echoes") drawEchoes(ctx, w, pos);
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
   else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
+  else if (id === "ger") drawGer(ctx, w, pos);
   else if (id === "white_album") drawWhiteAlbum(ctx, w, pos);
   else if (id === "purple_haze") drawPurpleHaze(ctx, w, pos);
+}
+
+function drawGer(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  const bob = Math.sin(w.time * 3.4) * 0.6;
+  // pale pink/gold aura
+  ctx.fillStyle = `rgba(255,214,224,${0.3 + Math.sin(w.time * 5) * 0.06})`;
+  ctx.beginPath(); ctx.arc(pos.x, pos.y + bob, 16, 0, Math.PI * 2); ctx.fill();
+  // body — pale gold
+  ctx.fillStyle = "#e8d090";
+  ctx.fillRect(pos.x - 5, pos.y - 2 + bob, 10, 12);
+  // pink trim
+  ctx.fillStyle = "#ffc8d6";
+  ctx.fillRect(pos.x - 5, pos.y + 6 + bob, 10, 2);
+  // ladybug spots (shoulders, knees)
+  ctx.fillStyle = "#c8324a";
+  ctx.fillRect(pos.x - 5, pos.y - 1 + bob, 2, 2);
+  ctx.fillRect(pos.x + 3, pos.y - 1 + bob, 2, 2);
+  ctx.fillRect(pos.x - 4, pos.y + 8 + bob, 2, 2);
+  ctx.fillRect(pos.x + 2, pos.y + 8 + bob, 2, 2);
+  // head — porcelain
+  ctx.fillStyle = "#fff3e8";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y - 7 + bob, 5, 0, Math.PI * 2); ctx.fill();
+  // pink hair tips
+  ctx.fillStyle = "#ffaec4";
+  ctx.fillRect(pos.x - 5, pos.y - 11 + bob, 10, 2);
+  ctx.fillRect(pos.x - 6, pos.y - 9 + bob, 2, 4);
+  ctx.fillRect(pos.x + 4, pos.y - 9 + bob, 2, 4);
+  // ladybug forehead emblem
+  ctx.fillStyle = "#c8324a";
+  ctx.fillRect(pos.x - 1, pos.y - 9 + bob, 2, 2);
+  // eyes
+  ctx.fillStyle = "#3a1a3a";
+  ctx.fillRect(pos.x - 3, pos.y - 7 + bob, 2, 1);
+  ctx.fillRect(pos.x + 1, pos.y - 7 + bob, 2, 1);
+  if (punching) {
+    const d = w.standPunchDir;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(pos.x - 1 + d.x * 8, pos.y - 1 + d.y * 8 + bob, 5, 4);
+    ctx.fillStyle = "#ffd6e0";
+    ctx.fillRect(pos.x + d.x * 11, pos.y + d.y * 11 + bob, 2, 2);
+  } else {
+    ctx.fillStyle = "#e8d090";
+    ctx.fillRect(pos.x - 7, pos.y + bob, 3, 5);
+    ctx.fillRect(pos.x + 4, pos.y + bob, 3, 5);
+  }
 }
 
 function drawSptw(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
