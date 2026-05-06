@@ -3382,15 +3382,32 @@ export function render(ctx: CanvasRenderingContext2D, w: World) {
       ctx.beginPath(); ctx.arc(-1.5, -1.5, 1.5, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     } else if (it.kind === "strange_hat") {
-      // Strange Black Hat — bowler-ish silhouette with cyan glow.
+      // Strange Black Cap (with hair tuft at back) + small gold box w/ palm outline.
       const pulse = 0.4 + 0.4 * Math.sin(w.time * 4);
-      ctx.fillStyle = `rgba(95,232,255,${0.45 * pulse})`;
-      ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(95,232,255,${0.35 * pulse})`;
+      ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2); ctx.fill();
+      // hair tuft (back)
       ctx.fillStyle = "#1a1a1a";
-      ctx.fillRect(cx - 7, cy + 1, 14, 2);   // brim
-      ctx.fillRect(cx - 4, cy - 5, 8, 6);    // crown
-      ctx.fillStyle = "#5fe8ff";
-      ctx.fillRect(cx - 4, cy, 8, 1);        // band
+      ctx.fillRect(cx - 2, cy + 2, 5, 3);
+      // flat-brim cap crown
+      ctx.fillStyle = "#0a0a0a";
+      ctx.beginPath(); ctx.ellipse(cx - 2, cy - 2, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+      // visor
+      ctx.fillStyle = "#0a0a0a";
+      ctx.fillRect(cx - 7, cy - 1, 8, 2);
+      // small gold box beside
+      ctx.fillStyle = "#f5d36b";
+      ctx.fillRect(cx + 5, cy - 2, 5, 5);
+      ctx.strokeStyle = "#1a1a1a";
+      ctx.lineWidth = 0.6;
+      ctx.strokeRect(cx + 5, cy - 2, 5, 5);
+      // black palm outline (5 little fingers as dots)
+      ctx.fillStyle = "#0a0a0a";
+      ctx.fillRect(cx + 7, cy + 0, 1, 1);
+      ctx.fillRect(cx + 6, cy - 1, 1, 1);
+      ctx.fillRect(cx + 8, cy - 1, 1, 1);
+      ctx.fillRect(cx + 5, cy, 1, 1);
+      ctx.fillRect(cx + 9, cy, 1, 1);
     } else {
       ctx.save();
       ctx.translate(cx, cy);
