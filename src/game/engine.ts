@@ -3788,8 +3788,55 @@ function drawStand(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
   else if (id === "echoes") drawEchoes(ctx, w, pos);
   else if (id === "ebony_devil") drawEbonyDevil(ctx, w, pos);
   else if (id === "gold_experience") drawGoldExperience(ctx, w, pos);
+  else if (id === "ger") drawGer(ctx, w, pos);
   else if (id === "white_album") drawWhiteAlbum(ctx, w, pos);
   else if (id === "purple_haze") drawPurpleHaze(ctx, w, pos);
+}
+
+function drawGer(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
+  const punching = w.time < w.standPunchUntil;
+  const bob = Math.sin(w.time * 3.4) * 0.6;
+  // pale pink/gold aura
+  ctx.fillStyle = `rgba(255,214,224,${0.3 + Math.sin(w.time * 5) * 0.06})`;
+  ctx.beginPath(); ctx.arc(pos.x, pos.y + bob, 16, 0, Math.PI * 2); ctx.fill();
+  // body — pale gold
+  ctx.fillStyle = "#e8d090";
+  ctx.fillRect(pos.x - 5, pos.y - 2 + bob, 10, 12);
+  // pink trim
+  ctx.fillStyle = "#ffc8d6";
+  ctx.fillRect(pos.x - 5, pos.y + 6 + bob, 10, 2);
+  // ladybug spots (shoulders, knees)
+  ctx.fillStyle = "#c8324a";
+  ctx.fillRect(pos.x - 5, pos.y - 1 + bob, 2, 2);
+  ctx.fillRect(pos.x + 3, pos.y - 1 + bob, 2, 2);
+  ctx.fillRect(pos.x - 4, pos.y + 8 + bob, 2, 2);
+  ctx.fillRect(pos.x + 2, pos.y + 8 + bob, 2, 2);
+  // head — porcelain
+  ctx.fillStyle = "#fff3e8";
+  ctx.beginPath(); ctx.arc(pos.x, pos.y - 7 + bob, 5, 0, Math.PI * 2); ctx.fill();
+  // pink hair tips
+  ctx.fillStyle = "#ffaec4";
+  ctx.fillRect(pos.x - 5, pos.y - 11 + bob, 10, 2);
+  ctx.fillRect(pos.x - 6, pos.y - 9 + bob, 2, 4);
+  ctx.fillRect(pos.x + 4, pos.y - 9 + bob, 2, 4);
+  // ladybug forehead emblem
+  ctx.fillStyle = "#c8324a";
+  ctx.fillRect(pos.x - 1, pos.y - 9 + bob, 2, 2);
+  // eyes
+  ctx.fillStyle = "#3a1a3a";
+  ctx.fillRect(pos.x - 3, pos.y - 7 + bob, 2, 1);
+  ctx.fillRect(pos.x + 1, pos.y - 7 + bob, 2, 1);
+  if (punching) {
+    const d = w.standPunchDir;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(pos.x - 1 + d.x * 8, pos.y - 1 + d.y * 8 + bob, 5, 4);
+    ctx.fillStyle = "#ffd6e0";
+    ctx.fillRect(pos.x + d.x * 11, pos.y + d.y * 11 + bob, 2, 2);
+  } else {
+    ctx.fillStyle = "#e8d090";
+    ctx.fillRect(pos.x - 7, pos.y + bob, 3, 5);
+    ctx.fillRect(pos.x + 4, pos.y + bob, 3, 5);
+  }
 }
 
 function drawSptw(ctx: CanvasRenderingContext2D, w: World, pos: Vec2) {
