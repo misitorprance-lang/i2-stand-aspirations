@@ -803,6 +803,20 @@ function damageEntity(w: World, e: Entity, dmg: number, knockback?: { dir: Vec2;
     e.respawnAt = w.time + RESPAWN_DELAY;
     spawnParticles(w, e.pos, e.color, 14);
     if (e.kind === "enemy") w.kills++;
+    // Simple ground destruction on NPC death (ragdoll scar) — excluded stands cannot scar ground.
+    const NO_SCAR = new Set<string>(["hanged_man", "harvest", "ebony_devil", "moon_rabbit", "none"]);
+    if (!NO_SCAR.has(w.standId)) {
+      // ragdoll fling
+      e.vel.x += (Math.random() - 0.5) * 80;
+      e.vel.y += (Math.random() - 0.5) * 80;
+      w.craters.push({
+        pos: { ...e.pos },
+        radius: 9 + Math.random() * 4,
+        bornAt: w.time,
+        expireAt: w.time + 16,
+      });
+      spawnVfx(w, { kind: "crater_smoke", pos: { ...e.pos }, radius: 10, color: "#3a2a1e", life: 0.8 } as any);
+    }
   }
 }
 

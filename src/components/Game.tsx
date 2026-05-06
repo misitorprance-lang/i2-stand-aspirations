@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   VW,
   VH,
+  MAP_W,
+  MAP_H,
   createWorld,
   makeInput,
   render,
@@ -100,8 +102,15 @@ export default function Game() {
   const [boingoOpen, setBoingoOpen] = useState(false);
   const [bookPage, setBookPage] = useState<1 | 2>(1);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [invTab, setInvTab] = useState<"items" | "map" | "howto" | "changelog">("items");
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
-  const [showHelp, setShowHelp] = useState<boolean>(true);
+  const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [bagHintUntil, setBagHintUntil] = useState<number>(() => Date.now() + 10000);
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => forceTick((t) => t + 1), 250);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Joystick state
   const joyRef = useRef<{ active: boolean; baseX: number; baseY: number; pointerId: number | null }>({
@@ -516,26 +525,16 @@ export default function Game() {
         </div>
       )}
 
-      {/* Help / controls */}
-      {showHelp && (
-        <div className="absolute inset-x-3 top-24 bg-black/75 border border-white/30 rounded p-3 text-white text-[11px] z-30 pointer-events-auto"
-             onClick={() => setShowHelp(false)}>
-          <div className="font-bold mb-1 text-sm">How to play (tap to close)</div>
-          <div>• Drag the LEFT half to move (or WASD).</div>
-          <div>• Tap M1 / 1-4 to attack (or Space, 1-4). Hold M1 to auto-repeat.</div>
-          <div>• M1 auto-aims at the closest NPC. 1-4 lock onto the closest enemy.</div>
-          <div>• Pick up <span style={{color:"#caa14a"}}>Arrows</span> to roll a stand. <span style={{color:"#cfd2d8"}}>DISCs</span> remove your stand.</div>
-          <div>• Tap "Stand: ON/OFF" to dismiss/resummon your stand.</div>
-          <div>• Hostile NPCs (red) only attack after you provoke them. You slowly regen out of combat.</div>
+      {/* Bag hint — 10s arrow toward INV button for new players */}
+      {Date.now() < bagHintUntil && !inventoryOpen && (
+        <div className="absolute z-40 pointer-events-none" style={{ top: 38, right: 8 }}>
+          <div className="flex flex-col items-end animate-pulse">
+            <div className="text-[10px] font-bold text-white bg-black/80 border border-yellow-300 rounded px-2 py-1 mb-1">
+              Tap 🎒 INV — items, map &amp; help!
+            </div>
+            <div style={{ fontSize: 22, color: "#ffd24a", lineHeight: 1 }}>↑</div>
+          </div>
         </div>
-      )}
-      {!showHelp && (
-        <button
-          onClick={() => setShowHelp(true)}
-          className="absolute top-24 right-3 bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-[10px] z-30"
-        >
-          ?
-        </button>
       )}
 
       {/* Joystick area (left half, bottom) */}
@@ -927,7 +926,12 @@ export default function Game() {
                 <span className="text-2xl">🎒</span>
                 <div>
                   <div className="text-[10px] text-white/60 tracking-widest">INVENTORY</div>
-                  <div className="text-sm font-bold text-white">Items & Tools</div>
+                  <div className="text-sm font-bold text-white">
+                    {invTab === "items" && "Items & Tools"}
+                    {invTab === "map" && "Mini Map"}
+                    {invTab === "howto" && "How to Play"}
+                    {invTab === "changelog" && "Change Log"}
+                  </div>
                 </div>
               </div>
               <button
@@ -939,63 +943,148 @@ export default function Game() {
               </button>
             </div>
 
-            <div className="p-3 grid grid-cols-2 gap-2 text-[11px] text-white">
-              <InvSlot
-                icon={<span style={{ color: "#caa14a", fontSize: 18 }}>➤</span>}
-                name="Arrow"
-                count={ui.arrows}
-                desc="Roll a random stand. Need empty stand slot."
-                color="#caa14a"
-                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
-                onUse={() => { onUseArrow(); }}
-              />
-              <InvSlot
-                icon={<span style={{ color: "#cfd2d8", fontSize: 18 }}>◎</span>}
-                name="DISC"
-                count={ui.discs}
-                desc="Remove your current stand."
-                color="#cfd2d8"
-                disabledReason={ui.standId === "none" ? "No stand equipped" : undefined}
-                onUse={() => { onUseDisc(); }}
-              />
-              <InvSlot
-                icon={<span style={{ color: "#ffd24a", fontSize: 18 }}>✦</span>}
-                name="Requiem Arrow"
-                count={ui.requiemArrows}
-                desc="Broken golden relic. (Decorative)"
-                color="#ffd24a"
-                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
-                onUse={() => { onUseRequiem(); }}
-              />
-              <InvSlot
-                icon={<span style={{ color: "#4a86d6", fontSize: 18 }}>●</span>}
-                name="Blue Pebble"
-                count={ui.bluePebbles}
-                desc="Grants Moon Rabbit. Need empty stand slot."
-                color="#4a86d6"
-                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
-                onUse={() => { onUsePebble(); }}
-              />
-              <InvSlot
-                icon={<span style={{ color: "#ba8cff", fontSize: 18 }}>📖</span>}
-                name="Tonth Copy"
-                count={ui.tonthCopies}
-                desc="Open the book of stands."
-                color="#ba8cff"
-                onUse={() => { onUseTonth(); setInventoryOpen(false); }}
-              />
-              {ui.strangeHats > 0 && (
-                <InvSlot
-                  icon={<span style={{ color: "#5fe8ff", fontSize: 18 }}>🎩</span>}
-                  name="Strange Black Hat"
-                  count={ui.strangeHats}
-                  desc="Awakens Star Platinum's true form."
-                  color="#5fe8ff"
-                  disabledReason={ui.standId !== "star_platinum" ? "Need Star Platinum equipped" : undefined}
-                  onUse={() => { onUseStrangeHat(); setInventoryOpen(false); }}
-                />
-              )}
+            {/* Tabs */}
+            <div className="px-3 pt-2 flex gap-1 flex-wrap">
+              {([
+                ["items", "ITEMS"],
+                ["map", "MAP"],
+                ["howto", "HELP"],
+                ["changelog", "LOG"],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setInvTab(key)}
+                  className="px-2 py-0.5 rounded text-[10px] font-bold"
+                  style={{
+                    background: invTab === key ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.4)",
+                    border: "1px solid rgba(255,255,255,0.4)",
+                    color: "#fff",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+
+            {invTab === "items" && (
+              <div className="p-3 grid grid-cols-2 gap-2 text-[11px] text-white">
+                <InvSlot
+                  icon={<span style={{ color: "#caa14a", fontSize: 18 }}>➤</span>}
+                  name="Arrow"
+                  count={ui.arrows}
+                  desc="Roll a random stand. Need empty stand slot."
+                  color="#caa14a"
+                  disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
+                  onUse={() => { onUseArrow(); }}
+                />
+                <InvSlot
+                  icon={<span style={{ color: "#cfd2d8", fontSize: 18 }}>◎</span>}
+                  name="DISC"
+                  count={ui.discs}
+                  desc="Remove your current stand."
+                  color="#cfd2d8"
+                  disabledReason={ui.standId === "none" ? "No stand equipped" : undefined}
+                  onUse={() => { onUseDisc(); }}
+                />
+                <InvSlot
+                  icon={<span style={{ color: "#ffd24a", fontSize: 18 }}>✦</span>}
+                  name="Requiem Arrow"
+                  count={ui.requiemArrows}
+                  desc="Evolves Gold Experience into GER."
+                  color="#ffd24a"
+                  disabledReason={ui.standId !== "gold_experience" ? "Only Gold Experience can use this" : undefined}
+                  onUse={() => { onUseRequiem(); }}
+                />
+                <InvSlot
+                  icon={<span style={{ color: "#4a86d6", fontSize: 18 }}>●</span>}
+                  name="Blue Pebble"
+                  count={ui.bluePebbles}
+                  desc="Grants Moon Rabbit. Need empty stand slot."
+                  color="#4a86d6"
+                  disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
+                  onUse={() => { onUsePebble(); }}
+                />
+                <InvSlot
+                  icon={<span style={{ color: "#ba8cff", fontSize: 18 }}>📖</span>}
+                  name="Tonth Copy"
+                  count={ui.tonthCopies}
+                  desc="Open the book of stands."
+                  color="#ba8cff"
+                  onUse={() => { onUseTonth(); setInventoryOpen(false); }}
+                />
+                {ui.strangeHats > 0 && (
+                  <InvSlot
+                    icon={<span style={{ color: "#5fe8ff", fontSize: 18 }}>🎩</span>}
+                    name="Strange Black Hat"
+                    count={ui.strangeHats}
+                    desc="Awakens Star Platinum's true form."
+                    color="#5fe8ff"
+                    disabledReason={ui.standId !== "star_platinum" ? "Need Star Platinum equipped" : undefined}
+                    onUse={() => { onUseStrangeHat(); setInventoryOpen(false); }}
+                  />
+                )}
+              </div>
+            )}
+
+            {invTab === "map" && (
+              <div className="p-3 text-[10px] text-white">
+                <MiniMap world={worldRef.current} />
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
+                  <LegendDot color="#5fe8ff" label="You" />
+                  <LegendDot color="#5fd16a" label="Neutral NPC" />
+                  <LegendDot color="#d04848" label="Hostile NPC" />
+                  <LegendDot color="#caa14a" label="Arrow" />
+                  <LegendDot color="#cfd2d8" label="DISC" />
+                  <LegendDot color="#ffd24a" label="Requiem Arrow" />
+                  <LegendDot color="#4a86d6" label="Blue Pebble" />
+                  <LegendDot color="#ba8cff" label="Boingo" />
+                </div>
+                <div className="mt-2 text-white/60 text-[9px]">
+                  Shows a wide area around you. Edges clamp at the world border.
+                </div>
+              </div>
+            )}
+
+            {invTab === "howto" && (
+              <div className="p-3 text-[11px] text-white space-y-1 max-h-[60vh] overflow-y-auto">
+                <div className="font-bold text-sm mb-1">How to Play</div>
+                <div>• Drag the LEFT half to move (or WASD).</div>
+                <div>• Drag the RIGHT half to aim. Release to auto-aim.</div>
+                <div>• Tap M1 / 1-4 to attack (Space or 1-4 on keyboard). Hold M1 to auto-repeat.</div>
+                <div>• M1 auto-aims at the closest NPC. 1-4 lock onto the closest enemy.</div>
+                <div>• Pick up <span style={{ color: "#caa14a" }}>Arrows</span> to roll a stand. <span style={{ color: "#cfd2d8" }}>DISCs</span> remove your stand.</div>
+                <div>• <span style={{ color: "#ffd24a" }}>Requiem Arrows</span> only work on Gold Experience.</div>
+                <div>• Tap "Stand: ON/OFF" to dismiss/resummon your stand.</div>
+                <div>• Hostile NPCs (red) only attack after you provoke them. You slowly regen out of combat.</div>
+                <div>• Find <span style={{ color: "#ba8cff" }}>Boingo</span> to get a Tonth Copy (full stand catalog).</div>
+              </div>
+            )}
+
+            {invTab === "changelog" && (
+              <div className="p-3 text-[11px] text-white space-y-2 max-h-[60vh] overflow-y-auto">
+                <div className="font-bold text-sm mb-1">Change Log</div>
+                <ChangelogEntry version="v0.9" title="Inventory Overhaul">
+                  <li>Tabbed inventory: Items, Mini Map, How to Play, Change Log.</li>
+                  <li>Mini map with player / NPC / item icons + legend.</li>
+                  <li>Requiem Arrow gating fixed — usable on Gold Experience.</li>
+                  <li>Ground destruction: NPC death scars the ground (excl. Hanged Man, Harvest, Ebony Devil, Moon Rabbit).</li>
+                  <li>10s onboarding hint pointing at the bag icon.</li>
+                </ChangelogEntry>
+                <ChangelogEntry version="v0.8" title="Stand Overhaul">
+                  <li>GER added. Return-to-Zero passive, Life Beam, Truth Punch, Triple Loop.</li>
+                  <li>SPTW: Rage button now overlays A1+A2, blue eye-flow VFX, 10s duration.</li>
+                  <li>SPTW A2 redesigned to triple-pebble click charges.</li>
+                  <li>Echoes: Japanese-glyph rework (ゴゴゴ / ドドド / ピピピ / ズキューン).</li>
+                  <li>RHCP: Cable Dash, Ground Bomber knockback + fading craters.</li>
+                  <li>NPC HP buffed; DISC spawns rebalanced; map-center spawn anchors.</li>
+                </ChangelogEntry>
+                <ChangelogEntry version="v0.7" title="Polish Pass">
+                  <li>Fixed time-stop banner placement (top-center).</li>
+                  <li>Strange Hat remodelled (cap + gold palm box).</li>
+                  <li>Requiem Arrow: 1-in-world cap, beetle silhouette on head.</li>
+                </ChangelogEntry>
+              </div>
+            )}
 
             <div className="px-4 py-2 border-t border-white/20 flex justify-end">
               <button
@@ -1099,5 +1188,120 @@ function InvSlot({
       </div>
       <div className="text-[9px] text-white/70 leading-tight">{locked ? disabledReason : desc}</div>
     </button>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          background: color,
+          borderRadius: 9999,
+          border: "1px solid rgba(255,255,255,0.4)",
+          display: "inline-block",
+        }}
+      />
+      <span className="text-white/85">{label}</span>
+    </div>
+  );
+}
+
+function ChangelogEntry({
+  version,
+  title,
+  children,
+}: {
+  version: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded p-2" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.18)" }}>
+      <div className="flex items-baseline gap-2 mb-1">
+        <span className="text-[10px] font-bold text-yellow-300">{version}</span>
+        <span className="font-bold">{title}</span>
+      </div>
+      <ul className="list-disc list-inside text-[10px] text-white/85 space-y-0.5">{children}</ul>
+    </div>
+  );
+}
+
+interface MiniMapWorld {
+  player: { pos: { x: number; y: number } };
+  npcs: Array<{ pos: { x: number; y: number }; alive: boolean; kind: string }>;
+  items: Array<{ pos: { x: number; y: number }; kind: string }>;
+  boingo?: { pos: { x: number; y: number }; alive: boolean };
+}
+
+function MiniMap({ world }: { world: MiniMapWorld | null }) {
+  const SIZE = 240; // square mini map
+  const RANGE = 900; // half-extent of the wide area shown around player (world units)
+  if (!world) return <div className="text-white/60 text-[10px]">Loading…</div>;
+  const px = world.player.pos.x;
+  const py = world.player.pos.y;
+  // Clamp the view box so it never goes beyond world borders.
+  let vx0 = px - RANGE;
+  let vy0 = py - RANGE;
+  let vx1 = px + RANGE;
+  let vy1 = py + RANGE;
+  if (vx0 < 0) { vx1 -= vx0; vx0 = 0; }
+  if (vy0 < 0) { vy1 -= vy0; vy0 = 0; }
+  if (vx1 > MAP_W) { const d = vx1 - MAP_W; vx0 -= d; vx1 = MAP_W; if (vx0 < 0) vx0 = 0; }
+  if (vy1 > MAP_H) { const d = vy1 - MAP_H; vy0 -= d; vy1 = MAP_H; if (vy0 < 0) vy0 = 0; }
+  const w = vx1 - vx0;
+  const h = vy1 - vy0;
+  const project = (x: number, y: number) => ({
+    x: ((x - vx0) / w) * SIZE,
+    y: ((y - vy0) / h) * SIZE,
+  });
+  const dot = (color: string, key: string, x: number, y: number, r = 2.5) => {
+    const p = project(x, y);
+    if (p.x < 0 || p.x > SIZE || p.y < 0 || p.y > SIZE) return null;
+    return (
+      <circle key={key} cx={p.x} cy={p.y} r={r} fill={color} stroke="rgba(0,0,0,0.6)" strokeWidth={0.5} />
+    );
+  };
+  const itemColor = (kind: string) => {
+    switch (kind) {
+      case "arrow": return "#caa14a";
+      case "disc": return "#cfd2d8";
+      case "requiem_arrow": return "#ffd24a";
+      case "blue_pebble": return "#4a86d6";
+      case "strange_hat": return "#5fe8ff";
+      default: return "#fff";
+    }
+  };
+  const player = project(px, py);
+  return (
+    <svg
+      width={SIZE}
+      height={SIZE}
+      style={{
+        background: "#1c2a1c",
+        border: "1px solid rgba(255,255,255,0.4)",
+        borderRadius: 6,
+        display: "block",
+        margin: "0 auto",
+      }}
+    >
+      {/* world-edge indicators (darker bands where view hits the world border) */}
+      {vx0 <= 0 && <rect x={0} y={0} width={2} height={SIZE} fill="rgba(0,0,0,0.6)" />}
+      {vy0 <= 0 && <rect x={0} y={0} width={SIZE} height={2} fill="rgba(0,0,0,0.6)" />}
+      {vx1 >= MAP_W && <rect x={SIZE - 2} y={0} width={2} height={SIZE} fill="rgba(0,0,0,0.6)" />}
+      {vy1 >= MAP_H && <rect x={0} y={SIZE - 2} width={SIZE} height={2} fill="rgba(0,0,0,0.6)" />}
+      {/* items (smaller) */}
+      {world.items.map((it, i) => dot(itemColor(it.kind), `i${i}`, it.pos.x, it.pos.y, 1.6))}
+      {/* npcs */}
+      {world.npcs.filter((n) => n.alive).map((n, i) =>
+        dot(n.kind === "enemy" ? "#d04848" : "#5fd16a", `n${i}`, n.pos.x, n.pos.y, 2.4),
+      )}
+      {/* boingo */}
+      {world.boingo?.alive && dot("#ba8cff", "boingo", world.boingo.pos.x, world.boingo.pos.y, 2.6)}
+      {/* player on top */}
+      <circle cx={player.x} cy={player.y} r={3.6} fill="#5fe8ff" stroke="#fff" strokeWidth={1} />
+    </svg>
   );
 }
