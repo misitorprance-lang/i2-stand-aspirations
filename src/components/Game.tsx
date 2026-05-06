@@ -100,8 +100,15 @@ export default function Game() {
   const [boingoOpen, setBoingoOpen] = useState(false);
   const [bookPage, setBookPage] = useState<1 | 2>(1);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [invTab, setInvTab] = useState<"items" | "map" | "howto" | "changelog">("items");
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled());
-  const [showHelp, setShowHelp] = useState<boolean>(true);
+  const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [bagHintUntil, setBagHintUntil] = useState<number>(() => Date.now() + 10000);
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => forceTick((t) => t + 1), 250);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Joystick state
   const joyRef = useRef<{ active: boolean; baseX: number; baseY: number; pointerId: number | null }>({
