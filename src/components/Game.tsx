@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   VW,
   VH,
+  MAP_W,
+  MAP_H,
   createWorld,
   makeInput,
   render,
