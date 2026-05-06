@@ -962,9 +962,9 @@ export default function Game() {
                 icon={<span style={{ color: "#ffd24a", fontSize: 18 }}>✦</span>}
                 name="Requiem Arrow"
                 count={ui.requiemArrows}
-                desc="Broken golden relic. (Decorative)"
+                desc="Evolves Gold Experience into GER."
                 color="#ffd24a"
-                disabledReason={ui.standId !== "none" ? "Use a DISC first" : undefined}
+                disabledReason={ui.standId !== "gold_experience" ? "Only Gold Experience can use this" : undefined}
                 onUse={() => { onUseRequiem(); }}
               />
               <InvSlot
