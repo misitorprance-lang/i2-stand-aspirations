@@ -3743,9 +3743,22 @@ function drawPlayer(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fillStyle = flash ? "#ffffff" : pl.color;
     ctx.fillRect(pl.pos.x - 5, pl.pos.y - 10, 10, 9);
     const fx = pl.facing.x, fy = pl.facing.y;
-    ctx.fillStyle = "#222";
+    const sptwRaging = w.standId === "sptw" && w.time < w.rageUntil;
+    ctx.fillStyle = sptwRaging ? "#5fe8ff" : "#222";
     ctx.fillRect(pl.pos.x - 3 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
     ctx.fillRect(pl.pos.x + 1 + Math.sign(fx) * 1, pl.pos.y - 6 + Math.sign(fy) * 1, 2, 2);
+    if (sptwRaging) {
+      // upward flowing cyan trail off the eyes
+      const t = w.time * 6;
+      for (let i = 0; i < 4; i++) {
+        const ph = (t + i * 0.7) % 2;
+        const a = Math.max(0, 1 - ph / 2);
+        ctx.fillStyle = `rgba(95,232,255,${0.6 * a})`;
+        ctx.fillRect(pl.pos.x - 3, pl.pos.y - 7 - ph * 5, 2, 2);
+        ctx.fillStyle = `rgba(95,232,255,${0.6 * a})`;
+        ctx.fillRect(pl.pos.x + 1, pl.pos.y - 7 - ph * 5, 2, 2);
+      }
+    }
   }
   if (pl.hp < pl.maxHp) drawHpBar(ctx, pl.pos.x, pl.pos.y - 16, pl.hp / pl.maxHp);
   if (standVisible && standInFront) drawStand(ctx, w, standPos);
