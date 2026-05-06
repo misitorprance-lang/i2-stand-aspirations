@@ -1190,3 +1190,118 @@ function InvSlot({
     </button>
   );
 }
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          background: color,
+          borderRadius: 9999,
+          border: "1px solid rgba(255,255,255,0.4)",
+          display: "inline-block",
+        }}
+      />
+      <span className="text-white/85">{label}</span>
+    </div>
+  );
+}
+
+function ChangelogEntry({
+  version,
+  title,
+  children,
+}: {
+  version: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded p-2" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.18)" }}>
+      <div className="flex items-baseline gap-2 mb-1">
+        <span className="text-[10px] font-bold text-yellow-300">{version}</span>
+        <span className="font-bold">{title}</span>
+      </div>
+      <ul className="list-disc list-inside text-[10px] text-white/85 space-y-0.5">{children}</ul>
+    </div>
+  );
+}
+
+interface MiniMapWorld {
+  player: { pos: { x: number; y: number } };
+  npcs: Array<{ pos: { x: number; y: number }; alive: boolean; kind: string }>;
+  items: Array<{ pos: { x: number; y: number }; kind: string }>;
+  boingo?: { pos: { x: number; y: number }; alive: boolean };
+}
+
+function MiniMap({ world }: { world: MiniMapWorld | null }) {
+  const SIZE = 240; // square mini map
+  const RANGE = 900; // half-extent of the wide area shown around player (world units)
+  if (!world) return <div className="text-white/60 text-[10px]">Loading…</div>;
+  const px = world.player.pos.x;
+  const py = world.player.pos.y;
+  // Clamp the view box so it never goes beyond world borders.
+  let vx0 = px - RANGE;
+  let vy0 = py - RANGE;
+  let vx1 = px + RANGE;
+  let vy1 = py + RANGE;
+  if (vx0 < 0) { vx1 -= vx0; vx0 = 0; }
+  if (vy0 < 0) { vy1 -= vy0; vy0 = 0; }
+  if (vx1 > MAP_W) { const d = vx1 - MAP_W; vx0 -= d; vx1 = MAP_W; if (vx0 < 0) vx0 = 0; }
+  if (vy1 > MAP_H) { const d = vy1 - MAP_H; vy0 -= d; vy1 = MAP_H; if (vy0 < 0) vy0 = 0; }
+  const w = vx1 - vx0;
+  const h = vy1 - vy0;
+  const project = (x: number, y: number) => ({
+    x: ((x - vx0) / w) * SIZE,
+    y: ((y - vy0) / h) * SIZE,
+  });
+  const dot = (color: string, key: string, x: number, y: number, r = 2.5) => {
+    const p = project(x, y);
+    if (p.x < 0 || p.x > SIZE || p.y < 0 || p.y > SIZE) return null;
+    return (
+      <circle key={key} cx={p.x} cy={p.y} r={r} fill={color} stroke="rgba(0,0,0,0.6)" strokeWidth={0.5} />
+    );
+  };
+  const itemColor = (kind: string) => {
+    switch (kind) {
+      case "arrow": return "#caa14a";
+      case "disc": return "#cfd2d8";
+      case "requiem_arrow": return "#ffd24a";
+      case "blue_pebble": return "#4a86d6";
+      case "strange_hat": return "#5fe8ff";
+      default: return "#fff";
+    }
+  };
+  const player = project(px, py);
+  return (
+    <svg
+      width={SIZE}
+      height={SIZE}
+      style={{
+        background: "#1c2a1c",
+        border: "1px solid rgba(255,255,255,0.4)",
+        borderRadius: 6,
+        display: "block",
+        margin: "0 auto",
+      }}
+    >
+      {/* world-edge indicators (darker bands where view hits the world border) */}
+      {vx0 <= 0 && <rect x={0} y={0} width={2} height={SIZE} fill="rgba(0,0,0,0.6)" />}
+      {vy0 <= 0 && <rect x={0} y={0} width={SIZE} height={2} fill="rgba(0,0,0,0.6)" />}
+      {vx1 >= MAP_W && <rect x={SIZE - 2} y={0} width={2} height={SIZE} fill="rgba(0,0,0,0.6)" />}
+      {vy1 >= MAP_H && <rect x={0} y={SIZE - 2} width={SIZE} height={2} fill="rgba(0,0,0,0.6)" />}
+      {/* items (smaller) */}
+      {world.items.map((it, i) => dot(itemColor(it.kind), `i${i}`, it.pos.x, it.pos.y, 1.6))}
+      {/* npcs */}
+      {world.npcs.filter((n) => n.alive).map((n, i) =>
+        dot(n.kind === "enemy" ? "#d04848" : "#5fd16a", `n${i}`, n.pos.x, n.pos.y, 2.4),
+      )}
+      {/* boingo */}
+      {world.boingo?.alive && dot("#ba8cff", "boingo", world.boingo.pos.x, world.boingo.pos.y, 2.6)}
+      {/* player on top */}
+      <circle cx={player.x} cy={player.y} r={3.6} fill="#5fe8ff" stroke="#fff" strokeWidth={1} />
+    </svg>
+  );
+}
