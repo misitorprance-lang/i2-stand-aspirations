@@ -523,26 +523,16 @@ export default function Game() {
         </div>
       )}
 
-      {/* Help / controls */}
-      {showHelp && (
-        <div className="absolute inset-x-3 top-24 bg-black/75 border border-white/30 rounded p-3 text-white text-[11px] z-30 pointer-events-auto"
-             onClick={() => setShowHelp(false)}>
-          <div className="font-bold mb-1 text-sm">How to play (tap to close)</div>
-          <div>• Drag the LEFT half to move (or WASD).</div>
-          <div>• Tap M1 / 1-4 to attack (or Space, 1-4). Hold M1 to auto-repeat.</div>
-          <div>• M1 auto-aims at the closest NPC. 1-4 lock onto the closest enemy.</div>
-          <div>• Pick up <span style={{color:"#caa14a"}}>Arrows</span> to roll a stand. <span style={{color:"#cfd2d8"}}>DISCs</span> remove your stand.</div>
-          <div>• Tap "Stand: ON/OFF" to dismiss/resummon your stand.</div>
-          <div>• Hostile NPCs (red) only attack after you provoke them. You slowly regen out of combat.</div>
+      {/* Bag hint — 10s arrow toward INV button for new players */}
+      {Date.now() < bagHintUntil && !inventoryOpen && (
+        <div className="absolute z-40 pointer-events-none" style={{ top: 38, right: 8 }}>
+          <div className="flex flex-col items-end animate-pulse">
+            <div className="text-[10px] font-bold text-white bg-black/80 border border-yellow-300 rounded px-2 py-1 mb-1">
+              Tap 🎒 INV — items, map &amp; help!
+            </div>
+            <div style={{ fontSize: 22, color: "#ffd24a", lineHeight: 1 }}>↑</div>
+          </div>
         </div>
-      )}
-      {!showHelp && (
-        <button
-          onClick={() => setShowHelp(true)}
-          className="absolute top-24 right-3 bg-black/60 border border-white/30 rounded px-2 py-1 text-white text-[10px] z-30"
-        >
-          ?
-        </button>
       )}
 
       {/* Joystick area (left half, bottom) */}
